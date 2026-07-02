@@ -1,0 +1,58 @@
+{
+  "payload": {
+    "export": "cart-lines-discounts-generate-run",
+    "target": "cart.lines.discounts.generate.run",
+    "input": {
+      "cart": {
+        "lines": [
+          {
+            "id": "gid://shopify/CartLine/0",
+            "quantity": 2,
+            "cost": {
+              "amountPerQuantity": {
+                "amount": "50.0"
+              }
+            },
+            "merchandise": {
+              "product": {
+                "id": "gid://shopify/Product/123"
+              }
+            }
+          }
+        ]
+      },
+      "discount": {
+        "metafield": {
+          "value": "{\"productIds\":[\"gid://shopify/Product/123\"],\"percentage\":20}"
+        }
+      }
+    },
+    "expectedOutput": {
+      "operations": [
+        {
+          "productDiscountsAdd": {
+            "candidates": [
+              {
+                "message": "20% off",
+                "targets": [
+                  {
+                    "cartLine": {
+                      "id": "gid://shopify/CartLine/0",
+                      "quantity": 1
+                    }
+                  }
+                ],
+                "value": {
+                  "percentage": {
+                    "value": 20
+                  }
+                }
+              }
+            ],
+            "selectionStrategy": "FIRST"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "t:name"
+handle = "block-discount-products-function"
+uid = "48e49f3d-5bfa-20cc-f784-a51a48e17ad2c7fac43c"
+type = "function"
+
+[[extensions.targeting]]
+target = "cart.validations.generate.run"
+input_query = "src/cart_validations_generate_run.graphql"
+export = "cart-validations-generate-run"
+
+[extensions.build]
+command = ""
+path = "dist/function.wasm"

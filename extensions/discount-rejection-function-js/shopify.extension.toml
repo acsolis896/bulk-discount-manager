@@ -1,0 +1,21 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "t:name"
+handle = "discount-rejection-function-js"
+type = "function"
+uid = "28ea1b1b-4d37-b8bb-c209-b76d1fd74cedd898fa04"
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.run"
+  input_query = "src/cart_lines_discounts_generate_run.graphql"
+  export = "cart-lines-discounts-generate-run"
+
+  [extensions.ui.paths]
+  create = "/app/discounts/new"
+  details = "/app/discounts/:id"
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"

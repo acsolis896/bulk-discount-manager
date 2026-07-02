@@ -1,0 +1,23 @@
+# query Input {
+#   cart {
+#     lines {
+#       merchandise {
+#         ... on ProductVariant {
+#           product {
+#             hasTags(tags: ["gwp"]) {
+#               hasTag
+#             }
+#           }
+#         }
+#       }
+#     }
+#   }
+# }
+
+query Input {
+  cart {
+    lines {
+      id
+    }
+  }
+}

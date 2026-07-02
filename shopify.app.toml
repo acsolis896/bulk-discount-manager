@@ -1,0 +1,32 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "b350a7a96101159f068755dd33014af2"
+name = "Bulk Discount Manager"
+application_url = "https://example.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2026-04"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+[access_scopes]
+scopes = "write_discounts,read_products"
+
+[discount.metafields.app.function-configuration]
+type = "json"
+name = "Function configuration"
+access.admin = "merchant_read_write"
+access.storefront = "none"
+
+[auth]
+redirect_urls = [ "https://example.com" ]

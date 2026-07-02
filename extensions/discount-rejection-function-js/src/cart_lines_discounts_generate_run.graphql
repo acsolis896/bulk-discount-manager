@@ -1,0 +1,30 @@
+query CartLinesDiscountsGenerateRunInput {
+  cart {
+    lines {
+      id
+      quantity
+      cost {
+        amountPerQuantity {
+          amount
+        }
+      }
+      merchandise {
+        ... on ProductVariant {
+          product {
+            id
+            productType
+          }
+        }
+      }
+    }
+  }
+  enteredDiscountCodes {
+    code
+    rejectable
+  }
+  discount {
+    metafield(namespace: "$app", key: "function-configuration") {
+      value
+    }
+  }
+}
