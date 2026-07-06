@@ -2,7 +2,7 @@
 
 client_id = "b350a7a96101159f068755dd33014af2"
 name = "Bulk Discount Manager"
-application_url = "https://example.com"
+application_url = "https://bulk-discount-manager-production.up.railway.app"
 embedded = true
 
 [build]
@@ -29,4 +29,4 @@ access.admin = "merchant_read_write"
 access.storefront = "none"
 
 [auth]
-redirect_urls = [ "https://example.com" ]
+redirect_urls = [ "https://bulk-discount-manager-production.up.railway.app/auth/callback" ]
