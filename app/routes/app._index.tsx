@@ -47,6 +47,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
     const usageLimitOne = formData.get("usageLimitOne") === "1";
     const oncePerCustomer = formData.get("oncePerCustomer") === "1";
+    const combinesWithProduct = formData.get("combinesWithProduct") === "1";
+    const combinesWithOrder = formData.get("combinesWithOrder") === "1";
+    const combinesWithShipping = formData.get("combinesWithShipping") === "1";
     const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
     const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
 
@@ -156,6 +159,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               ...(usageLimitOne ? { usageLimit: 1 } : {}),
               code: finalCodes[i],
               discountClasses: ["PRODUCT"],
+              combinesWith: {
+                productDiscounts: combinesWithProduct,
+                orderDiscounts: combinesWithOrder,
+                shippingDiscounts: combinesWithShipping,
+              },
             },
           },
         }
@@ -200,7 +208,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               namespace: "$app",
               key: "function-configuration",
               type: "json",
-              value: JSON.stringify({ productIds: resolvedProductIds, percentage, blockedProductTypes }),
+              value: JSON.stringify({ productIds: resolvedProductIds, collectionIds, percentage, blockedProductTypes }),
             },
           ],
         },
@@ -282,6 +290,9 @@ export default function Index() {
   const [endsAt, setEndsAt] = useState("");
   const [usageLimitOne, setUsageLimitOne] = useState(true);
   const [oncePerCustomer, setOncePerCustomer] = useState(true);
+  const [combinesWithProduct, setCombinesWithProduct] = useState(false);
+  const [combinesWithOrder, setCombinesWithOrder] = useState(false);
+  const [combinesWithShipping, setCombinesWithShipping] = useState(false);
   const [prefix, setPrefix] = useState("");
   const [codeCount, setCodeCount] = useState("100");
   const [codeLength, setCodeLength] = useState("6");
@@ -329,6 +340,9 @@ export default function Index() {
     formData.set("endsAt", endsAt);
     formData.set("usageLimitOne", usageLimitOne ? "1" : "0");
     formData.set("oncePerCustomer", oncePerCustomer ? "1" : "0");
+    formData.set("combinesWithProduct", combinesWithProduct ? "1" : "0");
+    formData.set("combinesWithOrder", combinesWithOrder ? "1" : "0");
+    formData.set("combinesWithShipping", combinesWithShipping ? "1" : "0");
     if (codeMode === "import" && csvFile) {
       formData.set("csvFile", csvFile);
     } else {
@@ -441,6 +455,24 @@ export default function Index() {
             </label>
           </s-stack>
         </s-form-layout>
+      </s-section>
+
+      <s-section heading="Combinations">
+        <s-stack direction="block" gap="tight">
+          <s-paragraph>Choose whether this discount can be combined with other discount types.</s-paragraph>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+            <input type="checkbox" checked={combinesWithProduct} onChange={(e) => setCombinesWithProduct(e.target.checked)} />
+            Product discounts
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+            <input type="checkbox" checked={combinesWithOrder} onChange={(e) => setCombinesWithOrder(e.target.checked)} />
+            Order discounts
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+            <input type="checkbox" checked={combinesWithShipping} onChange={(e) => setCombinesWithShipping(e.target.checked)} />
+            Shipping discounts
+          </label>
+        </s-stack>
       </s-section>
 
       <s-section heading="Codes">

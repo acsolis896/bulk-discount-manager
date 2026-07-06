@@ -1,6 +1,7 @@
 import { useCallback, useState, useMemo } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs, HeadersFunction } from "react-router";
 import { useLoaderData, useNavigate, useFetcher } from "react-router";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
@@ -63,7 +64,61 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     });
     const preUsedCodes = preUsedRows.map((r) => r.code);
 
-    return { numericId, title, shop, codes: allCodes, totalCount, usedCount, preUsedCodes, error: null as string | null };
+    // Fetch metafield config to show eligible products
+    const metafieldRes = await admin.graphql(
+      `#graphql
+      query GetDiscountConfig($id: ID!) {
+        discountNode(id: $id) {
+          metafield(namespace: "$app", key: "function-configuration") { value }
+        }
+      }`,
+      { variables: { id: gid } }
+    );
+    const metafieldData = await metafieldRes.json();
+    const rawConfig = metafieldData.data?.discountNode?.metafield?.value ?? null;
+    let eligibleProductIds: string[] = [];
+    let eligibleCollectionIds: string[] = [];
+    let percentage: number | null = null;
+    try {
+      if (rawConfig) {
+        const cfg = JSON.parse(rawConfig);
+        eligibleProductIds = cfg.productIds ?? [];
+        eligibleCollectionIds = cfg.collectionIds ?? [];
+        percentage = cfg.percentage ?? null;
+      }
+    } catch { /* ignore */ }
+
+    // Prefer showing collections if they were used; fall back to products
+    let eligibleProducts: { id: string; title: string }[] = [];
+    let eligibleCollections: { id: string; title: string }[] = [];
+
+    if (eligibleCollectionIds.length > 0) {
+      const colTitlesRes = await admin.graphql(
+        `#graphql
+        query CollectionTitles($ids: [ID!]!) {
+          nodes(ids: $ids) { ... on Collection { id title } }
+        }`,
+        { variables: { ids: eligibleCollectionIds.slice(0, 50) } }
+      );
+      const colTitlesData = await colTitlesRes.json();
+      eligibleCollections = (colTitlesData.data?.nodes ?? [])
+        .filter((n: { id?: string; title?: string } | null) => n?.id)
+        .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
+    } else if (eligibleProductIds.length > 0) {
+      const titlesRes = await admin.graphql(
+        `#graphql
+        query ProductTitles($ids: [ID!]!) {
+          nodes(ids: $ids) { ... on Product { id title } }
+        }`,
+        { variables: { ids: eligibleProductIds.slice(0, 50) } }
+      );
+      const titlesData = await titlesRes.json();
+      eligibleProducts = (titlesData.data?.nodes ?? [])
+        .filter((n: { id?: string; title?: string } | null) => n?.id)
+        .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
+    }
+
+    return { numericId, title, shop, codes: allCodes, totalCount, usedCount, preUsedCodes, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, percentage, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -73,6 +128,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       totalCount: 0,
       usedCount: 0,
       preUsedCodes: [] as string[],
+      eligibleProducts: [] as { id: string; title: string }[],
+      eligibleProductIds: [] as string[],
+      eligibleCollections: [] as { id: string; title: string }[],
+      eligibleCollectionIds: [] as string[],
+      percentage: null as number | null,
       error: err instanceof Error ? err.message : String(err),
     };
   }
@@ -81,8 +141,85 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
   const formData = await request.formData();
-  const code = formData.get("code") as string;
+  const intent = formData.get("intent") as string;
   const gid = `gid://shopify/DiscountCodeNode/${params.id}`;
+
+  if (intent === "updateItems") {
+    const productIds: string[] = JSON.parse(formData.get("productIds") as string ?? "[]");
+    const collectionIds: string[] = JSON.parse(formData.get("collectionIds") as string ?? "[]");
+    const percentage = Number(formData.get("percentage") ?? 0);
+
+    // Expand collections to product IDs
+    let resolvedProductIds = [...productIds];
+    for (const collectionId of collectionIds) {
+      let cursor: string | null = null;
+      do {
+        const colRes = await admin.graphql(
+          `#graphql
+          query CollectionProducts($id: ID!, $after: String) {
+            collection(id: $id) {
+              products(first: 250, after: $after) {
+                nodes { id }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }`,
+          { variables: { id: collectionId, after: cursor } }
+        );
+        const colData = await colRes.json();
+        const products = colData.data?.collection?.products;
+        for (const p of products?.nodes ?? []) {
+          if (!resolvedProductIds.includes(p.id)) resolvedProductIds.push(p.id);
+        }
+        cursor = products?.pageInfo?.hasNextPage ? products.pageInfo.endCursor : null;
+      } while (cursor);
+    }
+
+    if (resolvedProductIds.length === 0) return { error: "No products found." };
+
+    // Read existing metafield to preserve other config (blockedProductTypes etc.)
+    const existing = await admin.graphql(
+      `#graphql
+      query GetMeta($id: ID!) {
+        discountNode(id: $id) {
+          metafield(namespace: "$app", key: "function-configuration") { value }
+        }
+      }`,
+      { variables: { id: gid } }
+    );
+    const existingData = await existing.json();
+    let existingConfig: Record<string, unknown> = {};
+    try {
+      const raw = existingData.data?.discountNode?.metafield?.value;
+      if (raw) existingConfig = JSON.parse(raw);
+    } catch { /* empty */ }
+
+    const newConfig = { ...existingConfig, productIds: resolvedProductIds, collectionIds, percentage };
+
+    await admin.graphql(
+      `#graphql
+      mutation UpdateConfig($metafields: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $metafields) {
+          userErrors { field message }
+        }
+      }`,
+      {
+        variables: {
+          metafields: [{
+            ownerId: gid,
+            namespace: "$app",
+            key: "function-configuration",
+            type: "json",
+            value: JSON.stringify(newConfig),
+          }],
+        },
+      }
+    );
+
+    return { updated: true };
+  }
+
+  const code = formData.get("code") as string;
 
   await admin.graphql(
     `#graphql
@@ -98,11 +235,35 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function DiscountDetails() {
-  const { title, numericId, shop, codes, totalCount, usedCount, preUsedCodes, error } = useLoaderData<typeof loader>();
+  const { title, numericId, shop, codes, totalCount, usedCount, preUsedCodes, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, percentage, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
+  const shopify = useAppBridge();
   const unusedCount = Math.max(0, totalCount - usedCount - preUsedCodes.length);
   const [confirmCode, setConfirmCode] = useState<string | null>(null);
+  const [editingItems, setEditingItems] = useState(false);
+
+  const handleEditItems = useCallback(async (mode: "product" | "collection") => {
+    setEditingItems(true);
+    try {
+      const selected = await shopify.resourcePicker({
+        type: mode,
+        multiple: true,
+        selectionIds: mode === "product"
+          ? eligibleProductIds.map((id) => ({ id }))
+          : eligibleCollectionIds.map((id) => ({ id })),
+      });
+      if (!selected) return;
+      const form = new FormData();
+      form.append("intent", "updateItems");
+      form.append("productIds", JSON.stringify(mode === "product" ? selected.map((p: { id: string }) => p.id) : []));
+      form.append("collectionIds", JSON.stringify(mode === "collection" ? selected.map((c: { id: string }) => c.id) : []));
+      form.append("percentage", String(percentage ?? 0));
+      fetcher.submit(form, { method: "post" });
+    } finally {
+      setEditingItems(false);
+    }
+  }, [shopify, eligibleProductIds, percentage, fetcher]);
 
   const PAGE_SIZE = 50;
   const [search, setSearch] = useState("");
@@ -188,6 +349,74 @@ export default function DiscountDetails() {
               </s-stack>
             </s-box>
           )}
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Eligible items">
+        <s-stack direction="block" gap="base">
+          <s-paragraph>
+            The discount applies to the highest-priced eligible item in the cart — 1 unit only.
+            {percentage !== null && <> ({percentage}% off)</>}
+          </s-paragraph>
+
+          {(fetcher.data as { updated?: boolean })?.updated && (
+            <s-banner tone="success">
+              <s-paragraph>Eligible items updated successfully.</s-paragraph>
+            </s-banner>
+          )}
+          {(fetcher.data as { error?: string })?.error && (
+            <s-banner tone="critical">
+              <s-paragraph>{(fetcher.data as { error: string }).error}</s-paragraph>
+            </s-banner>
+          )}
+
+          {eligibleCollections.length > 0 ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Collection</span>
+              </div>
+              {eligibleCollections.map((c: { id: string; title: string }) => (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", padding: "12px", borderBottom: "1px solid #e1e3e5" }}>
+                  <span style={{ fontSize: "14px", flex: 1 }}>{c.title}</span>
+                </div>
+              ))}
+              {eligibleCollectionIds.length > 50 && (
+                <div style={{ padding: "8px 12px", fontSize: "13px", color: "#6d7175" }}>
+                  Showing 50 of {eligibleCollectionIds.length} collections.
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Product</span>
+              </div>
+              {eligibleProducts.length === 0 && (
+                <div style={{ padding: "12px", color: "#6d7175", fontSize: "14px" }}>
+                  No eligible products configured.
+                </div>
+              )}
+              {eligibleProducts.map((p: { id: string; title: string }) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", padding: "12px", borderBottom: "1px solid #e1e3e5" }}>
+                  <span style={{ fontSize: "14px", flex: 1 }}>{p.title}</span>
+                </div>
+              ))}
+              {eligibleProductIds.length > 50 && (
+                <div style={{ padding: "8px 12px", fontSize: "13px", color: "#6d7175" }}>
+                  Showing 50 of {eligibleProductIds.length} eligible products.
+                </div>
+              )}
+            </>
+          )}
+
+          <s-stack direction="inline" gap="base">
+            <s-button onClick={() => handleEditItems("product")} disabled={editingItems}>
+              {editingItems ? "Opening picker…" : "Edit by products"}
+            </s-button>
+            <s-button onClick={() => handleEditItems("collection")} disabled={editingItems}>
+              Edit by collection
+            </s-button>
+          </s-stack>
         </s-stack>
       </s-section>
 
