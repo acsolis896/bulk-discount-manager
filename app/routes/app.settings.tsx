@@ -172,6 +172,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           ...(code.blockedTag ? { blockedCustomerIds: blocked } : {}),
         };
 
+        // Write to the scanned node AND to the creation node (code.discountId) if they differ.
+        // The Shopify Function may read from either depending on internal Shopify routing,
+        // so both must have the full config.
+        const targetIds = shopifyNode.id !== code.discountId
+          ? [shopifyNode.id, code.discountId]
+          : [shopifyNode.id];
+
         const updateRes = await admin.graphql(
           `#graphql
           mutation UpdateDiscountMF($metafields: [MetafieldsSetInput!]!) {
@@ -181,9 +188,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           }`,
           {
             variables: {
-              metafields: [
-                { ownerId: shopifyNode.id, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify(newConfig) },
-              ],
+              metafields: targetIds.map((ownerId) => ({
+                ownerId,
+                namespace: "$app",
+                key: "function-configuration",
+                type: "json",
+                value: JSON.stringify(newConfig),
+              })),
             },
           }
         );
@@ -250,7 +261,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         cursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
       } while (cursor);
 
-      const metafields = allNodes.map((node) => {
+      // Also include the DB-stored discountIds (construction nodes) in case the function
+      // reads from those rather than the scanned nodes.
+      const dbCodes = await db.singleCodeDiscount.findMany({
+        where: { shop: session.shop },
+        select: { discountId: true },
+      });
+      const dbNodeIds = new Set(dbCodes.map((c: { discountId: string }) => c.discountId));
+      const scannedIds = new Set(allNodes.map((n) => n.id));
+
+      const allTargets: Array<{ id: string; metafieldValue: string | null }> = [
+        ...allNodes,
+        ...[...dbNodeIds].filter((id) => !scannedIds.has(id)).map((id) => ({ id, metafieldValue: null })),
+      ];
+
+      const metafields = allTargets.map((node) => {
         let config: Record<string, unknown> = {};
         try { if (node.metafieldValue) config = JSON.parse(node.metafieldValue); } catch { /* empty */ }
         const value = JSON.stringify({ ...config, blockedProductTypes });
