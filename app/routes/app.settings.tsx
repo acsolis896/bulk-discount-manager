@@ -172,7 +172,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           ...(code.blockedTag ? { blockedCustomerIds: blocked } : {}),
         };
 
-        const appNodeId = shopifyNode.id.replace("DiscountCodeNode", "DiscountCodeApp");
         const updateRes = await admin.graphql(
           `#graphql
           mutation UpdateDiscountMF($metafields: [MetafieldsSetInput!]!) {
@@ -184,7 +183,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             variables: {
               metafields: [
                 { ownerId: shopifyNode.id, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify(newConfig) },
-                { ownerId: appNodeId, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify(newConfig) },
               ],
             },
           }
@@ -252,17 +250,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         cursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
       } while (cursor);
 
-      // Write to both DiscountCodeNode (admin API reads) and DiscountCodeApp (function reads)
-      // Both share the same numeric ID but are separate metafield stores in Shopify
-      const metafields = allNodes.flatMap((node) => {
+      const metafields = allNodes.map((node) => {
         let config: Record<string, unknown> = {};
         try { if (node.metafieldValue) config = JSON.parse(node.metafieldValue); } catch { /* empty */ }
         const value = JSON.stringify({ ...config, blockedProductTypes });
-        const appId = node.id.replace("DiscountCodeNode", "DiscountCodeApp");
-        return [
-          { ownerId: node.id, namespace: "$app", key: "function-configuration", type: "json", value },
-          { ownerId: appId, namespace: "$app", key: "function-configuration", type: "json", value },
-        ];
+        return { ownerId: node.id, namespace: "$app", key: "function-configuration", type: "json", value };
       });
 
       for (let i = 0; i < metafields.length; i += 25) {
@@ -281,7 +273,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (updateErrors.length > 0) {
           errors.push(...updateErrors.map((e: { message: string }) => e.message));
         } else {
-          updated += batch.length / 2;
+          updated += batch.length;
         }
       }
     } catch (err: unknown) {

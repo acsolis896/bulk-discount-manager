@@ -153,8 +153,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       blockedTag,
     };
 
-    const appDiscountId = discountId.replace("DiscountCodeNode", "DiscountCodeApp");
-    await admin.graphql(
+    const saveRes = await admin.graphql(
       `#graphql
       mutation SetDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
         metafieldsSet(metafields: $metafields) {
@@ -165,11 +164,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         variables: {
           metafields: [
             { ownerId: discountId, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify(newConfig) },
-            { ownerId: appDiscountId, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify(newConfig) },
           ],
         },
       }
     );
+    const saveData = await saveRes.json();
+    const saveErrors = saveData.data?.metafieldsSet?.userErrors ?? [];
+    if (saveErrors.length > 0) {
+      return { error: `Failed to save: ${saveErrors.map((e: { message: string }) => e.message).join(", ")}` };
+    }
 
     await db.singleCodeDiscount.updateMany({
       where: { shop: session.shop, discountId },

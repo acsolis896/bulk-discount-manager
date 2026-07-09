@@ -106,8 +106,36 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const appDiscountId = createData.data?.discountCodeAppCreate?.codeAppDiscount?.discountId;
   if (!appDiscountId) return { error: "Failed to create discount." };
 
+  // discountCodeAppCreate returns a DiscountCodeApp GID. Construct the DiscountCodeNode
+  // GID with the same numeric ID as a starting point, then verify by scanning discountNodes
+  // to get the authoritative node ID that the Shopify Function reads from.
   const numericId = appDiscountId.split("/").pop();
-  const nodeDiscountId = `gid://shopify/DiscountCodeNode/${numericId}`;
+  let nodeDiscountId = `gid://shopify/DiscountCodeNode/${numericId}`;
+
+  // Scan to find the real node ID — discountNodes() is the source of truth for the function.
+  const scanRes = await admin.graphql(
+    `#graphql
+    query FindCreatedNode {
+      discountNodes(first: 50, query: "function_id:discount-rejection-function-js") {
+        nodes {
+          id
+          discount {
+            ... on DiscountCodeApp {
+              codes(first: 5) { nodes { code } }
+            }
+          }
+        }
+      }
+    }`
+  );
+  const scanData = await scanRes.json();
+  for (const node of scanData.data?.discountNodes?.nodes ?? []) {
+    const codes: string[] = (node.discount?.codes?.nodes ?? []).map((c: { code: string }) => c.code.toUpperCase());
+    if (codes.includes(code)) {
+      nodeDiscountId = node.id;
+      break;
+    }
+  }
 
   const metafieldConfig = JSON.stringify({
     productIds: resolvedProductIds,
