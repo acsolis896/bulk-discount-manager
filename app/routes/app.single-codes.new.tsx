@@ -103,10 +103,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (createErrors.length > 0) {
     return { error: `Creating discount: ${createErrors.map((e: { message: string }) => e.message).join(", ")}` };
   }
-  const discountId = createData.data?.discountCodeAppCreate?.codeAppDiscount?.discountId;
-  if (!discountId) return { error: "Failed to create discount." };
+  const appDiscountId = createData.data?.discountCodeAppCreate?.codeAppDiscount?.discountId;
+  if (!appDiscountId) return { error: "Failed to create discount." };
 
-  // Save metafield
+  // Look up the actual DiscountCodeNode ID — this is what the Shopify Function reads from.
+  // discountCodeAppCreate returns a DiscountCodeApp GID which has a separate metafield store.
+  const nodeRes = await admin.graphql(
+    `#graphql
+    query FindDiscountNode($query: String!) {
+      discountNodes(first: 1, query: $query) {
+        nodes { id }
+      }
+    }`,
+    { variables: { query: `code:${code}` } }
+  );
+  const nodeData = await nodeRes.json();
+  const discountId = nodeData.data?.discountNodes?.nodes?.[0]?.id ?? appDiscountId;
+
+  // Save metafield to the DiscountCodeNode (same resource the function reads)
   const metafieldConfig = JSON.stringify({
     productIds: resolvedProductIds,
     collectionIds,
@@ -115,7 +129,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     requiredTag,
     blockedTag,
   });
-  await admin.graphql(
+  const mfRes = await admin.graphql(
     `#graphql
     mutation SetDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
       metafieldsSet(metafields: $metafields) {
@@ -134,8 +148,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       },
     }
   );
+  const mfData = await mfRes.json();
+  const mfErrors = mfData.data?.metafieldsSet?.userErrors ?? [];
+  if (mfErrors.length > 0) {
+    return { error: `Discount created but config save failed: ${mfErrors.map((e: { message: string }) => e.message).join(", ")}` };
+  }
 
-  // Save to DB
+  // Save to DB using the DiscountCodeNode ID
   await db.singleCodeDiscount.create({
     data: {
       shop: session.shop,

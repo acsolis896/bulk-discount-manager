@@ -48,12 +48,37 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     try {
       const singleCodes = await db.singleCodeDiscount.findMany({
         where: { shop: session.shop },
-        select: { discountId: true, requiredTag: true, blockedTag: true },
+        select: { id: true, discountId: true, code: true, requiredTag: true, blockedTag: true },
       });
 
       if (singleCodes.length === 0) return { syncedCustomers: 0 };
 
-      for (const code of singleCodes) {
+      for (const codeRecord of singleCodes) {
+        // Ensure we have the DiscountCodeNode GID — the resource the Shopify Function reads from.
+        // Old records may have stored a DiscountCodeApp GID with a separate metafield store.
+        let discountId = codeRecord.discountId;
+        if (!discountId.includes("DiscountCodeNode")) {
+          const nodeRes = await admin.graphql(
+            `#graphql
+            query FindDiscountNode($query: String!) {
+              discountNodes(first: 1, query: $query) {
+                nodes { id }
+              }
+            }`,
+            { variables: { query: `code:${codeRecord.code}` } }
+          );
+          const nodeData = await nodeRes.json();
+          const correctId = nodeData.data?.discountNodes?.nodes?.[0]?.id;
+          if (correctId && correctId !== discountId) {
+            await db.singleCodeDiscount.update({
+              where: { id: codeRecord.id },
+              data: { discountId: correctId },
+            });
+            discountId = correctId;
+          }
+        }
+        const code = { ...codeRecord, discountId };
+
         const eligible: string[] = [];
         const blocked: string[] = [];
 
