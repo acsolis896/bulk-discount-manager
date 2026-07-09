@@ -103,10 +103,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (createErrors.length > 0) {
     return { error: `Creating discount: ${createErrors.map((e: { message: string }) => e.message).join(", ")}` };
   }
-  const discountId = createData.data?.discountCodeAppCreate?.codeAppDiscount?.discountId;
-  if (!discountId) return { error: "Failed to create discount." };
+  const appDiscountId = createData.data?.discountCodeAppCreate?.codeAppDiscount?.discountId;
+  if (!appDiscountId) return { error: "Failed to create discount." };
 
-  // Save metafield to the discount
+  // The function reads metafields from the DiscountCodeNode GID, not DiscountCodeApp.
+  // Both share the same numeric ID, so we write to both to guarantee the function sees the config.
+  const numericId = appDiscountId.split("/").pop();
+  const nodeDiscountId = `gid://shopify/DiscountCodeNode/${numericId}`;
+
   const metafieldConfig = JSON.stringify({
     productIds: resolvedProductIds,
     collectionIds,
@@ -124,13 +128,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }`,
     {
       variables: {
-        metafields: [{
-          ownerId: discountId,
-          namespace: "$app",
-          key: "function-configuration",
-          type: "json",
-          value: metafieldConfig,
-        }],
+        metafields: [
+          {
+            ownerId: appDiscountId,
+            namespace: "$app",
+            key: "function-configuration",
+            type: "json",
+            value: metafieldConfig,
+          },
+          {
+            ownerId: nodeDiscountId,
+            namespace: "$app",
+            key: "function-configuration",
+            type: "json",
+            value: metafieldConfig,
+          },
+        ],
       },
     }
   );
@@ -140,18 +153,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: `Discount created but config save failed: ${mfErrors.map((e: { message: string }) => e.message).join(", ")}` };
   }
 
-  // Save to DB using the DiscountCodeNode ID
+  // Store the DiscountCodeNode GID so the detail page loader can find it
   await db.singleCodeDiscount.create({
     data: {
       shop: session.shop,
-      discountId,
+      discountId: nodeDiscountId,
       code,
       requiredTag,
       blockedTag,
     },
   });
 
-  const numericId = discountId.split("/").pop();
   return { success: true, numericId };
 };
 
