@@ -44,6 +44,7 @@ model SingleCodeDiscount {
   configJson          String?
   eligibleCustomerIds String?
   blockedCustomerIds  String?
+  functionNodeId      String?
   createdAt           DateTime @default(now())
 
   @@unique([shop, discountId])
