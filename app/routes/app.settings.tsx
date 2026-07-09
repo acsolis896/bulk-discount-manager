@@ -83,6 +83,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const nodes = data.data?.discountNodes?.nodes ?? [];
 
         for (const node of nodes) {
+          // Skip non-code-discount nodes (e.g. DiscountAutomaticNode) — they cause silent metafieldsSet batch failures
+          if (!node.id.includes("DiscountCodeNode")) continue;
           const discountCode = node.discount?.codes?.nodes?.[0]?.code?.toUpperCase() ?? null;
           const dbRecord = discountCode ? codeMap.get(discountCode) : null;
 

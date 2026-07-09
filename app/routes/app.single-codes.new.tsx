@@ -144,6 +144,56 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: `Discount created but config save failed: ${mfErrors.map((e: { message: string }) => e.message).join(", ")}` };
   }
 
+  // Scan discountNodes to find the real function node (may differ from construction node)
+  let functionNodeId: string | null = null;
+  try {
+    const scanRes = await admin.graphql(
+      `#graphql
+      query FindFunctionNode($after: String) {
+        discountNodes(first: 50, query: "function_id:discount-rejection-function-js") {
+          nodes {
+            id
+            discount {
+              ... on DiscountCodeApp {
+                codes(first: 1) { nodes { code } }
+              }
+            }
+          }
+        }
+      }`,
+      { variables: { after: null } }
+    );
+    const scanData = await scanRes.json();
+    for (const n of scanData.data?.discountNodes?.nodes ?? []) {
+      if (!n.id.includes("DiscountCodeNode")) continue;
+      const nodeCode = n.discount?.codes?.nodes?.[0]?.code?.toUpperCase();
+      if (nodeCode === code) { functionNodeId = n.id; break; }
+    }
+  } catch { /* ignore — functionNodeId stays null, global sync will find it */ }
+
+  // If real node differs from construction node, write config there too
+  if (functionNodeId && functionNodeId !== nodeDiscountId) {
+    await admin.graphql(
+      `#graphql
+      mutation SetDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $metafields) {
+          userErrors { field message }
+        }
+      }`,
+      {
+        variables: {
+          metafields: [{
+            ownerId: functionNodeId,
+            namespace: "$app",
+            key: "function-configuration",
+            type: "json",
+            value: metafieldConfig,
+          }],
+        },
+      }
+    );
+  }
+
   await db.singleCodeDiscount.create({
     data: {
       shop: session.shop,
@@ -152,6 +202,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       requiredTag,
       blockedTag,
       configJson: metafieldConfig,
+      functionNodeId: functionNodeId !== nodeDiscountId ? functionNodeId : null,
     },
   });
 
