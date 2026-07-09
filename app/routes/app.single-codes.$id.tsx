@@ -153,6 +153,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       blockedTag,
     };
 
+    const appDiscountId = discountId.replace("DiscountCodeNode", "DiscountCodeApp");
     await admin.graphql(
       `#graphql
       mutation SetDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
@@ -162,13 +163,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       }`,
       {
         variables: {
-          metafields: [{
-            ownerId: discountId,
-            namespace: "$app",
-            key: "function-configuration",
-            type: "json",
-            value: JSON.stringify(newConfig),
-          }],
+          metafields: [
+            { ownerId: discountId, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify(newConfig) },
+            { ownerId: appDiscountId, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify(newConfig) },
+          ],
         },
       }
     );
