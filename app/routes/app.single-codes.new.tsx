@@ -103,24 +103,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (createErrors.length > 0) {
     return { error: `Creating discount: ${createErrors.map((e: { message: string }) => e.message).join(", ")}` };
   }
-  const appDiscountId = createData.data?.discountCodeAppCreate?.codeAppDiscount?.discountId;
-  if (!appDiscountId) return { error: "Failed to create discount." };
+  const discountId = createData.data?.discountCodeAppCreate?.codeAppDiscount?.discountId;
+  if (!discountId) return { error: "Failed to create discount." };
 
-  // Look up the actual DiscountCodeNode ID — this is what the Shopify Function reads from.
-  // discountCodeAppCreate returns a DiscountCodeApp GID which has a separate metafield store.
-  const nodeRes = await admin.graphql(
-    `#graphql
-    query FindDiscountNode($query: String!) {
-      discountNodes(first: 1, query: $query) {
-        nodes { id }
-      }
-    }`,
-    { variables: { query: `code:${code}` } }
-  );
-  const nodeData = await nodeRes.json();
-  const discountId = nodeData.data?.discountNodes?.nodes?.[0]?.id ?? appDiscountId;
-
-  // Save metafield to the DiscountCodeNode (same resource the function reads)
+  // Save metafield to the discount
   const metafieldConfig = JSON.stringify({
     productIds: resolvedProductIds,
     collectionIds,
