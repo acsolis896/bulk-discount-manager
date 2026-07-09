@@ -53,36 +53,76 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (singleCodes.length === 0) return { syncedCustomers: 0 };
 
+      // Scan all discount nodes for this function to find the correct DiscountCodeNode ID for each code.
+      const allShopifyNodes: Array<{ id: string; codes: string[]; metafieldValue: string | null }> = [];
+      let nodeCursor: string | null = null;
+      do {
+        const res = await admin.graphql(
+          `#graphql
+          query GetAllFunctionNodes($after: String) {
+            discountNodes(first: 50, after: $after, query: "function_id:discount-rejection-function-js") {
+              nodes {
+                id
+                discount {
+                  ... on DiscountCodeApp {
+                    codes(first: 10) { nodes { code } }
+                  }
+                }
+                metafield(namespace: "$app", key: "function-configuration") { value }
+              }
+              pageInfo { hasNextPage endCursor }
+            }
+          }`,
+          { variables: { after: nodeCursor } }
+        );
+        const data = await res.json();
+        for (const node of data.data?.discountNodes?.nodes ?? []) {
+          allShopifyNodes.push({
+            id: node.id,
+            codes: (node.discount?.codes?.nodes ?? []).map((c: { code: string }) => c.code.toUpperCase()),
+            metafieldValue: node.metafield?.value ?? null,
+          });
+        }
+        const pi = data.data?.discountNodes?.pageInfo;
+        nodeCursor = pi?.hasNextPage ? pi.endCursor : null;
+      } while (nodeCursor);
+
+      const nodeByCode = new Map<string, (typeof allShopifyNodes)[0]>();
+      for (const node of allShopifyNodes) {
+        for (const c of node.codes) nodeByCode.set(c, node);
+      }
+
       for (const codeRecord of singleCodes) {
-        // Ensure we have the DiscountCodeNode GID — the resource the Shopify Function reads from.
-        // Old records may have stored a DiscountCodeApp GID with a separate metafield store.
-        let discountId = codeRecord.discountId;
-        if (!discountId.includes("DiscountCodeNode")) {
-          const nodeRes = await admin.graphql(
+        const shopifyNode = nodeByCode.get(codeRecord.code.toUpperCase());
+        if (!shopifyNode) {
+          errors.push(`${codeRecord.code}: discount not found on Shopify`);
+          continue;
+        }
+
+        let creationConfig: Record<string, unknown> = {};
+        if (shopifyNode.id !== codeRecord.discountId) {
+          const oldRes = await admin.graphql(
             `#graphql
-            query FindDiscountNode($query: String!) {
-              discountNodes(first: 1, query: $query) {
-                nodes { id }
+            query GetOldMF($id: ID!) {
+              discountNode(id: $id) {
+                metafield(namespace: "$app", key: "function-configuration") { value }
               }
             }`,
-            { variables: { query: `code:${codeRecord.code}` } }
+            { variables: { id: codeRecord.discountId } }
           );
-          const nodeData = await nodeRes.json();
-          const correctId = nodeData.data?.discountNodes?.nodes?.[0]?.id;
-          if (correctId && correctId !== discountId) {
-            await db.singleCodeDiscount.update({
-              where: { id: codeRecord.id },
-              data: { discountId: correctId },
-            });
-            discountId = correctId;
-          }
+          const oldData = await oldRes.json();
+          try { creationConfig = JSON.parse(oldData.data?.discountNode?.metafield?.value ?? "{}"); } catch {}
+
+          await db.singleCodeDiscount.update({
+            where: { id: codeRecord.id },
+            data: { discountId: shopifyNode.id },
+          });
         }
-        const code = { ...codeRecord, discountId };
 
         const eligible: string[] = [];
         const blocked: string[] = [];
 
-        if (code.requiredTag) {
+        if (codeRecord.requiredTag) {
           let cursor: string | null = null;
           do {
             const res = await admin.graphql(
@@ -93,7 +133,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   pageInfo { hasNextPage endCursor }
                 }
               }`,
-              { variables: { query: `tag:${code.requiredTag}`, after: cursor } }
+              { variables: { query: `tag:${codeRecord.requiredTag}`, after: cursor } }
             );
             const data = await res.json();
             const nodes: Array<{ id: string }> = data.data?.customers?.nodes ?? [];
@@ -103,7 +143,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           } while (cursor);
         }
 
-        if (code.blockedTag) {
+        if (codeRecord.blockedTag) {
           let cursor: string | null = null;
           do {
             const res = await admin.graphql(
@@ -114,7 +154,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   pageInfo { hasNextPage endCursor }
                 }
               }`,
-              { variables: { query: `tag:${code.blockedTag}`, after: cursor } }
+              { variables: { query: `tag:${codeRecord.blockedTag}`, after: cursor } }
             );
             const data = await res.json();
             const nodes: Array<{ id: string }> = data.data?.customers?.nodes ?? [];
@@ -124,23 +164,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           } while (cursor);
         }
 
-        const mfRes = await admin.graphql(
-          `#graphql
-          query GetMF($id: ID!) {
-            discountNode(id: $id) {
-              metafield(namespace: "$app", key: "function-configuration") { value }
-            }
-          }`,
-          { variables: { id: code.discountId } }
-        );
-        const mfData = await mfRes.json();
-        let existing: Record<string, unknown> = {};
-        try { existing = JSON.parse(mfData.data?.discountNode?.metafield?.value); } catch {}
+        let nodeConfig: Record<string, unknown> = {};
+        try { nodeConfig = JSON.parse(shopifyNode.metafieldValue ?? "{}"); } catch {}
 
         const newConfig = {
-          ...existing,
-          ...(code.requiredTag ? { eligibleCustomerIds: eligible } : {}),
-          ...(code.blockedTag ? { blockedCustomerIds: blocked } : {}),
+          ...creationConfig,
+          ...nodeConfig,
+          ...(codeRecord.requiredTag ? { eligibleCustomerIds: eligible } : {}),
+          ...(codeRecord.blockedTag ? { blockedCustomerIds: blocked } : {}),
         };
 
         const updateRes = await admin.graphql(
@@ -153,7 +184,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           {
             variables: {
               metafields: [{
-                ownerId: code.discountId,
+                ownerId: shopifyNode.id,
                 namespace: "$app",
                 key: "function-configuration",
                 type: "json",
@@ -165,7 +196,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const updateData = await updateRes.json();
         const updateErrors = updateData.data?.metafieldsSet?.userErrors ?? [];
         if (updateErrors.length > 0) {
-          errors.push(...updateErrors.map((e: { message: string }) => e.message));
+          errors.push(`${codeRecord.code}: ${updateErrors.map((e: { message: string }) => e.message).join(", ")}`);
         } else {
           synced += eligible.length;
         }
