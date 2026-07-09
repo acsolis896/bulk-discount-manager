@@ -136,6 +136,101 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { synced: updated };
   }
 
+  if (intent === "syncCustomers") {
+    const codes = await db.singleCodeDiscount.findMany({
+      where: { shop: session.shop },
+      select: { discountId: true, requiredTag: true, blockedTag: true, configJson: true },
+    });
+
+    if (codes.length === 0) return { syncedCustomers: 0 };
+
+    const errors: string[] = [];
+    let syncedCount = 0;
+
+    for (const code of codes) {
+      if (!code.configJson) {
+        errors.push(`Discount ${code.discountId} has no saved config — re-create it to enable customer sync.`);
+        continue;
+      }
+
+      let baseConfig: Record<string, unknown>;
+      try { baseConfig = JSON.parse(code.configJson); } catch { errors.push(`Bad configJson for ${code.discountId}`); continue; }
+
+      const eligibleCustomerIds: string[] = [];
+      const blockedCustomerIds: string[] = [];
+
+      if (code.requiredTag) {
+        let cursor: string | null = null;
+        do {
+          const res = await admin.graphql(
+            `#graphql
+            query CustomersWithTag($query: String!, $after: String) {
+              customers(first: 250, query: $query, after: $after) {
+                nodes { id }
+                pageInfo { hasNextPage endCursor }
+              }
+            }`,
+            { variables: { query: `tag:'${code.requiredTag}'`, after: cursor } }
+          );
+          const data = await res.json();
+          const customers = data.data?.customers;
+          for (const c of customers?.nodes ?? []) eligibleCustomerIds.push(c.id);
+          cursor = customers?.pageInfo?.hasNextPage ? customers.pageInfo.endCursor : null;
+        } while (cursor);
+      }
+
+      if (code.blockedTag) {
+        let cursor: string | null = null;
+        do {
+          const res = await admin.graphql(
+            `#graphql
+            query CustomersWithTag($query: String!, $after: String) {
+              customers(first: 250, query: $query, after: $after) {
+                nodes { id }
+                pageInfo { hasNextPage endCursor }
+              }
+            }`,
+            { variables: { query: `tag:'${code.blockedTag}'`, after: cursor } }
+          );
+          const data = await res.json();
+          const customers = data.data?.customers;
+          for (const c of customers?.nodes ?? []) blockedCustomerIds.push(c.id);
+          cursor = customers?.pageInfo?.hasNextPage ? customers.pageInfo.endCursor : null;
+        } while (cursor);
+      }
+
+      const fullConfig = JSON.stringify({ ...baseConfig, eligibleCustomerIds, blockedCustomerIds });
+
+      await db.singleCodeDiscount.update({
+        where: { shop_discountId: { shop: session.shop, discountId: code.discountId } },
+        data: {
+          eligibleCustomerIds: JSON.stringify(eligibleCustomerIds),
+          blockedCustomerIds: JSON.stringify(blockedCustomerIds),
+        },
+      });
+
+      const mfRes = await admin.graphql(
+        `#graphql
+        mutation SetDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
+          metafieldsSet(metafields: $metafields) {
+            userErrors { field message }
+          }
+        }`,
+        { variables: { metafields: [{ ownerId: code.discountId, namespace: "$app", key: "function-configuration", type: "json", value: fullConfig }] } }
+      );
+      const mfData = await mfRes.json();
+      const mfErrors = mfData.data?.metafieldsSet?.userErrors ?? [];
+      if (mfErrors.length > 0) {
+        errors.push(`Discount ${code.discountId}: ${mfErrors.map((e: { message: string }) => e.message).join(", ")}`);
+      } else {
+        syncedCount++;
+      }
+    }
+
+    if (errors.length > 0) return { error: `Synced ${syncedCount} discounts. Errors: ${errors.join("; ")}` };
+    return { syncedCustomers: syncedCount };
+  }
+
   return { error: "Unknown action." };
 };
 
@@ -185,6 +280,12 @@ export default function SettingsPage() {
     fetcher.submit(form, { method: "post" });
   };
 
+  const handleSyncCustomers = () => {
+    const form = new FormData();
+    form.append("intent", "syncCustomers");
+    fetcher.submit(form, { method: "post" });
+  };
+
   return (
     <s-page heading="Discount Rules">
       <s-section heading="Blocked product types">
@@ -207,6 +308,11 @@ export default function SettingsPage() {
           {(result as { synced?: number })?.synced !== undefined && (
             <s-banner tone="success">
               <s-paragraph>Synced: updated {(result as { synced: number }).synced} discount set{(result as { synced: number }).synced !== 1 ? "s" : ""} with the current blocked types.</s-paragraph>
+            </s-banner>
+          )}
+          {(result as { syncedCustomers?: number })?.syncedCustomers !== undefined && (
+            <s-banner tone="success">
+              <s-paragraph>Customer eligibility synced for {(result as { syncedCustomers: number }).syncedCustomers} discount{(result as { syncedCustomers: number }).syncedCustomers !== 1 ? "s" : ""}.</s-paragraph>
             </s-banner>
           )}
 
@@ -263,6 +369,19 @@ export default function SettingsPage() {
           <div>
             <s-button variant="primary" onClick={handleSync} disabled={isSubmitting}>
               {isSubmitting && (fetcher.formData?.get("intent") === "sync") ? "Syncing…" : "Sync to all discounts"}
+            </s-button>
+          </div>
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Sync customer eligibility">
+        <s-stack direction="block" gap="base">
+          <s-paragraph>
+            For each single-code discount, fetches all customers with the required tag (eligible) and blocked tag (usage limit reached) from Shopify and updates the discount's customer lists. Run this after tagging or un-tagging customers.
+          </s-paragraph>
+          <div>
+            <s-button variant="primary" onClick={handleSyncCustomers} disabled={isSubmitting}>
+              {isSubmitting && (fetcher.formData?.get("intent") === "syncCustomers") ? "Syncing customers…" : "Sync customer eligibility"}
             </s-button>
           </div>
         </s-stack>

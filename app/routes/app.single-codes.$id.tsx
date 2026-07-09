@@ -174,9 +174,18 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return { error: `Failed to save: ${saveErrors.map((e: { message: string }) => e.message).join(", ")}` };
     }
 
+    const baseConfigJson = JSON.stringify({
+      productIds: resolvedProductIds,
+      collectionIds,
+      percentage,
+      blockedProductTypes: existing.blockedProductTypes ?? ["GWP"],
+      requiredTag,
+      blockedTag,
+    });
+
     await db.singleCodeDiscount.updateMany({
       where: { shop: session.shop, discountId },
-      data: { requiredTag, blockedTag },
+      data: { requiredTag, blockedTag, configJson: baseConfigJson },
     });
 
     return { success: true };

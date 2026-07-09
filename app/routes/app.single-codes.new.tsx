@@ -151,6 +151,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       code,
       requiredTag,
       blockedTag,
+      configJson: metafieldConfig,
     },
   });
 
