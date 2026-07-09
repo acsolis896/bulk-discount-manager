@@ -53,69 +53,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (singleCodes.length === 0) return { syncedCustomers: 0 };
 
-      const allShopifyNodes: Array<{ id: string; codes: string[]; metafieldValue: string | null }> = [];
-      let nodeCursor: string | null = null;
-      do {
-        const res = await admin.graphql(
+      for (const code of singleCodes) {
+        // Read the current config directly from the DB's discountId — this is the same
+        // node creation wrote to and the Shopify Function reads from. No scanning needed.
+        const configRes = await admin.graphql(
           `#graphql
-          query GetAllFunctionNodes($after: String) {
-            discountNodes(first: 50, after: $after, query: "function_id:discount-rejection-function-js") {
-              nodes {
-                id
-                discount {
-                  ... on DiscountCodeApp {
-                    codes(first: 10) { nodes { code } }
-                  }
-                }
-                metafield(namespace: "$app", key: "function-configuration") { value }
-              }
-              pageInfo { hasNextPage endCursor }
+          query GetCurrentConfig($id: ID!) {
+            discountNode(id: $id) {
+              metafield(namespace: "$app", key: "function-configuration") { value }
             }
           }`,
-          { variables: { after: nodeCursor } }
+          { variables: { id: code.discountId } }
         );
-        const data = await res.json();
-        for (const node of data.data?.discountNodes?.nodes ?? []) {
-          allShopifyNodes.push({
-            id: node.id,
-            codes: (node.discount?.codes?.nodes ?? []).map((c: { code: string }) => c.code.toUpperCase()),
-            metafieldValue: node.metafield?.value ?? null,
-          });
-        }
-        const pi = data.data?.discountNodes?.pageInfo;
-        nodeCursor = pi?.hasNextPage ? pi.endCursor : null;
-      } while (nodeCursor);
-
-      const nodeByCode = new Map<string, (typeof allShopifyNodes)[0]>();
-      for (const node of allShopifyNodes) {
-        for (const c of node.codes) nodeByCode.set(c, node);
-      }
-
-      for (const code of singleCodes) {
-        const shopifyNode = nodeByCode.get(code.code.toUpperCase());
-        if (!shopifyNode) {
-          errors.push(`${code.code}: not found in Shopify — try again after creation`);
-          continue;
-        }
-
-        let creationConfig: Record<string, unknown> = {};
-        if (shopifyNode.id !== code.discountId) {
-          const oldRes = await admin.graphql(
-            `#graphql
-            query GetOldMF($id: ID!) {
-              discountNode(id: $id) {
-                metafield(namespace: "$app", key: "function-configuration") { value }
-              }
-            }`,
-            { variables: { id: code.discountId } }
-          );
-          const oldData = await oldRes.json();
-          try { creationConfig = JSON.parse(oldData.data?.discountNode?.metafield?.value ?? "{}"); } catch {}
-          await db.singleCodeDiscount.update({
-            where: { id: code.id },
-            data: { discountId: shopifyNode.id },
-          });
-        }
+        const configData = await configRes.json();
+        let currentConfig: Record<string, unknown> = {};
+        try { currentConfig = JSON.parse(configData.data?.discountNode?.metafield?.value ?? "{}"); } catch {}
 
         const eligible: string[] = [];
         const blocked: string[] = [];
@@ -162,22 +114,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           } while (cursor);
         }
 
-        let nodeConfig: Record<string, unknown> = {};
-        try { nodeConfig = JSON.parse(shopifyNode.metafieldValue ?? "{}"); } catch {}
-
+        // Preserve all existing config fields; only update eligibility lists.
         const newConfig = {
-          ...creationConfig,
-          ...nodeConfig,
+          ...currentConfig,
           ...(code.requiredTag ? { eligibleCustomerIds: eligible } : {}),
           ...(code.blockedTag ? { blockedCustomerIds: blocked } : {}),
         };
-
-        // Write to the scanned node AND to the creation node (code.discountId) if they differ.
-        // The Shopify Function may read from either depending on internal Shopify routing,
-        // so both must have the full config.
-        const targetIds = shopifyNode.id !== code.discountId
-          ? [shopifyNode.id, code.discountId]
-          : [shopifyNode.id];
 
         const updateRes = await admin.graphql(
           `#graphql
@@ -188,13 +130,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           }`,
           {
             variables: {
-              metafields: targetIds.map((ownerId) => ({
-                ownerId,
+              metafields: [{
+                ownerId: code.discountId,
                 namespace: "$app",
                 key: "function-configuration",
                 type: "json",
                 value: JSON.stringify(newConfig),
-              })),
+              }],
             },
           }
         );
