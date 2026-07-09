@@ -106,8 +106,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const appDiscountId = createData.data?.discountCodeAppCreate?.codeAppDiscount?.discountId;
   if (!appDiscountId) return { error: "Failed to create discount." };
 
-  // The function reads metafields from the DiscountCodeNode GID, not DiscountCodeApp.
-  // Both share the same numeric ID, so we write to both to guarantee the function sees the config.
   const numericId = appDiscountId.split("/").pop();
   const nodeDiscountId = `gid://shopify/DiscountCodeNode/${numericId}`;
 
@@ -128,22 +126,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }`,
     {
       variables: {
-        metafields: [
-          {
-            ownerId: appDiscountId,
-            namespace: "$app",
-            key: "function-configuration",
-            type: "json",
-            value: metafieldConfig,
-          },
-          {
-            ownerId: nodeDiscountId,
-            namespace: "$app",
-            key: "function-configuration",
-            type: "json",
-            value: metafieldConfig,
-          },
-        ],
+        metafields: [{
+          ownerId: nodeDiscountId,
+          namespace: "$app",
+          key: "function-configuration",
+          type: "json",
+          value: metafieldConfig,
+        }],
       },
     }
   );
@@ -153,7 +142,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: `Discount created but config save failed: ${mfErrors.map((e: { message: string }) => e.message).join(", ")}` };
   }
 
-  // Store the DiscountCodeNode GID so the detail page loader can find it
   await db.singleCodeDiscount.create({
     data: {
       shop: session.shop,
