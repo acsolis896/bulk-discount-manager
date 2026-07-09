@@ -41,6 +41,118 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { ok: true };
   }
 
+  if (intent === "syncCustomers") {
+    let synced = 0;
+    const errors: string[] = [];
+
+    try {
+      const singleCodes = await db.singleCodeDiscount.findMany({
+        where: { shop: session.shop },
+        select: { discountId: true, requiredTag: true, blockedTag: true },
+      });
+
+      if (singleCodes.length === 0) return { syncedCustomers: 0 };
+
+      for (const code of singleCodes) {
+        const eligible: string[] = [];
+        const blocked: string[] = [];
+
+        if (code.requiredTag) {
+          let cursor: string | null = null;
+          do {
+            const res = await admin.graphql(
+              `#graphql
+              query GetTaggedCustomers($query: String!, $after: String) {
+                customers(first: 250, query: $query, after: $after) {
+                  nodes { id }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }`,
+              { variables: { query: `tag:${code.requiredTag}`, after: cursor } }
+            );
+            const data = await res.json();
+            const nodes: Array<{ id: string }> = data.data?.customers?.nodes ?? [];
+            for (const c of nodes) eligible.push(c.id);
+            const pageInfo = data.data?.customers?.pageInfo;
+            cursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
+          } while (cursor);
+        }
+
+        if (code.blockedTag) {
+          let cursor: string | null = null;
+          do {
+            const res = await admin.graphql(
+              `#graphql
+              query GetBlockedCustomers($query: String!, $after: String) {
+                customers(first: 250, query: $query, after: $after) {
+                  nodes { id }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }`,
+              { variables: { query: `tag:${code.blockedTag}`, after: cursor } }
+            );
+            const data = await res.json();
+            const nodes: Array<{ id: string }> = data.data?.customers?.nodes ?? [];
+            for (const c of nodes) blocked.push(c.id);
+            const pageInfo = data.data?.customers?.pageInfo;
+            cursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
+          } while (cursor);
+        }
+
+        const mfRes = await admin.graphql(
+          `#graphql
+          query GetMF($id: ID!) {
+            discountNode(id: $id) {
+              metafield(namespace: "$app", key: "function-configuration") { value }
+            }
+          }`,
+          { variables: { id: code.discountId } }
+        );
+        const mfData = await mfRes.json();
+        let existing: Record<string, unknown> = {};
+        try { existing = JSON.parse(mfData.data?.discountNode?.metafield?.value); } catch {}
+
+        const newConfig = {
+          ...existing,
+          ...(code.requiredTag ? { eligibleCustomerIds: eligible } : {}),
+          ...(code.blockedTag ? { blockedCustomerIds: blocked } : {}),
+        };
+
+        const updateRes = await admin.graphql(
+          `#graphql
+          mutation UpdateDiscountMF($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+              userErrors { field message }
+            }
+          }`,
+          {
+            variables: {
+              metafields: [{
+                ownerId: code.discountId,
+                namespace: "$app",
+                key: "function-configuration",
+                type: "json",
+                value: JSON.stringify(newConfig),
+              }],
+            },
+          }
+        );
+        const updateData = await updateRes.json();
+        const updateErrors = updateData.data?.metafieldsSet?.userErrors ?? [];
+        if (updateErrors.length > 0) {
+          errors.push(...updateErrors.map((e: { message: string }) => e.message));
+        } else {
+          synced += eligible.length;
+        }
+      }
+    } catch (err: unknown) {
+      return { error: `Customer sync failed: ${err instanceof Error ? err.message : String(err)}` };
+    }
+
+    if (errors.length > 0) return { error: `Sync completed but some updates failed: ${errors.slice(0, 3).join("; ")}` };
+    return { syncedCustomers: synced };
+  }
+
   if (intent === "sync") {
     // Fetch current blocked types for this shop
     const rows = await db.blockedProductType.findMany({
@@ -141,7 +253,8 @@ export default function SettingsPage() {
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (isFetcherBusy && fetcher.formData?.get("intent") === "sync") {
+    const intent = fetcher.formData?.get("intent");
+    if (isFetcherBusy && (intent === "sync" || intent === "syncCustomers")) {
       setForcedIdle(false);
       syncTimeoutRef.current = setTimeout(() => setForcedIdle(true), 60000);
     } else {
@@ -173,6 +286,12 @@ export default function SettingsPage() {
   const handleSync = () => {
     const form = new FormData();
     form.append("intent", "sync");
+    fetcher.submit(form, { method: "post" });
+  };
+
+  const handleSyncCustomers = () => {
+    const form = new FormData();
+    form.append("intent", "syncCustomers");
     fetcher.submit(form, { method: "post" });
   };
 
@@ -240,6 +359,29 @@ export default function SettingsPage() {
             />
             <s-button variant="primary" onClick={handleAdd} disabled={isSubmitting || !newType.trim()}>
               Add
+            </s-button>
+          </div>
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Sync customer tags">
+        <s-stack direction="block" gap="base">
+          <s-paragraph>
+            Single codes restrict access by customer tag. Clicking sync queries all customers who have your
+            configured required or blocked tags and saves their IDs directly to the discount's configuration.
+            Run this after adding or removing customer tags in Shopify admin. Tag changes are also synced
+            automatically via webhook.
+          </s-paragraph>
+          {(result as { syncedCustomers?: number })?.syncedCustomers !== undefined && (
+            <s-banner tone="success">
+              <s-paragraph>
+                Synced {(result as { syncedCustomers: number }).syncedCustomers} customer{(result as { syncedCustomers: number }).syncedCustomers !== 1 ? "s" : ""} successfully.
+              </s-paragraph>
+            </s-banner>
+          )}
+          <div>
+            <s-button variant="primary" onClick={handleSyncCustomers} disabled={isSubmitting}>
+              {isSubmitting && fetcher.formData?.get("intent") === "syncCustomers" ? "Syncing customers…" : "Sync all customers"}
             </s-button>
           </div>
         </s-stack>

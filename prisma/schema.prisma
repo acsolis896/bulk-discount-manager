@@ -34,6 +34,19 @@ model PreUsedCode {
   @@index([shop, discountId])
 }
 
+model SingleCodeDiscount {
+  id         String   @id @default(cuid())
+  shop       String
+  discountId String
+  code       String
+  requiredTag String  @default("")
+  blockedTag  String  @default("")
+  createdAt  DateTime @default(now())
+
+  @@unique([shop, discountId])
+  @@index([shop])
+}
+
 model Session {
   id            String    @id
   shop          String
