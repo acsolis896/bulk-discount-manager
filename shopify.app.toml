@@ -19,10 +19,6 @@ api_version = "2026-04"
   topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"
 
-  [[webhooks.subscriptions]]
-  topics = [ "customers/update" ]
-  uri = "/webhooks/customers/update"
-
 [access_scopes]
 scopes = "write_discounts,read_products,read_customers,write_customers"
 
