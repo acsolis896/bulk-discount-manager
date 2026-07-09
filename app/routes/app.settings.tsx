@@ -86,9 +86,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           const discountCode = node.discount?.codes?.nodes?.[0]?.code?.toUpperCase() ?? null;
           const dbRecord = discountCode ? codeMap.get(discountCode) : null;
 
-          if (dbRecord?.configJson) {
+          if (dbRecord) {
             let baseConfig: Record<string, unknown> = {};
-            try { baseConfig = JSON.parse(dbRecord.configJson); } catch { /* empty */ }
+
+            if (dbRecord.configJson) {
+              try { baseConfig = JSON.parse(dbRecord.configJson); } catch { /* empty */ }
+            } else {
+              const fallbackRes = await admin.graphql(
+                `#graphql
+                query GetMF($id: ID!) {
+                  discountNode(id: $id) {
+                    metafield(namespace: "$app", key: "function-configuration") { value }
+                  }
+                }`,
+                { variables: { id: dbRecord.discountId } }
+              );
+              const fallbackData = await fallbackRes.json();
+              const fallbackValue = fallbackData.data?.discountNode?.metafield?.value;
+              try { if (fallbackValue) baseConfig = JSON.parse(fallbackValue); } catch { /* empty */ }
+              if (Object.keys(baseConfig).length > 0) {
+                await db.singleCodeDiscount.updateMany({
+                  where: { shop: session.shop, discountId: dbRecord.discountId },
+                  data: { configJson: JSON.stringify(baseConfig) },
+                });
+              }
+            }
+
             const eligibleCustomerIds = dbRecord.eligibleCustomerIds ? JSON.parse(dbRecord.eligibleCustomerIds) : undefined;
             const blockedCustomerIds = dbRecord.blockedCustomerIds ? JSON.parse(dbRecord.blockedCustomerIds) : undefined;
             const fullConfig: Record<string, unknown> = { ...baseConfig, blockedProductTypes };
