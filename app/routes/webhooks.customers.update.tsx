@@ -25,77 +25,76 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const singleCodes = await db.singleCodeDiscount.findMany({
     where: { shop: session.shop },
-    select: { discountId: true, requiredTag: true, blockedTag: true },
+    select: { discountId: true, requiredTag: true, blockedTag: true, configJson: true, functionNodeId: true, blockedCustomerIds: true },
   });
 
   for (const code of singleCodes) {
-    const mfRes = await admin.graphql(
-      `#graphql
-      query GetMF($id: ID!) {
-        discountNode(id: $id) {
-          metafield(namespace: "$app", key: "function-configuration") { value }
-        }
-      }`,
-      { variables: { id: code.discountId } }
-    );
-    const mfData = await mfRes.json();
-    let config: Record<string, unknown> = {};
-    try { config = JSON.parse(mfData.data?.discountNode?.metafield?.value); } catch {}
+    if (!code.configJson) continue;
 
-    let eligibleIds: string[] = Array.isArray(config.eligibleCustomerIds)
-      ? (config.eligibleCustomerIds as string[])
-      : [];
-    let blockedIds: string[] = Array.isArray(config.blockedCustomerIds)
-      ? (config.blockedCustomerIds as string[])
-      : [];
+    let baseConfig: Record<string, unknown> = {};
+    try { baseConfig = JSON.parse(code.configJson); } catch { continue; }
 
-    let changed = false;
+    const hasRequiredTag = code.requiredTag ? customerTags.includes(code.requiredTag.toLowerCase()) : false;
+    const hasBlockedTag = code.blockedTag ? customerTags.includes(code.blockedTag.toLowerCase()) : false;
 
+    const blockedIds: string[] = code.blockedCustomerIds ? JSON.parse(code.blockedCustomerIds) : [];
+    let blockedChanged = false;
+
+    if (hasBlockedTag && !blockedIds.includes(customerId)) {
+      blockedIds.push(customerId);
+      blockedChanged = true;
+    }
+    if (!hasBlockedTag && blockedIds.includes(customerId)) {
+      blockedIds.splice(blockedIds.indexOf(customerId), 1);
+      blockedChanged = true;
+    }
+
+    // Update native customer selection for eligible list (no metafield node confusion)
     if (code.requiredTag) {
-      const hasTag = customerTags.includes(code.requiredTag.toLowerCase());
-      if (hasTag && !eligibleIds.includes(customerId)) {
-        eligibleIds = [...eligibleIds, customerId];
-        changed = true;
-      } else if (!hasTag && eligibleIds.includes(customerId)) {
-        eligibleIds = eligibleIds.filter((id) => id !== customerId);
-        changed = true;
-      }
+      const appId = code.discountId.replace("DiscountCodeNode", "DiscountCodeApp");
+      const action = hasRequiredTag
+        ? { customers: { add: [customerId], remove: [] as string[] } }
+        : { customers: { remove: [customerId], add: [] as string[] } };
+      await admin.graphql(
+        `#graphql
+        mutation UpdateCustomerSelection($id: ID!, $input: DiscountCodeAppInput!) {
+          discountCodeAppUpdate(id: $id, codeAppDiscount: $input) {
+            userErrors { field message }
+          }
+        }`,
+        { variables: { id: appId, input: { customerSelection: { all: false, ...action } } } }
+      );
     }
 
-    if (code.blockedTag) {
-      const hasTag = customerTags.includes(code.blockedTag.toLowerCase());
-      if (hasTag && !blockedIds.includes(customerId)) {
-        blockedIds = [...blockedIds, customerId];
-        changed = true;
-      } else if (!hasTag && blockedIds.includes(customerId)) {
-        blockedIds = blockedIds.filter((id) => id !== customerId);
-        changed = true;
-      }
-    }
+    // Update blockedCustomerIds in metafield if changed
+    if (blockedChanged) {
+      await db.singleCodeDiscount.updateMany({
+        where: { shop: session.shop, discountId: code.discountId },
+        data: { blockedCustomerIds: JSON.stringify(blockedIds) },
+      });
 
-    if (!changed) continue;
-
-    const newConfig = { ...config, eligibleCustomerIds: eligibleIds, blockedCustomerIds: blockedIds };
-
-    await admin.graphql(
-      `#graphql
-      mutation UpdateDiscountMF($metafields: [MetafieldsSetInput!]!) {
-        metafieldsSet(metafields: $metafields) {
-          userErrors { field message }
+      const metafieldConfig = JSON.stringify({ ...baseConfig, blockedCustomerIds: blockedIds });
+      const writeTarget = code.functionNodeId ?? code.discountId;
+      await admin.graphql(
+        `#graphql
+        mutation UpdateDiscountMF($metafields: [MetafieldsSetInput!]!) {
+          metafieldsSet(metafields: $metafields) {
+            userErrors { field message }
+          }
+        }`,
+        {
+          variables: {
+            metafields: [{
+              ownerId: writeTarget,
+              namespace: "$app",
+              key: "function-configuration",
+              type: "json",
+              value: metafieldConfig,
+            }],
+          },
         }
-      }`,
-      {
-        variables: {
-          metafields: [{
-            ownerId: code.discountId,
-            namespace: "$app",
-            key: "function-configuration",
-            type: "json",
-            value: JSON.stringify(newConfig),
-          }],
-        },
-      }
-    );
+      );
+    }
   }
 
   return new Response();

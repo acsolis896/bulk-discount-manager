@@ -271,7 +271,53 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         } while (cursor);
       }
 
-      const fullConfig = JSON.stringify({ ...baseConfig, eligibleCustomerIds, blockedCustomerIds });
+      // --- ELIGIBLE LIST: use Shopify's native customer selection on the discount ---
+      // This is unambiguous — we use the DiscountCodeApp GID from creation, not the function node.
+      if (code.requiredTag) {
+        const oldEligible: string[] = code.eligibleCustomerIds ? JSON.parse(code.eligibleCustomerIds) : [];
+        const appId = code.discountId.replace("DiscountCodeNode", "DiscountCodeApp");
+        const selRes = await admin.graphql(
+          `#graphql
+          mutation UpdateCustomerSelection($id: ID!, $input: DiscountCodeAppInput!) {
+            discountCodeAppUpdate(id: $id, codeAppDiscount: $input) {
+              userErrors { field message }
+            }
+          }`,
+          {
+            variables: {
+              id: appId,
+              input: {
+                customerSelection: eligibleCustomerIds.length > 0
+                  ? { all: false, customers: { remove: oldEligible, add: eligibleCustomerIds } }
+                  : { all: false },
+              },
+            },
+          }
+        );
+        const selData = await selRes.json();
+        const selErrors = selData.data?.discountCodeAppUpdate?.userErrors ?? [];
+        if (selErrors.length > 0) {
+          errors.push(`Customer selection for ${code.code}: ${selErrors.map((e: { message: string }) => e.message).join(", ")}`);
+        }
+      }
+
+      // --- BLOCKED LIST: write only blockedCustomerIds to function metafield ---
+      const metafieldConfig = JSON.stringify({ ...baseConfig, blockedCustomerIds });
+      const writeTarget = code.functionNodeId ?? code.discountId;
+      const mfRes = await admin.graphql(
+        `#graphql
+        mutation SetDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
+          metafieldsSet(metafields: $metafields) {
+            userErrors { field message }
+          }
+        }`,
+        { variables: { metafields: [{ ownerId: writeTarget, namespace: "$app", key: "function-configuration", type: "json", value: metafieldConfig }] } }
+      );
+      const mfData = await mfRes.json();
+      const mfErrors = mfData.data?.metafieldsSet?.userErrors ?? [];
+      if (mfErrors.length > 0) {
+        errors.push(`Metafield for ${code.code}: ${mfErrors.map((e: { message: string }) => e.message).join(", ")}`);
+      }
 
       await db.singleCodeDiscount.update({
         where: { shop_discountId: { shop: session.shop, discountId: code.discountId } },
@@ -281,24 +327,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         },
       });
 
-      // Write to the real function node (discovered above if it was missing)
-      const writeTarget = code.functionNodeId ?? code.discountId;
-      const mfRes = await admin.graphql(
-        `#graphql
-        mutation SetDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
-          metafieldsSet(metafields: $metafields) {
-            userErrors { field message }
-          }
-        }`,
-        { variables: { metafields: [{ ownerId: writeTarget, namespace: "$app", key: "function-configuration", type: "json", value: fullConfig }] } }
-      );
-      const mfData = await mfRes.json();
-      const mfErrors = mfData.data?.metafieldsSet?.userErrors ?? [];
-      if (mfErrors.length > 0) {
-        errors.push(`Discount ${code.discountId}: ${mfErrors.map((e: { message: string }) => e.message).join(", ")}`);
-      } else {
-        syncedCount++;
-      }
+      if (!errors.some(e => e.includes(code.code))) syncedCount++;
     }
 
     if (errors.length > 0) return { error: `Synced ${syncedCount} discounts. Errors: ${errors.join("; ")}` };
