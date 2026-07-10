@@ -272,32 +272,65 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
 
       // --- ELIGIBLE LIST: use Shopify's native customer selection on the discount ---
-      // This is unambiguous — we use the DiscountCodeApp GID from creation, not the function node.
+      // Shopify limits add/remove to 10 IDs per call, so we batch.
       if (code.requiredTag) {
-        const oldEligible: string[] = code.eligibleCustomerIds ? JSON.parse(code.eligibleCustomerIds) : [];
         const appId = code.discountId.replace("DiscountCodeNode", "DiscountCodeApp");
-        const selRes = await admin.graphql(
+        const BATCH = 10;
+        let selectionError = false;
+
+        // Step 1: reset to all customers (clears existing specific selection)
+        const resetRes = await admin.graphql(
           `#graphql
           mutation UpdateCustomerSelection($id: ID!, $input: DiscountCodeAppInput!) {
             discountCodeAppUpdate(id: $id, codeAppDiscount: $input) {
               userErrors { field message }
             }
           }`,
-          {
-            variables: {
-              id: appId,
-              input: {
-                customerSelection: eligibleCustomerIds.length > 0
-                  ? { all: false, customers: { remove: oldEligible, add: eligibleCustomerIds } }
-                  : { all: false },
-              },
-            },
-          }
+          { variables: { id: appId, input: { customerSelection: { all: true } } } }
         );
-        const selData = await selRes.json();
-        const selErrors = selData.data?.discountCodeAppUpdate?.userErrors ?? [];
-        if (selErrors.length > 0) {
-          errors.push(`Customer selection for ${code.code}: ${selErrors.map((e: { message: string }) => e.message).join(", ")}`);
+        const resetData = await resetRes.json();
+        const resetErrors = resetData.data?.discountCodeAppUpdate?.userErrors ?? [];
+        if (resetErrors.length > 0) {
+          errors.push(`Customer selection reset for ${code.code}: ${resetErrors.map((e: { message: string }) => e.message).join(", ")}`);
+          selectionError = true;
+        }
+
+        // Step 2: set to specific customers in batches of 10
+        if (!selectionError && eligibleCustomerIds.length > 0) {
+          for (let i = 0; i < eligibleCustomerIds.length; i += BATCH) {
+            const batch = eligibleCustomerIds.slice(i, i + BATCH);
+            const selRes = await admin.graphql(
+              `#graphql
+              mutation UpdateCustomerSelection($id: ID!, $input: DiscountCodeAppInput!) {
+                discountCodeAppUpdate(id: $id, codeAppDiscount: $input) {
+                  userErrors { field message }
+                }
+              }`,
+              { variables: { id: appId, input: { customerSelection: { all: false, customers: { add: batch } } } } }
+            );
+            const selData = await selRes.json();
+            const selErrors = selData.data?.discountCodeAppUpdate?.userErrors ?? [];
+            if (selErrors.length > 0) {
+              errors.push(`Customer selection for ${code.code} (batch ${i}): ${selErrors.map((e: { message: string }) => e.message).join(", ")}`);
+              selectionError = true;
+              break;
+            }
+          }
+        } else if (!selectionError && eligibleCustomerIds.length === 0) {
+          const noneRes = await admin.graphql(
+            `#graphql
+            mutation UpdateCustomerSelection($id: ID!, $input: DiscountCodeAppInput!) {
+              discountCodeAppUpdate(id: $id, codeAppDiscount: $input) {
+                userErrors { field message }
+              }
+            }`,
+            { variables: { id: appId, input: { customerSelection: { all: false } } } }
+          );
+          const noneData = await noneRes.json();
+          const noneErrors = noneData.data?.discountCodeAppUpdate?.userErrors ?? [];
+          if (noneErrors.length > 0) {
+            errors.push(`Customer selection for ${code.code}: ${noneErrors.map((e: { message: string }) => e.message).join(", ")}`);
+          }
         }
       }
 
