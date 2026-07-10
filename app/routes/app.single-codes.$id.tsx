@@ -99,7 +99,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     collectionIds,
     collectionTitles,
     blockedProductTypes: (config.blockedProductTypes as string[]) ?? [],
-    metafieldRaw: metafieldValue ?? null,
   };
 };
 
@@ -400,43 +399,6 @@ export default function SingleCodeDetailsPage() {
             />
           </>
         )}
-      </s-section>
-
-      <s-section heading="Eligible customers">
-        {(() => {
-          if (!loaderData.metafieldRaw) {
-            return (
-              <s-banner tone="critical">
-                <s-paragraph>Metafield is missing — delete and recreate this single code, then run Sync customer tags in Settings.</s-paragraph>
-              </s-banner>
-            );
-          }
-          let cfg: Record<string, unknown> = {};
-          try { cfg = JSON.parse(loaderData.metafieldRaw); } catch {}
-          const eligible = Array.isArray(cfg.eligibleCustomerIds) ? (cfg.eligibleCustomerIds as unknown[]).length : null;
-          const blockedCount = Array.isArray(cfg.blockedCustomerIds) ? (cfg.blockedCustomerIds as unknown[]).length : null;
-          if (eligible === null) {
-            return (
-              <s-banner tone="warning">
-                <s-paragraph>No eligible customers synced yet. Go to Settings → Sync customer tags after adding the required tag to customers in Shopify admin.</s-paragraph>
-              </s-banner>
-            );
-          }
-          return (
-            <div style={{ display: "flex", gap: "24px" }}>
-              <div>
-                <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Eligible</div>
-                <span style={{ fontSize: "16px", fontWeight: 500 }}>{eligible} customer{eligible !== 1 ? "s" : ""}</span>
-              </div>
-              {blockedCount !== null && (
-                <div>
-                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Blocked (limit reached)</div>
-                  <span style={{ fontSize: "16px", fontWeight: 500 }}>{blockedCount} customer{blockedCount !== 1 ? "s" : ""}</span>
-                </div>
-              )}
-            </div>
-          );
-        })()}
       </s-section>
 
       <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
