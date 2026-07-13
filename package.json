@@ -1,5 +1,5 @@
 {
-  "name": "discount-code-blocker",
+  "name": "checkout-discount-rules",
   "private": true,
   "scripts": {
     "build": "react-router build",

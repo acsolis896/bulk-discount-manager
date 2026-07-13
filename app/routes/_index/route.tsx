@@ -21,9 +21,10 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>Bulk Discount Manager</h1>
+        <h1 className={styles.heading}>Checkout Discount Rules</h1>
         <p className={styles.text}>
-          Create and manage bulk discount code sets for your Shopify store.
+          Create bulk and single-use discount codes, and control which items and
+          combinations are allowed at checkout.
         </p>
         {showForm && (
           <Form className={styles.form} method="post" action="/auth/login">
