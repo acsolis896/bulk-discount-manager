@@ -21,6 +21,26 @@ const shopify = shopifyApp({
   },
   hooks: {
     afterAuth: async ({ admin }) => {
+      const existingRes = await admin.graphql(`
+        query FindAutomaticDiscount {
+          discountNodes(first: 5, query: "function_id:discount-rejection-function-js") {
+            nodes {
+              discount {
+                __typename
+              }
+            }
+          }
+        }
+      `);
+      const existingData = await existingRes.json();
+      const alreadyExists = (existingData.data?.discountNodes?.nodes ?? []).some(
+        (n: { discount?: { __typename?: string } }) => n.discount?.__typename === "DiscountAutomaticApp"
+      );
+      if (alreadyExists) {
+        console.log("Discount Rejection automatic discount already exists, skipping creation");
+        return;
+      }
+
       const response = await admin.graphql(`
         mutation {
           discountAutomaticAppCreate(

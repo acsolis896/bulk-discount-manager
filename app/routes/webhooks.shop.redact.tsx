@@ -3,17 +3,12 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, session, topic } = await authenticate.webhook(request);
+  const { shop, topic } = await authenticate.webhook(request);
 
   console.log(`Received ${topic} webhook for ${shop}`);
 
-  // Webhook requests can trigger multiple times and after an app has already been uninstalled.
-  // If this webhook already ran, the session may have been deleted previously.
-  if (session) {
-    await db.session.deleteMany({ where: { shop } });
-  }
-
-  // Clean up all shop data on uninstall
+  // Fires 48 hours after uninstall — purge anything still left for this shop.
+  await db.session.deleteMany({ where: { shop } });
   await db.preUsedCode.deleteMany({ where: { shop } });
   await db.blockedProductType.deleteMany({ where: { shop } });
   await db.singleCodeDiscount.deleteMany({ where: { shop } });
