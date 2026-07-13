@@ -1,4 +1,4 @@
 {
-  "name": "discount-rejection-function-js",
-  "description": "discount-rejection-function-js"
+  "name": "Discount Codes & Rules",
+  "description": "Applies discount code eligibility, blocks codes when restricted items are in the cart, and enforces checkout rules."
 }
