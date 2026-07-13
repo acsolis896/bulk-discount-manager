@@ -9,9 +9,8 @@ import {
   PLAN_PRO_ANNUAL,
   FREE_PLAN_LIMIT,
   STARTER_PLAN_LIMIT,
-  getCurrentPlan,
-  countActiveCodes,
-} from "../billing.server";
+} from "../billing";
+import { getCurrentPlan, countActiveCodes } from "../billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, billing } = await authenticate.admin(request);

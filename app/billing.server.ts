@@ -1,18 +1,16 @@
 import { BillingInterval } from "@shopify/shopify-app-react-router/server";
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import type { BillingConfigSubscriptionLineItemPlan } from "@shopify/shopify-api";
-
-export const PLAN_STARTER_MONTHLY = "Starter";
-export const PLAN_STARTER_ANNUAL = "Starter (Annual)";
-export const PLAN_PRO_MONTHLY = "Pro";
-export const PLAN_PRO_ANNUAL = "Pro (Annual)";
-
-export const ALL_PAID_PLANS = [
+import {
   PLAN_STARTER_MONTHLY,
   PLAN_STARTER_ANNUAL,
   PLAN_PRO_MONTHLY,
   PLAN_PRO_ANNUAL,
-];
+  ALL_PAID_PLANS,
+  tierForPlanName,
+  limitForTier,
+  type PlanTier,
+} from "./billing";
 
 export const billingConfig = {
   [PLAN_STARTER_MONTHLY]: {
@@ -28,24 +26,6 @@ export const billingConfig = {
     lineItems: [{ amount: 499.9, currencyCode: "USD", interval: BillingInterval.Annual }],
   },
 } satisfies Record<string, BillingConfigSubscriptionLineItemPlan>;
-
-export const FREE_PLAN_LIMIT = 10;
-export const STARTER_PLAN_LIMIT = 1000;
-// Pro = unlimited (limit is null)
-
-export type PlanTier = "Free" | "Starter" | "Pro";
-
-export function tierForPlanName(planName: string | null): PlanTier {
-  if (planName === PLAN_STARTER_MONTHLY || planName === PLAN_STARTER_ANNUAL) return "Starter";
-  if (planName === PLAN_PRO_MONTHLY || planName === PLAN_PRO_ANNUAL) return "Pro";
-  return "Free";
-}
-
-export function limitForTier(tier: PlanTier): number | null {
-  if (tier === "Starter") return STARTER_PLAN_LIMIT;
-  if (tier === "Pro") return null; // unlimited
-  return FREE_PLAN_LIMIT;
-}
 
 // The real BillingContext type's `check` signature is generic over the
 // app's exact billing config, which makes it awkward to name here. This
