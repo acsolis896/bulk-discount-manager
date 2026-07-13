@@ -72,7 +72,7 @@ export default function SingleCodesPage() {
   const navigate = useNavigate();
 
   return (
-    <s-page heading="Single Codes">
+    <s-page heading="Reusable Codes">
       {dbError && (
         <s-banner tone="critical" style={{ marginBottom: "16px" }}>
           <s-paragraph>Database error: {dbError}. The table may not have been created yet — try redeploying the app.</s-paragraph>
@@ -80,16 +80,16 @@ export default function SingleCodesPage() {
       )}
       <div style={{ marginBottom: "20px" }}>
         <s-button variant="primary" onClick={() => navigate("/app/single-codes/new")}>
-          Create single code
+          Create reusable code
         </s-button>
       </div>
 
       {codes.length === 0 ? (
         <s-section heading="">
-          <s-paragraph>No single codes created yet.</s-paragraph>
+          <s-paragraph>No reusable codes created yet.</s-paragraph>
         </s-section>
       ) : (
-        <s-section heading="All single codes">
+        <s-section heading="All reusable codes">
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px", marginBottom: "4px" }}>
               <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 2 }}>Code</span>

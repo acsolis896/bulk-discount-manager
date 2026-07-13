@@ -299,7 +299,7 @@ export default function NewSingleCodePage() {
       : null;
 
   return (
-    <s-page heading="Create single code">
+    <s-page heading="Create reusable code">
       {result?.error && (
         <s-banner tone="critical" style={{ marginBottom: "16px" }}>
           <s-paragraph>{result.error}</s-paragraph>

@@ -308,7 +308,7 @@ export default function SingleCodeDetailsPage() {
   return (
     <s-page heading={loaderData.title}>
       <div style={{ marginBottom: "16px" }}>
-        <s-button onClick={() => navigate("/app/single-codes")}>← Back to Single codes</s-button>
+        <s-button onClick={() => navigate("/app/single-codes")}>← Back to Reusable codes</s-button>
       </div>
 
       {result?.error && (
