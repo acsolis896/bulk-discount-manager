@@ -42,6 +42,7 @@ export default function App() {
         <s-link href="/app/additional">Discount sets</s-link>
         <s-link href="/app/settings">Rules</s-link>
         <s-link href="/app/single-codes">Single codes</s-link>
+        <s-link href="/app/plans">Plans</s-link>
       </s-app-nav>
       {isLoading ? (
         <s-page heading="Loading…">

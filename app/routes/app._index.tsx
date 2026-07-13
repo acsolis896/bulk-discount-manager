@@ -9,6 +9,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { checkCodeQuota } from "../billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -37,7 +38,7 @@ function parseCSVCodes(text: string): ParsedCode[] {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
-    const { admin, session } = await authenticate.admin(request);
+    const { admin, session, billing } = await authenticate.admin(request);
     const formData = await request.formData();
 
     const title = String(formData.get("title") || "Bulk Discount");
@@ -102,6 +103,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const codeSet = new Set<string>();
       while (codeSet.size < codeCount) codeSet.add(`${prefix}-${randomSuffix()}`);
       finalCodes = Array.from(codeSet);
+    }
+
+    const quota = await checkCodeQuota(admin, billing, finalCodes.length);
+    if (!quota.allowed) {
+      return {
+        error: `Your ${quota.tier} plan allows up to ${quota.limit} active discount codes (currently using ${quota.current}). Upgrade on the Plans page to create more.`,
+      };
     }
 
     // Expand collection IDs → product IDs

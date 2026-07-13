@@ -5,6 +5,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { checkCodeQuota } from "../billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -12,7 +13,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { admin, session, billing } = await authenticate.admin(request);
   const formData = await request.formData();
 
   const title = String(formData.get("title") || "").trim();
@@ -32,6 +33,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!code) return { error: "Discount code is required." };
   if (!percentage || percentage < 1 || percentage > 100) return { error: "Percentage must be between 1 and 100." };
   if (productIds.length === 0 && collectionIds.length === 0) return { error: "Select at least one eligible product or collection." };
+
+  const quota = await checkCodeQuota(admin, billing, 1);
+  if (!quota.allowed) {
+    return {
+      error: `Your ${quota.tier} plan allows up to ${quota.limit} active discount codes (currently using ${quota.current}). Upgrade on the Plans page to create more.`,
+    };
+  }
 
   // Expand collections to product IDs
   let resolvedProductIds = [...productIds];
