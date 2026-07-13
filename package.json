@@ -1,5 +1,5 @@
 {
-  "name": "checkout-discount-rules",
+  "name": "discount-codes-and-rules",
   "private": true,
   "scripts": {
     "build": "react-router build",

@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "b350a7a96101159f068755dd33014af2"
-name = "Checkout Discount Rules"
+name = "Discount Codes & Rules"
 application_url = "https://bulk-discount-manager-production.up.railway.app"
 embedded = true
 
