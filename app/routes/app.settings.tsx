@@ -373,7 +373,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const intent = fetcher.formData?.get("intent");
-    if (isFetcherBusy && intent === "sync") {
+    if (isFetcherBusy && (intent === "sync" || intent === "syncCustomers")) {
       setForcedIdle(false);
       syncTimeoutRef.current = setTimeout(() => setForcedIdle(true), 60000);
     } else {

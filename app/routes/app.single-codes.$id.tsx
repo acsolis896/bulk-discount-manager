@@ -218,6 +218,24 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return { success: true };
   }
 
+  if (intent === "delete") {
+    // Try to delete from Shopify (may already be gone)
+    try {
+      await admin.graphql(
+        `#graphql
+        mutation DeleteDiscount($id: ID!) {
+          discountCodeDelete(id: $id) {
+            userErrors { field message }
+          }
+        }`,
+        { variables: { id: discountId } }
+      );
+    } catch { /* ignore — already deleted from Shopify */ }
+
+    await db.singleCodeDiscount.deleteMany({ where: { shop: session.shop, discountId } });
+    return { deleted: true };
+  }
+
   return { error: "Unknown intent" };
 };
 
@@ -237,10 +255,11 @@ export default function SingleCodeDetailsPage() {
   const [collectionTitles, setCollectionTitles] = useState<string[]>(loaderData.collectionTitles);
 
   const isSaving = fetcher.state !== "idle";
-  const result = fetcher.data as { error?: string; success?: boolean } | undefined;
+  const result = fetcher.data as { error?: string; success?: boolean; deleted?: boolean } | undefined;
 
   useEffect(() => {
     if (result?.success && editing) setEditing(false);
+    if (result?.deleted) navigate("/app/single-codes");
   }, [result]);
 
   const handlePickCollections = useCallback(async () => {
@@ -401,17 +420,32 @@ export default function SingleCodeDetailsPage() {
         )}
       </s-section>
 
-      <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
-        {!editing ? (
-          <s-button variant="primary" onClick={() => setEditing(true)}>Edit</s-button>
-        ) : (
-          <>
-            <s-button variant="primary" disabled={isSaving} onClick={handleSave}>
-              {isSaving ? "Saving..." : "Save changes"}
-            </s-button>
-            <s-button onClick={() => setEditing(false)}>Cancel</s-button>
-          </>
-        )}
+      <div style={{ display: "flex", gap: "8px", marginTop: "16px", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: "8px" }}>
+          {!editing ? (
+            <s-button variant="primary" onClick={() => setEditing(true)}>Edit</s-button>
+          ) : (
+            <>
+              <s-button variant="primary" disabled={isSaving} onClick={handleSave}>
+                {isSaving ? "Saving..." : "Save changes"}
+              </s-button>
+              <s-button onClick={() => setEditing(false)}>Cancel</s-button>
+            </>
+          )}
+        </div>
+        <s-button
+          tone="critical"
+          disabled={isSaving}
+          onClick={() => {
+            if (confirm(`Delete ${loaderData.code}? This cannot be undone.`)) {
+              const form = new FormData();
+              form.set("intent", "delete");
+              fetcher.submit(form, { method: "post" });
+            }
+          }}
+        >
+          Delete
+        </s-button>
       </div>
     </s-page>
   );
