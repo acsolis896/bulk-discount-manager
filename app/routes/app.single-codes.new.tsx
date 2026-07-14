@@ -394,7 +394,7 @@ export default function NewSingleCodePage() {
           </div>
         </div>
         <div style={{ marginTop: "16px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 600 }}>Expiry date (optional)</div>
+          <div style={{ fontSize: "14px", fontWeight: 600 }}>Expiration date (optional)</div>
           <input
             type="date"
             value={endsAt}
