@@ -41,6 +41,8 @@ model SingleCodeDiscount {
   code                String
   requiredTag         String   @default("")
   blockedTag          String   @default("")
+  eligibilityMode     String?
+  segmentId           String?
   configJson          String?
   eligibleCustomerIds String?
   blockedCustomerIds  String?

@@ -5,6 +5,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { applyEligibility, listSegments } from "../eligibility.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
@@ -15,6 +16,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     where: { shop: session.shop, discountId },
   });
   if (!row) throw new Response("Not found", { status: 404 });
+
+  const segments = await listSegments(admin);
+  const eligibilityMode: "all" | "tags" | "segment" =
+    row.eligibilityMode === "tags" || row.eligibilityMode === "segment"
+      ? row.eligibilityMode
+      : row.requiredTag
+        ? "tags"
+        : "all";
 
   // Fetch discount details from Shopify
   const res = await admin.graphql(
@@ -88,6 +97,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     code: row.code,
     requiredTag: row.requiredTag,
     blockedTag: row.blockedTag,
+    eligibilityMode,
+    segmentId: row.segmentId ?? "",
+    segments,
     title: discount?.title ?? row.code,
     status: discount?.status ?? "UNKNOWN",
     usageCount: discount?.asyncUsageCount ?? 0,
@@ -113,8 +125,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const intent = String(formData.get("intent") || "");
 
   if (intent === "updateConfig") {
-    const requiredTag = String(formData.get("requiredTag") || "").trim();
-    const blockedTag = String(formData.get("blockedTag") || "").trim();
+    const eligibilityMode = (["all", "tags", "segment"] as const).includes(String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
+      ? (String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
+      : "all";
+    const requiredTag = eligibilityMode === "tags" ? String(formData.get("requiredTag") || "").trim() : "";
+    const blockedTag = eligibilityMode === "tags" ? String(formData.get("blockedTag") || "").trim() : "";
+    const selectedSegmentId = String(formData.get("segmentId") || "").trim();
     const discountType = String(formData.get("discountType") || "percentage") === "fixedAmount" ? "fixedAmount" : "percentage";
     const percentage = Number(formData.get("percentage") || 0);
     const fixedAmount = Number(formData.get("fixedAmount") || 0);
@@ -158,7 +174,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     // Look up functionNodeId from DB
-    const dbRow = await db.singleCodeDiscount.findFirst({ where: { shop: session.shop, discountId }, select: { functionNodeId: true } });
+    const dbRow = await db.singleCodeDiscount.findFirst({ where: { shop: session.shop, discountId }, select: { functionNodeId: true, code: true } });
     const fnNodeId = dbRow?.functionNodeId ?? null;
     const readFromId = fnNodeId ?? discountId;
 
@@ -226,12 +242,31 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       blockedTag,
     });
 
+    let eligibilityWarning: string | null = null;
+    if (eligibilityMode !== "all") {
+      eligibilityWarning = await applyEligibility(
+        admin,
+        discountId,
+        `${dbRow?.code ?? numericId} Eligible`,
+        eligibilityMode,
+        requiredTag,
+        blockedTag,
+        selectedSegmentId
+      );
+    }
+
     await db.singleCodeDiscount.updateMany({
       where: { shop: session.shop, discountId },
-      data: { requiredTag, blockedTag, configJson: baseConfigJson },
+      data: {
+        requiredTag,
+        blockedTag,
+        eligibilityMode,
+        segmentId: eligibilityMode === "segment" ? selectedSegmentId : null,
+        configJson: baseConfigJson,
+      },
     });
 
-    return { success: true };
+    return { success: true, eligibilityWarning };
   }
 
   if (intent === "delete") {
@@ -262,8 +297,10 @@ export default function SingleCodeDetailsPage() {
   const fetcher = useFetcher<typeof action>();
 
   const [editing, setEditing] = useState(false);
+  const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">(loaderData.eligibilityMode);
   const [requiredTag, setRequiredTag] = useState(loaderData.requiredTag);
   const [blockedTag, setBlockedTag] = useState(loaderData.blockedTag);
+  const [selectedSegmentId, setSelectedSegmentId] = useState(loaderData.segmentId);
   const [discountType, setDiscountType] = useState<"percentage" | "fixedAmount">(loaderData.discountType);
   const [percentage, setPercentage] = useState(String(loaderData.percentage ?? ""));
   const [fixedAmount, setFixedAmount] = useState(String(loaderData.fixedAmount ?? ""));
@@ -274,7 +311,7 @@ export default function SingleCodeDetailsPage() {
   const [collectionTitles, setCollectionTitles] = useState<string[]>(loaderData.collectionTitles);
 
   const isSaving = fetcher.state !== "idle";
-  const result = fetcher.data as { error?: string; success?: boolean; deleted?: boolean } | undefined;
+  const result = fetcher.data as { error?: string; success?: boolean; deleted?: boolean; eligibilityWarning?: string | null } | undefined;
 
   useEffect(() => {
     if (result?.success && editing) setEditing(false);
@@ -312,8 +349,10 @@ export default function SingleCodeDetailsPage() {
   const handleSave = () => {
     const form = new FormData();
     form.set("intent", "updateConfig");
+    form.set("eligibilityMode", eligibilityMode);
     form.set("requiredTag", requiredTag);
     form.set("blockedTag", blockedTag);
+    form.set("segmentId", selectedSegmentId);
     form.set("discountType", discountType);
     form.set("percentage", percentage);
     form.set("fixedAmount", fixedAmount);
@@ -336,6 +375,12 @@ export default function SingleCodeDetailsPage() {
       {result?.error && (
         <s-banner tone="critical" style={{ marginBottom: "16px" }}>
           <s-paragraph>{result.error}</s-paragraph>
+        </s-banner>
+      )}
+
+      {result?.success && result.eligibilityWarning && (
+        <s-banner tone="warning" style={{ marginBottom: "16px" }}>
+          <s-paragraph>Saved, but customer eligibility couldn't be applied: {result.eligibilityWarning}</s-paragraph>
         </s-banner>
       )}
 
@@ -405,32 +450,84 @@ export default function SingleCodeDetailsPage() {
 
       <s-section heading="Customer eligibility">
         {!editing ? (
-          <div style={{ display: "flex", gap: "24px" }}>
-            <div>
-              <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Required tag</div>
-              <span style={{ fontFamily: "monospace" }}>{loaderData.requiredTag || "—"}</span>
-            </div>
-            <div>
-              <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Blocked tag</div>
-              <span style={{ fontFamily: "monospace" }}>{loaderData.blockedTag || "—"}</span>
-            </div>
+          <div>
+            {loaderData.eligibilityMode === "all" && <span>All customers</span>}
+            {loaderData.eligibilityMode === "tags" && (
+              <div style={{ display: "flex", gap: "24px" }}>
+                <div>
+                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Required tag</div>
+                  <span style={{ fontFamily: "monospace" }}>{loaderData.requiredTag || "—"}</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Blocked tag</div>
+                  <span style={{ fontFamily: "monospace" }}>{loaderData.blockedTag || "—"}</span>
+                </div>
+              </div>
+            )}
+            {loaderData.eligibilityMode === "segment" && (
+              <span>
+                {loaderData.segments.find((s: { id: string; name: string }) => s.id === loaderData.segmentId)?.name ?? "Segment"}
+              </span>
+            )}
           </div>
         ) : (
           <>
-            <s-text-field
-              label="Required customer tag"
-              value={requiredTag}
-              placeholder="e.g. GUIDE50"
-              helpText="Customers must have this tag to use the code"
-              onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
-            />
-            <s-text-field
-              label="Blocked customer tag"
-              value={blockedTag}
-              placeholder="e.g. GUIDE50-USED"
-              helpText="Customers with this tag will be rejected (usage limit reached)"
-              onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
-            />
+            <div style={{ width: "fit-content" }}>
+              <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
+                {(["all", "tags", "segment"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setEligibilityMode(mode)}
+                    style={{
+                      padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
+                      fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
+                      background: eligibilityMode === mode ? "#fff" : "transparent",
+                      color: eligibilityMode === mode ? "#202223" : "#6d7175",
+                      boxShadow: eligibilityMode === mode ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                    }}
+                  >
+                    {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {eligibilityMode === "tags" && (
+              <div style={{ marginTop: "16px" }}>
+                <s-text-field
+                  label="Required customer tag"
+                  value={requiredTag}
+                  placeholder="e.g. GUIDE50"
+                  helpText="Customers must have this tag to use the code"
+                  onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
+                />
+                <s-text-field
+                  label="Blocked customer tag"
+                  value={blockedTag}
+                  placeholder="e.g. GUIDE50-USED"
+                  helpText="Customers with this tag will be rejected (usage limit reached)"
+                  onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
+                />
+              </div>
+            )}
+
+            {eligibilityMode === "segment" && (
+              <div style={{ marginTop: "16px" }}>
+                <label style={{ display: "block", fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>
+                  Customer segment
+                </label>
+                <select
+                  value={selectedSegmentId}
+                  onChange={(e) => setSelectedSegmentId(e.target.value)}
+                  style={{ padding: "6px 8px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", width: "300px" }}
+                >
+                  <option value="">Select a segment…</option>
+                  {loaderData.segments.map((s: { id: string; name: string }) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div style={{ marginTop: "16px" }}>
               <s-stack direction="block" gap="tight">
                 <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>

@@ -237,6 +237,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       code,
       requiredTag,
       blockedTag,
+      eligibilityMode,
+      segmentId: eligibilityMode === "segment" ? selectedSegmentId : null,
       configJson: metafieldConfig,
       functionNodeId: functionNodeId !== nodeDiscountId ? functionNodeId : null,
     },
