@@ -431,7 +431,7 @@ export default function SingleCodeDetailsPage() {
               helpText="Customers with this tag will be rejected (usage limit reached)"
               onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
             />
-            <s-stack direction="block" gap="tight">
+            <s-stack direction="block" gap="tight" style={{ marginTop: "16px" }}>
               <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
               <div style={{ width: "fit-content" }}>
                 <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
@@ -475,7 +475,7 @@ export default function SingleCodeDetailsPage() {
                 />
               )}
             </s-stack>
-            <s-stack direction="block" gap="none">
+            <s-stack direction="block" gap="none" style={{ marginTop: "16px" }}>
               <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
                 <input type="checkbox" checked={oncePerOrder} onChange={(e) => setOncePerOrder(e.target.checked)} />
                 Only apply discount once per order

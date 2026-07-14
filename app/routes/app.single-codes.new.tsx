@@ -336,7 +336,7 @@ export default function NewSingleCodePage() {
           helpText="The code customers enter at checkout"
           onInput={(e: { target: { value: string } }) => setCode(e.target.value.toUpperCase())}
         />
-        <s-stack direction="block" gap="tight">
+        <s-stack direction="block" gap="tight" style={{ marginTop: "16px" }}>
           <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
           <div style={{ width: "fit-content" }}>
             <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
@@ -380,7 +380,7 @@ export default function NewSingleCodePage() {
             />
           )}
         </s-stack>
-        <s-stack direction="block" gap="none">
+        <s-stack direction="block" gap="none" style={{ marginTop: "16px" }}>
           <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
             <input type="checkbox" checked={oncePerOrder} onChange={(e) => setOncePerOrder(e.target.checked)} />
             Only apply discount once per order
@@ -391,12 +391,14 @@ export default function NewSingleCodePage() {
               : "The discount will be taken off every eligible item in the cart."}
           </s-text>
         </s-stack>
-        <s-text-field
-          label="Expiry date (optional)"
-          type="date"
-          value={endsAt}
-          onInput={(e: { target: { value: string } }) => setEndsAt(e.target.value)}
-        />
+        <div style={{ marginTop: "16px" }}>
+          <s-text-field
+            label="Expiry date (optional)"
+            type="date"
+            value={endsAt}
+            onInput={(e: { target: { value: string } }) => setEndsAt(e.target.value)}
+          />
+        </div>
       </s-section>
 
       <s-section heading="Eligible items">

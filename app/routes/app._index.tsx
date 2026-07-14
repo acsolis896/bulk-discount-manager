@@ -451,7 +451,7 @@ export default function Index() {
             onInput={(e: InputEvent) => setTitle((e.target as HTMLInputElement).value)}
             helpText="Shown in the Shopify admin discounts list"
           />
-          <s-stack direction="block" gap="tight">
+          <s-stack direction="block" gap="tight" style={{ marginTop: "16px" }}>
             <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
             <div style={{ width: "fit-content" }}>
               <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
@@ -494,7 +494,7 @@ export default function Index() {
               />
             )}
           </s-stack>
-          <s-stack direction="block" gap="none">
+          <s-stack direction="block" gap="none" style={{ marginTop: "16px" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
               <input type="checkbox" checked={oncePerOrder} onChange={(e) => setOncePerOrder(e.target.checked)} />
               Only apply discount once per order
@@ -505,7 +505,7 @@ export default function Index() {
                 : "The discount will be taken off every eligible item in the cart."}
             </s-text>
           </s-stack>
-          <s-stack direction="block" gap="none">
+          <s-stack direction="block" gap="none" style={{ marginTop: "16px" }}>
             <s-text emphasis="bold" style={{ fontSize: "14px" }}>Expiration date</s-text>
             <input
               type="date"
@@ -515,7 +515,7 @@ export default function Index() {
             />
             <s-text style={{ fontSize: "12px", color: "#6d7175", marginTop: "4px" }}>Optional — leave blank for no expiration</s-text>
           </s-stack>
-          <s-stack direction="block" gap="tight">
+          <s-stack direction="block" gap="tight" style={{ marginTop: "16px" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
               <input
                 type="checkbox"
