@@ -4,16 +4,18 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { useFetcher } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { checkCodeQuota } from "../billing.server";
+import { applyEligibility, listSegments } from "../eligibility.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  return null;
+  const { admin } = await authenticate.admin(request);
+  const segments = await listSegments(admin);
+  return { segments };
 };
 
 type ParsedCode = { code: string; used: boolean };
@@ -54,6 +56,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const combinesWithProduct = formData.get("combinesWithProduct") === "1";
     const combinesWithOrder = formData.get("combinesWithOrder") === "1";
     const combinesWithShipping = formData.get("combinesWithShipping") === "1";
+    const eligibilityMode = (["all", "tags", "segment"] as const).includes(String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
+      ? (String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
+      : "all";
+    const requiredTag = String(formData.get("requiredTag") || "").trim();
+    const blockedTag = String(formData.get("blockedTag") || "").trim();
+    const selectedSegmentId = String(formData.get("segmentId") || "").trim();
     const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
     const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
 
@@ -244,6 +252,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return { error: `Saving configuration: ${metafieldErrors.map((e: { message: string }) => e.message).join(", ")}` };
     }
 
+    let eligibilityWarning: string | null = null;
+    if (eligibilityMode !== "all") {
+      eligibilityWarning = await applyEligibility(
+        admin,
+        discountId,
+        `${title} Eligible`,
+        eligibilityMode,
+        requiredTag,
+        blockedTag,
+        selectedSegmentId
+      );
+    }
+
     // Step 3: bulk-add remaining codes in batches of 250 (skip the one used for creation)
     const remainingCodes = finalCodes
       .filter((_, i) => i !== firstCodeIndex)
@@ -296,6 +317,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       codeCount: finalCodes.length,
       preUsedCount: preUsedCodes.length,
       firstCode,
+      eligibilityWarning,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -306,6 +328,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 type SelectedItem = { id: string; title: string };
 
 export default function Index() {
+  const { segments } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -315,6 +338,10 @@ export default function Index() {
   const [percentage, setPercentage] = useState("20");
   const [fixedAmount, setFixedAmount] = useState("10");
   const [oncePerOrder, setOncePerOrder] = useState(true);
+  const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">("all");
+  const [requiredTag, setRequiredTag] = useState("");
+  const [blockedTag, setBlockedTag] = useState("");
+  const [selectedSegmentId, setSelectedSegmentId] = useState("");
   const [codeMode, setCodeMode] = useState<"generate" | "import">("generate");
   const [endsAt, setEndsAt] = useState("");
   const [usageLimitOne, setUsageLimitOne] = useState(true);
@@ -375,6 +402,10 @@ export default function Index() {
     formData.set("combinesWithProduct", combinesWithProduct ? "1" : "0");
     formData.set("combinesWithOrder", combinesWithOrder ? "1" : "0");
     formData.set("combinesWithShipping", combinesWithShipping ? "1" : "0");
+    formData.set("eligibilityMode", eligibilityMode);
+    formData.set("requiredTag", requiredTag);
+    formData.set("blockedTag", blockedTag);
+    formData.set("segmentId", selectedSegmentId);
     if (codeMode === "import" && csvFile) {
       formData.set("csvFile", csvFile);
     } else {
@@ -390,7 +421,7 @@ export default function Index() {
       formData.set("productIds", JSON.stringify([]));
     }
     fetcher.submit(formData, { method: "POST", encType: "multipart/form-data" });
-  }, [fetcher, title, discountType, percentage, fixedAmount, oncePerOrder, codeMode, csvFile, prefix, codeCount, codeLength, selectionType, selectedItems]);
+  }, [fetcher, title, discountType, percentage, fixedAmount, oncePerOrder, eligibilityMode, requiredTag, blockedTag, selectedSegmentId, codeMode, csvFile, prefix, codeCount, codeLength, selectionType, selectedItems]);
 
   const handleReset = useCallback(() => {
     setTitle("Bulk Discount");
@@ -433,6 +464,9 @@ export default function Index() {
               {result.preUsedCount as number} previously used codes recorded for history.
             </s-paragraph>
           )}
+          {result.eligibilityWarning ? (
+            <s-paragraph>Customer eligibility warning: {result.eligibilityWarning as string}</s-paragraph>
+          ) : null}
           <s-paragraph>Discount ID: {result.discountId as string}</s-paragraph>
         </s-banner>
       )}
@@ -538,24 +572,6 @@ export default function Index() {
           </s-stack>
           </div>
         </s-form-layout>
-      </s-section>
-
-      <s-section heading="Combinations">
-        <s-stack direction="block" gap="tight">
-          <s-paragraph>Choose whether this discount can be combined with other discount types.</s-paragraph>
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
-            <input type="checkbox" checked={combinesWithProduct} onChange={(e) => setCombinesWithProduct(e.target.checked)} />
-            Product discounts
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
-            <input type="checkbox" checked={combinesWithOrder} onChange={(e) => setCombinesWithOrder(e.target.checked)} />
-            Order discounts
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
-            <input type="checkbox" checked={combinesWithShipping} onChange={(e) => setCombinesWithShipping(e.target.checked)} />
-            Shipping discounts
-          </label>
-        </s-stack>
       </s-section>
 
       <s-section heading="Codes">
@@ -676,6 +692,86 @@ export default function Index() {
               </s-stack>
             </s-box>
           )}
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Customer eligibility">
+        <s-stack direction="block" gap="tight">
+          <s-paragraph>Choose which customers can use these discount codes.</s-paragraph>
+          <div style={{ width: "fit-content" }}>
+            <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
+              {(["all", "tags", "segment"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setEligibilityMode(mode)}
+                  style={{
+                    padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
+                    fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
+                    background: eligibilityMode === mode ? "#fff" : "transparent",
+                    color: eligibilityMode === mode ? "#202223" : "#6d7175",
+                    boxShadow: eligibilityMode === mode ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                  }}
+                >
+                  {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {eligibilityMode === "tags" && (
+            <s-form-layout>
+              <s-text-field
+                label="Required customer tag"
+                value={requiredTag}
+                placeholder="e.g. VIP"
+                helpText="Customers must have this tag to use any of these codes"
+                onInput={(e: InputEvent) => setRequiredTag((e.target as HTMLInputElement).value)}
+              />
+              <s-text-field
+                label="Blocked customer tag (optional)"
+                value={blockedTag}
+                placeholder="e.g. VIP-USED"
+                helpText="Customers with this tag will be excluded"
+                onInput={(e: InputEvent) => setBlockedTag((e.target as HTMLInputElement).value)}
+              />
+            </s-form-layout>
+          )}
+
+          {eligibilityMode === "segment" && (
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>
+                Customer segment
+              </label>
+              <select
+                value={selectedSegmentId}
+                onChange={(e) => setSelectedSegmentId(e.target.value)}
+                style={{ padding: "6px 8px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", width: "300px" }}
+              >
+                <option value="">Select a segment…</option>
+                {segments.map((s: { id: string; name: string }) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Combinations">
+        <s-stack direction="block" gap="tight">
+          <s-paragraph>Choose whether this discount can be combined with other discount types.</s-paragraph>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+            <input type="checkbox" checked={combinesWithProduct} onChange={(e) => setCombinesWithProduct(e.target.checked)} />
+            Product discounts
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+            <input type="checkbox" checked={combinesWithOrder} onChange={(e) => setCombinesWithOrder(e.target.checked)} />
+            Order discounts
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+            <input type="checkbox" checked={combinesWithShipping} onChange={(e) => setCombinesWithShipping(e.target.checked)} />
+            Shipping discounts
+          </label>
         </s-stack>
       </s-section>
 

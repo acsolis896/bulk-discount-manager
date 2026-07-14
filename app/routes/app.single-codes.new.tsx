@@ -1,15 +1,17 @@
 import { useState, useCallback, useEffect } from "react";
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useNavigate, useFetcher } from "react-router";
+import { useNavigate, useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { checkCodeQuota } from "../billing.server";
+import { applyEligibility, listSegments } from "../eligibility.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  return null;
+  const { admin } = await authenticate.admin(request);
+  const segments = await listSegments(admin);
+  return { segments };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -22,8 +24,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const percentage = Number(formData.get("percentage") || 0);
   const fixedAmount = Number(formData.get("fixedAmount") || 0);
   const oncePerOrder = formData.get("oncePerOrder") !== "0";
-  const requiredTag = String(formData.get("requiredTag") || "").trim();
-  const blockedTag = String(formData.get("blockedTag") || "").trim();
+  const eligibilityMode = (["all", "tags", "segment"] as const).includes(String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
+    ? (String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
+    : "all";
+  const requiredTag = eligibilityMode === "tags" ? String(formData.get("requiredTag") || "").trim() : "";
+  const blockedTag = eligibilityMode === "tags" ? String(formData.get("blockedTag") || "").trim() : "";
+  const selectedSegmentId = String(formData.get("segmentId") || "").trim();
   const endsAtRaw = String(formData.get("endsAt") || "");
   const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
   const combinesWithProduct = formData.get("combinesWithProduct") === "1";
@@ -211,6 +217,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   }
 
+  let eligibilityWarning: string | null = null;
+  if (eligibilityMode !== "all") {
+    eligibilityWarning = await applyEligibility(
+      admin,
+      nodeDiscountId,
+      `${code} Eligible`,
+      eligibilityMode,
+      requiredTag,
+      blockedTag,
+      selectedSegmentId
+    );
+  }
+
   await db.singleCodeDiscount.create({
     data: {
       shop: session.shop,
@@ -223,10 +242,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     },
   });
 
-  return { success: true, numericId };
+  return { success: true, numericId, eligibilityWarning };
 };
 
 export default function NewSingleCodePage() {
+  const { segments } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const navigate = useNavigate();
   const shopify = useAppBridge();
@@ -237,8 +257,10 @@ export default function NewSingleCodePage() {
   const [percentage, setPercentage] = useState("50");
   const [fixedAmount, setFixedAmount] = useState("10");
   const [oncePerOrder, setOncePerOrder] = useState(true);
+  const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">("all");
   const [requiredTag, setRequiredTag] = useState("");
   const [blockedTag, setBlockedTag] = useState("");
+  const [selectedSegmentId, setSelectedSegmentId] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [productIds, setProductIds] = useState<string[]>([]);
   const [productTitles, setProductTitles] = useState<string[]>([]);
@@ -250,10 +272,10 @@ export default function NewSingleCodePage() {
   const [combinesWithShipping, setCombinesWithShipping] = useState(false);
 
   const isSubmitting = fetcher.state !== "idle";
-  const result = fetcher.data as { error?: string; success?: boolean; numericId?: string } | undefined;
+  const result = fetcher.data as { error?: string; success?: boolean; numericId?: string; eligibilityWarning?: string | null } | undefined;
 
   useEffect(() => {
-    if (result?.success && result.numericId) {
+    if (result?.success && result.numericId && !result.eligibilityWarning) {
       navigate(`/app/single-codes/${result.numericId}`);
     }
   }, [result, navigate]);
@@ -296,8 +318,10 @@ export default function NewSingleCodePage() {
     form.set("percentage", percentage);
     form.set("fixedAmount", fixedAmount);
     form.set("oncePerOrder", oncePerOrder ? "1" : "0");
+    form.set("eligibilityMode", eligibilityMode);
     form.set("requiredTag", requiredTag);
     form.set("blockedTag", blockedTag);
+    form.set("segmentId", selectedSegmentId);
     form.set("endsAt", endsAt);
     form.set("productIds", JSON.stringify(productIds));
     form.set("collectionIds", JSON.stringify(collectionIds));
@@ -318,6 +342,15 @@ export default function NewSingleCodePage() {
       {result?.error && (
         <s-banner tone="critical" style={{ marginBottom: "16px" }}>
           <s-paragraph>{result.error}</s-paragraph>
+        </s-banner>
+      )}
+
+      {result?.success && result.eligibilityWarning && (
+        <s-banner tone="warning" style={{ marginBottom: "16px" }}>
+          <s-paragraph>
+            Code created, but customer eligibility couldn't be applied: {result.eligibilityWarning}
+          </s-paragraph>
+          <s-button onClick={() => navigate(`/app/single-codes/${result.numericId}`)}>Continue</s-button>
         </s-banner>
       )}
 
@@ -417,20 +450,65 @@ export default function NewSingleCodePage() {
       </s-section>
 
       <s-section heading="Customer eligibility">
-        <s-text-field
-          label="Required customer tag"
-          value={requiredTag}
-          placeholder="e.g. GUIDE50"
-          helpText="Customers must have this tag to use the code"
-          onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
-        />
-        <s-text-field
-          label="Blocked customer tag"
-          value={blockedTag}
-          placeholder="e.g. GUIDE50-USED"
-          helpText="Customers with this tag will be rejected (usage limit reached)"
-          onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
-        />
+        <s-stack direction="block" gap="tight">
+          <s-paragraph>Choose which customers can use this code.</s-paragraph>
+          <div style={{ width: "fit-content" }}>
+            <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
+              {(["all", "tags", "segment"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setEligibilityMode(mode)}
+                  style={{
+                    padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
+                    fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
+                    background: eligibilityMode === mode ? "#fff" : "transparent",
+                    color: eligibilityMode === mode ? "#202223" : "#6d7175",
+                    boxShadow: eligibilityMode === mode ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                  }}
+                >
+                  {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {eligibilityMode === "tags" && (
+            <>
+              <s-text-field
+                label="Required customer tag"
+                value={requiredTag}
+                placeholder="e.g. GUIDE50"
+                helpText="Customers must have this tag to use the code"
+                onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
+              />
+              <s-text-field
+                label="Blocked customer tag"
+                value={blockedTag}
+                placeholder="e.g. GUIDE50-USED"
+                helpText="Customers with this tag will be rejected (usage limit reached)"
+                onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
+              />
+            </>
+          )}
+
+          {eligibilityMode === "segment" && (
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>
+                Customer segment
+              </label>
+              <select
+                value={selectedSegmentId}
+                onChange={(e) => setSelectedSegmentId(e.target.value)}
+                style={{ padding: "6px 8px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", width: "300px" }}
+              >
+                <option value="">Select a segment…</option>
+                {segments.map((s: { id: string; name: string }) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </s-stack>
       </s-section>
 
       <s-section heading="Combinations">
