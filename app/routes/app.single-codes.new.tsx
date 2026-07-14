@@ -336,61 +336,63 @@ export default function NewSingleCodePage() {
           helpText="The code customers enter at checkout"
           onInput={(e: { target: { value: string } }) => setCode(e.target.value.toUpperCase())}
         />
-        <s-stack direction="block" gap="tight" style={{ marginTop: "16px" }}>
-          <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
-          <div style={{ width: "fit-content" }}>
-            <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
-              {(["percentage", "fixedAmount"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setDiscountType(type)}
-                  style={{
-                    padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
-                    fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
-                    background: discountType === type ? "#fff" : "transparent",
-                    color: discountType === type ? "#202223" : "#6d7175",
-                    boxShadow: discountType === type ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
-                  }}
-                >
-                  {type === "percentage" ? "Percentage" : "Fixed amount"}
-                </button>
-              ))}
+        <div style={{ marginTop: "16px" }}>
+          <s-stack direction="block" gap="tight">
+            <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
+            <div style={{ width: "fit-content" }}>
+              <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
+                {(["percentage", "fixedAmount"] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setDiscountType(type)}
+                    style={{
+                      padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
+                      fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
+                      background: discountType === type ? "#fff" : "transparent",
+                      color: discountType === type ? "#202223" : "#6d7175",
+                      boxShadow: discountType === type ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                    }}
+                  >
+                    {type === "percentage" ? "Percentage" : "Fixed amount"}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          {discountType === "percentage" ? (
-            <s-text-field
-              label="Discount percentage"
-              type="number"
-              value={percentage}
-              min="1"
-              max="100"
-              helpText="Percentage off the eligible product"
-              onInput={(e: { target: { value: string } }) => setPercentage(e.target.value)}
-            />
-          ) : (
-            <s-text-field
-              label="Amount off"
-              type="number"
-              value={fixedAmount}
-              min="0.01"
-              step="0.01"
-              prefix="$"
-              helpText="Fixed amount off the eligible product"
-              onInput={(e: { target: { value: string } }) => setFixedAmount(e.target.value)}
-            />
-          )}
-        </s-stack>
-        <s-stack direction="block" gap="none" style={{ marginTop: "16px" }}>
+            {discountType === "percentage" ? (
+              <s-text-field
+                label="Discount percentage"
+                type="number"
+                value={percentage}
+                min="1"
+                max="100"
+                helpText="Percentage off the eligible product"
+                onInput={(e: { target: { value: string } }) => setPercentage(e.target.value)}
+              />
+            ) : (
+              <s-text-field
+                label="Amount off"
+                type="number"
+                value={fixedAmount}
+                min="0.01"
+                step="0.01"
+                prefix="$"
+                helpText="Fixed amount off the eligible product"
+                onInput={(e: { target: { value: string } }) => setFixedAmount(e.target.value)}
+              />
+            )}
+          </s-stack>
+        </div>
+        <div style={{ marginTop: "16px" }}>
           <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
             <input type="checkbox" checked={oncePerOrder} onChange={(e) => setOncePerOrder(e.target.checked)} />
             Only apply discount once per order
           </label>
-          <s-text style={{ fontSize: "12px", color: "#6d7175", marginTop: "4px" }}>
+          <div style={{ fontSize: "12px", color: "#6d7175", marginTop: "4px" }}>
             {oncePerOrder
               ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
               : "The discount will be taken off every eligible item in the cart."}
-          </s-text>
-        </s-stack>
+          </div>
+        </div>
         <div style={{ marginTop: "16px" }}>
           <s-text-field
             label="Expiry date (optional)"

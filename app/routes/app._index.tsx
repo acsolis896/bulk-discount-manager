@@ -451,71 +451,74 @@ export default function Index() {
             onInput={(e: InputEvent) => setTitle((e.target as HTMLInputElement).value)}
             helpText="Shown in the Shopify admin discounts list"
           />
-          <s-stack direction="block" gap="tight" style={{ marginTop: "16px" }}>
-            <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
-            <div style={{ width: "fit-content" }}>
-              <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
-                {(["percentage", "fixedAmount"] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setDiscountType(type)}
-                    style={{
-                      padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
-                      fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
-                      background: discountType === type ? "#fff" : "transparent",
-                      color: discountType === type ? "#202223" : "#6d7175",
-                      boxShadow: discountType === type ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
-                    }}
-                  >
-                    {type === "percentage" ? "Percentage" : "Fixed amount"}
-                  </button>
-                ))}
+          <div style={{ marginTop: "16px" }}>
+            <s-stack direction="block" gap="tight">
+              <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
+              <div style={{ width: "fit-content" }}>
+                <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
+                  {(["percentage", "fixedAmount"] as const).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setDiscountType(type)}
+                      style={{
+                        padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
+                        fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
+                        background: discountType === type ? "#fff" : "transparent",
+                        color: discountType === type ? "#202223" : "#6d7175",
+                        boxShadow: discountType === type ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                      }}
+                    >
+                      {type === "percentage" ? "Percentage" : "Fixed amount"}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            {discountType === "percentage" ? (
-              <s-text-field
-                label="Percentage off"
-                type="number"
-                value={percentage}
-                min="1"
-                max="100"
-                suffix="%"
-                onInput={(e: InputEvent) => setPercentage((e.target as HTMLInputElement).value)}
-              />
-            ) : (
-              <s-text-field
-                label="Amount off"
-                type="number"
-                value={fixedAmount}
-                min="0.01"
-                step="0.01"
-                prefix="$"
-                onInput={(e: InputEvent) => setFixedAmount((e.target as HTMLInputElement).value)}
-              />
-            )}
-          </s-stack>
-          <s-stack direction="block" gap="none" style={{ marginTop: "16px" }}>
+              {discountType === "percentage" ? (
+                <s-text-field
+                  label="Percentage off"
+                  type="number"
+                  value={percentage}
+                  min="1"
+                  max="100"
+                  suffix="%"
+                  onInput={(e: InputEvent) => setPercentage((e.target as HTMLInputElement).value)}
+                />
+              ) : (
+                <s-text-field
+                  label="Amount off"
+                  type="number"
+                  value={fixedAmount}
+                  min="0.01"
+                  step="0.01"
+                  prefix="$"
+                  onInput={(e: InputEvent) => setFixedAmount((e.target as HTMLInputElement).value)}
+                />
+              )}
+            </s-stack>
+          </div>
+          <div style={{ marginTop: "16px" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
               <input type="checkbox" checked={oncePerOrder} onChange={(e) => setOncePerOrder(e.target.checked)} />
               Only apply discount once per order
             </label>
-            <s-text style={{ fontSize: "12px", color: "#6d7175", marginTop: "4px" }}>
+            <div style={{ fontSize: "12px", color: "#6d7175", marginTop: "4px" }}>
               {oncePerOrder
                 ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
                 : "The discount will be taken off every eligible item in the cart."}
-            </s-text>
-          </s-stack>
-          <s-stack direction="block" gap="none" style={{ marginTop: "16px" }}>
-            <s-text emphasis="bold" style={{ fontSize: "14px" }}>Expiration date</s-text>
+            </div>
+          </div>
+          <div style={{ marginTop: "16px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 600 }}>Expiration date</div>
             <input
               type="date"
               value={endsAt}
               onChange={(e) => setEndsAt(e.target.value)}
               style={{ marginTop: "4px", padding: "6px 8px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", width: "200px" }}
             />
-            <s-text style={{ fontSize: "12px", color: "#6d7175", marginTop: "4px" }}>Optional — leave blank for no expiration</s-text>
-          </s-stack>
-          <s-stack direction="block" gap="tight" style={{ marginTop: "16px" }}>
+            <div style={{ fontSize: "12px", color: "#6d7175", marginTop: "4px" }}>Optional — leave blank for no expiration</div>
+          </div>
+          <div style={{ marginTop: "16px" }}>
+          <s-stack direction="block" gap="tight">
             <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
               <input
                 type="checkbox"
@@ -533,6 +536,7 @@ export default function Index() {
               Limit to one use per customer
             </label>
           </s-stack>
+          </div>
         </s-form-layout>
       </s-section>
 
