@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
 import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import db from "../db.server";
 
 type DiscountSet = {
   numericId: string;
@@ -14,7 +15,17 @@ type DiscountSet = {
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+
+  // Reusable codes have their own dedicated list page — exclude them here so
+  // "Discount sets" only shows bulk-created sets (a reusable code's usage
+  // count isn't capped at its codesCount of 1, so the X/Y framing below
+  // wouldn't make sense for them).
+  const reusableCodeRows = await db.singleCodeDiscount.findMany({
+    where: { shop: session.shop },
+    select: { discountId: true },
+  });
+  const reusableCodeIds = new Set(reusableCodeRows.map((r: { discountId: string }) => r.discountId.split("/").pop()));
 
   const sets: DiscountSet[] = [];
   let cursor: string | null = null;
@@ -49,8 +60,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     for (const node of nodes) {
       const d = node.discount;
       if (!d?.title) continue;
+      const numericId = node.id.split("/").pop();
+      if (reusableCodeIds.has(numericId)) continue;
       sets.push({
-        numericId: node.id.split("/").pop(),
+        numericId,
         title: d.title,
         status: d.status ?? "UNKNOWN",
         usedCodes: d.asyncUsageCount ?? 0,
