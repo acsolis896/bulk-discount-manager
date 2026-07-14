@@ -12,15 +12,15 @@ type DiscountSet = {
   totalCodes: number;
   startsAt: string;
   endsAt: string | null;
+  isReusableCode: boolean;
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
 
-  // Reusable codes have their own dedicated list page — exclude them here so
-  // "Discount sets" only shows bulk-created sets (a reusable code's usage
-  // count isn't capped at its codesCount of 1, so the X/Y framing below
-  // wouldn't make sense for them).
+  // Reusable codes have no usage cap, unlike bulk sets where totalCodes is a
+  // real ceiling — flag them so the UI can show "Unlimited" instead of a
+  // misleading X/1 fraction, without hiding them from this list.
   const reusableCodeRows = await db.singleCodeDiscount.findMany({
     where: { shop: session.shop },
     select: { discountId: true },
@@ -61,7 +61,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const d = node.discount;
       if (!d?.title) continue;
       const numericId = node.id.split("/").pop();
-      if (reusableCodeIds.has(numericId)) continue;
       sets.push({
         numericId,
         title: d.title,
@@ -70,6 +69,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         totalCodes: d.codesCount?.count ?? 0,
         startsAt: d.startsAt,
         endsAt: d.endsAt ?? null,
+        isReusableCode: reusableCodeIds.has(numericId),
       });
     }
 
@@ -79,8 +79,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   sets.sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
 
-  const totalCodes = sets.reduce((sum, s) => sum + s.totalCodes, 0);
-  const totalUsed = sets.reduce((sum, s) => sum + s.usedCodes, 0);
+  // Reusable codes have no usage cap, so they'd skew the aggregate usage
+  // rate below — only count bulk sets toward it.
+  const bulkSets = sets.filter((s) => !s.isReusableCode);
+  const totalCodes = bulkSets.reduce((sum, s) => sum + s.totalCodes, 0);
+  const totalUsed = bulkSets.reduce((sum, s) => sum + s.usedCodes, 0);
   const activeSets = sets.filter((s) => s.status === "ACTIVE").length;
 
   return { sets, totalCodes, totalUsed, activeSets };
@@ -163,7 +166,9 @@ export default function DiscountSets() {
                       <s-badge>{s.status.charAt(0) + s.status.slice(1).toLowerCase()}</s-badge>
                     )}
                   </div>
-                  <span style={{ flex: 2, fontSize: "14px", color: "#6d7175" }}>{s.usedCodes} / {s.totalCodes} ({setUsageRate}%)</span>
+                  <span style={{ flex: 2, fontSize: "14px", color: "#6d7175" }}>
+                    {s.isReusableCode ? `${s.usedCodes} uses (Reusable)` : `${s.usedCodes} / ${s.totalCodes} (${setUsageRate}%)`}
+                  </span>
                   <span style={{ flex: 2, fontSize: "14px", color: "#6d7175" }}>{formatDate(s.endsAt)}</span>
                   <div style={{ width: "60px" }}>
                     <s-button onClick={() => navigate(`/app/discounts/${s.numericId}`)}>View</s-button>
