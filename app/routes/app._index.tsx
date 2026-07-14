@@ -472,37 +472,39 @@ export default function Index() {
                 ))}
               </div>
             </div>
+            {discountType === "percentage" ? (
+              <s-text-field
+                label="Percentage off"
+                type="number"
+                value={percentage}
+                min="1"
+                max="100"
+                suffix="%"
+                onInput={(e: InputEvent) => setPercentage((e.target as HTMLInputElement).value)}
+              />
+            ) : (
+              <s-text-field
+                label="Amount off"
+                type="number"
+                value={fixedAmount}
+                min="0.01"
+                step="0.01"
+                prefix="$"
+                onInput={(e: InputEvent) => setFixedAmount((e.target as HTMLInputElement).value)}
+              />
+            )}
           </s-stack>
-          {discountType === "percentage" ? (
-            <s-text-field
-              label="Percentage off"
-              type="number"
-              value={percentage}
-              min="1"
-              max="100"
-              suffix="%"
-              onInput={(e: InputEvent) => setPercentage((e.target as HTMLInputElement).value)}
-            />
-          ) : (
-            <s-text-field
-              label="Amount off"
-              type="number"
-              value={fixedAmount}
-              min="0.01"
-              step="0.01"
-              prefix="$"
-              onInput={(e: InputEvent) => setFixedAmount((e.target as HTMLInputElement).value)}
-            />
-          )}
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
-            <input type="checkbox" checked={oncePerOrder} onChange={(e) => setOncePerOrder(e.target.checked)} />
-            Only apply discount once per order
-          </label>
-          <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
-            {oncePerOrder
-              ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
-              : "The discount will be taken off every eligible item in the cart."}
-          </s-text>
+          <s-stack direction="block" gap="none">
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+              <input type="checkbox" checked={oncePerOrder} onChange={(e) => setOncePerOrder(e.target.checked)} />
+              Only apply discount once per order
+            </label>
+            <s-text style={{ fontSize: "12px", color: "#6d7175", marginTop: "4px" }}>
+              {oncePerOrder
+                ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
+                : "The discount will be taken off every eligible item in the cart."}
+            </s-text>
+          </s-stack>
           <s-stack direction="block" gap="none">
             <s-text emphasis="bold" style={{ fontSize: "14px" }}>Expiration date</s-text>
             <input
