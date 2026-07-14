@@ -6,7 +6,6 @@ import {
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
-import { billingConfig } from "./billing.server";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -17,7 +16,9 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
-  billing: billingConfig,
+  // Plans are defined in Partners Dashboard (Shopify App Pricing) instead
+  // of a `billing` config here. Managed pricing support is always on at
+  // the API layer in this package version — there's no flag to set for it.
   future: {
     expiringOfflineAccessTokens: true,
   },

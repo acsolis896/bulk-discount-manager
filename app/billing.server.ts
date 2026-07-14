@@ -1,32 +1,12 @@
-import { BillingInterval } from "@shopify/shopify-app-react-router/server";
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
-import type { BillingConfigSubscriptionLineItemPlan } from "@shopify/shopify-api";
-import {
-  PLAN_STARTER_MONTHLY,
-  PLAN_STARTER_ANNUAL,
-  PLAN_PRO_MONTHLY,
-  PLAN_PRO_ANNUAL,
-  ALL_PAID_PLANS,
-  tierForPlanName,
-  limitForTier,
-  type PlanTier,
-} from "./billing";
+import { tierForPlanName, limitForTier, type PlanTier } from "./billing";
 
-export const billingConfig = {
-  [PLAN_STARTER_MONTHLY]: {
-    lineItems: [{ amount: 19.99, currencyCode: "USD", interval: BillingInterval.Every30Days }],
-  },
-  [PLAN_STARTER_ANNUAL]: {
-    lineItems: [{ amount: 199.9, currencyCode: "USD", interval: BillingInterval.Annual }],
-  },
-  [PLAN_PRO_MONTHLY]: {
-    lineItems: [{ amount: 49.99, currencyCode: "USD", interval: BillingInterval.Every30Days }],
-  },
-  [PLAN_PRO_ANNUAL]: {
-    lineItems: [{ amount: 499.9, currencyCode: "USD", interval: BillingInterval.Annual }],
-  },
-} satisfies Record<string, BillingConfigSubscriptionLineItemPlan>;
-
+// Plans are now defined in Partners Dashboard (Shopify App Pricing) rather
+// than in code — there's no `billing` config to pass to shopifyApp()
+// anymore. With unstable_managedPricingSupport enabled, billing.check()
+// takes just { isTest } and returns every active subscription regardless
+// of plan, so we don't need to pass plan names to filter by.
+//
 // The real BillingContext type's `check` signature is generic over the
 // app's exact billing config, which makes it awkward to name here. This
 // helper is only ever called with the real billing context from
@@ -37,9 +17,7 @@ export async function getCurrentPlan(
   billing: any
 ): Promise<{ planName: string | null; subscriptionId: string | null; tier: PlanTier; limit: number | null }> {
   const result: { appSubscriptions: { id: string; name: string; status: string }[] } = await billing.check({
-    plans: ALL_PAID_PLANS,
     isTest: process.env.NODE_ENV !== "production",
-    returnObject: true,
   });
   const active = result.appSubscriptions.find((s) => s.status === "ACTIVE");
   const planName = active?.name ?? null;
