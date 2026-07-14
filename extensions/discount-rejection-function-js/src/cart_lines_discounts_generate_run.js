@@ -18,7 +18,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const { productIds, percentage, blockedProductTypes } = config;
+  const { productIds, percentage, fixedAmount, discountType, oncePerOrder, blockedProductTypes } = config;
   const blocked = Array.isArray(blockedProductTypes) ? blockedProductTypes : ["GWP"];
 
   const hasBlockedType = input.cart.lines.some(
@@ -47,7 +47,13 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  if (!Array.isArray(productIds) || productIds.length === 0 || !percentage) {
+  // "fixedAmount" is opt-in via discountType; absent/anything else defaults to
+  // percentage to stay backward compatible with discounts created before this
+  // field existed.
+  const isFixedAmount = discountType === "fixedAmount";
+  const hasValue = isFixedAmount ? Boolean(fixedAmount) : Boolean(percentage);
+
+  if (!Array.isArray(productIds) || productIds.length === 0 || !hasValue) {
     return { operations: [] };
   }
 
@@ -61,24 +67,36 @@ export function cartLinesDiscountsGenerateRun(input) {
 
   if (eligibleLines.length === 0) return { operations: [] };
 
-  const bestLine = eligibleLines.reduce((best, line) => {
-    const price = parseFloat(line.cost.amountPerQuantity.amount);
-    const bestPrice = parseFloat(best.cost.amountPerQuantity.amount);
-    return price > bestPrice ? line : best;
-  });
+  // oncePerOrder is absent on discounts created before this field existed —
+  // default to true so their behavior (highest-priced eligible item, 1 unit
+  // only) doesn't change.
+  const applyOncePerOrder = oncePerOrder !== false;
 
-  const pct = Number(percentage);
+  let targets;
+  if (applyOncePerOrder) {
+    const bestLine = eligibleLines.reduce((best, line) => {
+      const price = parseFloat(line.cost.amountPerQuantity.amount);
+      const bestPrice = parseFloat(best.cost.amountPerQuantity.amount);
+      return price > bestPrice ? line : best;
+    });
+    targets = [{ cartLine: { id: bestLine.id, quantity: 1 } }];
+  } else {
+    targets = eligibleLines.map((line) => ({ cartLine: { id: line.id } }));
+  }
+
+  const value = isFixedAmount
+    ? { fixedAmount: { amount: Number(fixedAmount), appliesToEachItem: !applyOncePerOrder } }
+    : { percentage: { value: Number(percentage) } };
+
+  const message = isFixedAmount
+    ? "$" + Number(fixedAmount) + " off"
+    : Number(percentage) + "% off";
+
   return {
     operations: [
       {
         productDiscountsAdd: {
-          candidates: [
-            {
-              message: pct + "% off",
-              targets: [{ cartLine: { id: bestLine.id, quantity: 1 } }],
-              value: { percentage: { value: pct } },
-            },
-          ],
+          candidates: [{ message, targets, value }],
           selectionStrategy: "FIRST",
         },
       },

@@ -94,7 +94,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     startsAt: discount?.startsAt ?? null,
     endsAt: discount?.endsAt ?? null,
     combinesWith: discount?.combinesWith ?? { productDiscounts: false, orderDiscounts: false, shippingDiscounts: false },
+    discountType: config.discountType === "fixedAmount" ? "fixedAmount" : "percentage",
     percentage: config.percentage ?? null,
+    fixedAmount: config.fixedAmount ?? null,
+    oncePerOrder: config.oncePerOrder !== false,
     productIds,
     collectionIds,
     collectionTitles,
@@ -112,11 +115,18 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (intent === "updateConfig") {
     const requiredTag = String(formData.get("requiredTag") || "").trim();
     const blockedTag = String(formData.get("blockedTag") || "").trim();
+    const discountType = String(formData.get("discountType") || "percentage") === "fixedAmount" ? "fixedAmount" : "percentage";
     const percentage = Number(formData.get("percentage") || 0);
+    const fixedAmount = Number(formData.get("fixedAmount") || 0);
+    const oncePerOrder = formData.get("oncePerOrder") !== "0";
     const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
     const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
 
-    if (!percentage || percentage < 1 || percentage > 100) return { error: "Percentage must be between 1 and 100." };
+    if (discountType === "percentage") {
+      if (!percentage || percentage < 1 || percentage > 100) return { error: "Percentage must be between 1 and 100." };
+    } else {
+      if (!fixedAmount || fixedAmount <= 0) return { error: "Fixed amount must be greater than 0." };
+    }
     if (productIds.length === 0 && collectionIds.length === 0) return { error: "Select at least one eligible product or collection." };
 
     // Expand collections
@@ -170,7 +180,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       ...existing,
       productIds: resolvedProductIds,
       collectionIds,
-      percentage,
+      discountType,
+      percentage: discountType === "percentage" ? percentage : undefined,
+      fixedAmount: discountType === "fixedAmount" ? fixedAmount : undefined,
+      oncePerOrder,
       requiredTag,
       blockedTag,
     };
@@ -204,7 +217,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const baseConfigJson = JSON.stringify({
       productIds: resolvedProductIds,
       collectionIds,
-      percentage,
+      discountType,
+      percentage: discountType === "percentage" ? percentage : undefined,
+      fixedAmount: discountType === "fixedAmount" ? fixedAmount : undefined,
+      oncePerOrder,
       blockedProductTypes: existing.blockedProductTypes ?? ["GWP"],
       requiredTag,
       blockedTag,
@@ -248,7 +264,10 @@ export default function SingleCodeDetailsPage() {
   const [editing, setEditing] = useState(false);
   const [requiredTag, setRequiredTag] = useState(loaderData.requiredTag);
   const [blockedTag, setBlockedTag] = useState(loaderData.blockedTag);
+  const [discountType, setDiscountType] = useState<"percentage" | "fixedAmount">(loaderData.discountType);
   const [percentage, setPercentage] = useState(String(loaderData.percentage ?? ""));
+  const [fixedAmount, setFixedAmount] = useState(String(loaderData.fixedAmount ?? ""));
+  const [oncePerOrder, setOncePerOrder] = useState(loaderData.oncePerOrder);
   const [productIds, setProductIds] = useState<string[]>(loaderData.productIds);
   const [productTitles, setProductTitles] = useState<string[]>([]);
   const [collectionIds, setCollectionIds] = useState<string[]>(loaderData.collectionIds);
@@ -295,7 +314,10 @@ export default function SingleCodeDetailsPage() {
     form.set("intent", "updateConfig");
     form.set("requiredTag", requiredTag);
     form.set("blockedTag", blockedTag);
+    form.set("discountType", discountType);
     form.set("percentage", percentage);
+    form.set("fixedAmount", fixedAmount);
+    form.set("oncePerOrder", oncePerOrder ? "1" : "0");
     form.set("productIds", JSON.stringify(productIds));
     form.set("collectionIds", JSON.stringify(collectionIds));
     fetcher.submit(form, { method: "post" });
@@ -340,7 +362,9 @@ export default function SingleCodeDetailsPage() {
             </div>
             <div>
               <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Discount</div>
-              <span style={{ fontSize: "16px", fontWeight: 500 }}>{loaderData.percentage}%</span>
+              <span style={{ fontSize: "16px", fontWeight: 500 }}>
+                {loaderData.discountType === "fixedAmount" ? `$${loaderData.fixedAmount}` : `${loaderData.percentage}%`}
+              </span>
             </div>
           </div>
           {loaderData.endsAt && (
@@ -407,15 +431,51 @@ export default function SingleCodeDetailsPage() {
               helpText="Customers with this tag will be rejected (usage limit reached)"
               onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
             />
-            <s-text-field
-              label="Discount percentage"
-              type="number"
-              value={percentage}
-              min="1"
-              max="100"
-              helpText="Percentage off the eligible product"
-              onInput={(e: { target: { value: string } }) => setPercentage(e.target.value)}
-            />
+            <div style={{ width: "fit-content" }}>
+              <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
+                {(["percentage", "fixedAmount"] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setDiscountType(type)}
+                    style={{
+                      padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
+                      fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
+                      background: discountType === type ? "#fff" : "transparent",
+                      color: discountType === type ? "#202223" : "#6d7175",
+                      boxShadow: discountType === type ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                    }}
+                  >
+                    {type === "percentage" ? "Percentage" : "Fixed amount"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {discountType === "percentage" ? (
+              <s-text-field
+                label="Discount percentage"
+                type="number"
+                value={percentage}
+                min="1"
+                max="100"
+                helpText="Percentage off the eligible product"
+                onInput={(e: { target: { value: string } }) => setPercentage(e.target.value)}
+              />
+            ) : (
+              <s-text-field
+                label="Amount off"
+                type="number"
+                value={fixedAmount}
+                min="0.01"
+                step="0.01"
+                prefix="$"
+                helpText="Fixed amount off the eligible product"
+                onInput={(e: { target: { value: string } }) => setFixedAmount(e.target.value)}
+              />
+            )}
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+              <input type="checkbox" checked={oncePerOrder} onChange={(e) => setOncePerOrder(e.target.checked)} />
+              Only apply discount once per order
+            </label>
           </>
         )}
       </s-section>

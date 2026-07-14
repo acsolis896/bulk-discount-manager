@@ -79,12 +79,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     let eligibleProductIds: string[] = [];
     let eligibleCollectionIds: string[] = [];
     let percentage: number | null = null;
+    let fixedAmount: number | null = null;
+    let discountType: "percentage" | "fixedAmount" = "percentage";
     try {
       if (rawConfig) {
         const cfg = JSON.parse(rawConfig);
         eligibleProductIds = cfg.productIds ?? [];
         eligibleCollectionIds = cfg.collectionIds ?? [];
         percentage = cfg.percentage ?? null;
+        fixedAmount = cfg.fixedAmount ?? null;
+        discountType = cfg.discountType === "fixedAmount" ? "fixedAmount" : "percentage";
       }
     } catch { /* ignore */ }
 
@@ -118,7 +122,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
     }
 
-    return { numericId, title, shop, codes: allCodes, totalCount, usedCount, preUsedCodes, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, percentage, error: null as string | null };
+    return { numericId, title, shop, codes: allCodes, totalCount, usedCount, preUsedCodes, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -132,7 +136,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       eligibleProductIds: [] as string[],
       eligibleCollections: [] as { id: string; title: string }[],
       eligibleCollectionIds: [] as string[],
+      discountType: "percentage" as "percentage" | "fixedAmount",
       percentage: null as number | null,
+      fixedAmount: null as number | null,
       error: err instanceof Error ? err.message : String(err),
     };
   }
@@ -194,7 +200,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       if (raw) existingConfig = JSON.parse(raw);
     } catch { /* empty */ }
 
-    const newConfig = { ...existingConfig, productIds: resolvedProductIds, collectionIds, percentage };
+    // Only overwrite percentage if this discount actually uses it — a fixed-amount
+    // discount has no percentage field in its form, so don't stomp its config.
+    const newConfig =
+      existingConfig.discountType === "fixedAmount"
+        ? { ...existingConfig, productIds: resolvedProductIds, collectionIds }
+        : { ...existingConfig, productIds: resolvedProductIds, collectionIds, percentage };
 
     await admin.graphql(
       `#graphql
@@ -235,7 +246,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function DiscountDetails() {
-  const { title, numericId, shop, codes, totalCount, usedCount, preUsedCodes, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, percentage, error } = useLoaderData<typeof loader>();
+  const { title, numericId, shop, codes, totalCount, usedCount, preUsedCodes, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -356,7 +367,9 @@ export default function DiscountDetails() {
         <s-stack direction="block" gap="base">
           <s-paragraph>
             The discount applies to the highest-priced eligible item in the cart — 1 unit only.
-            {percentage !== null && <> ({percentage}% off)</>}
+            {discountType === "fixedAmount"
+              ? fixedAmount !== null && <> (${fixedAmount} off)</>
+              : percentage !== null && <> ({percentage}% off)</>}
           </s-paragraph>
 
           {(fetcher.data as { updated?: boolean })?.updated && (

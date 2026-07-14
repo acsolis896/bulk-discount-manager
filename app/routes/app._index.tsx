@@ -42,7 +42,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
 
     const title = String(formData.get("title") || "Bulk Discount");
+    const discountType = String(formData.get("discountType") || "percentage") === "fixedAmount" ? "fixedAmount" : "percentage";
     const percentage = Number(formData.get("percentage") || 0);
+    const fixedAmount = Number(formData.get("fixedAmount") || 0);
+    const oncePerOrder = formData.get("oncePerOrder") !== "0";
     const codeMode = String(formData.get("codeMode") || "generate");
     const endsAtRaw = String(formData.get("endsAt") || "");
     const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
@@ -54,8 +57,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
     const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
 
-    if (!percentage || percentage < 1 || percentage > 100) {
-      return { error: "Percentage must be between 1 and 100." };
+    if (discountType === "percentage") {
+      if (!percentage || percentage < 1 || percentage > 100) {
+        return { error: "Percentage must be between 1 and 100." };
+      }
+    } else {
+      if (!fixedAmount || fixedAmount <= 0) {
+        return { error: "Fixed amount must be greater than 0." };
+      }
     }
     if (productIds.length === 0 && collectionIds.length === 0) {
       return { error: "Select at least one eligible product or collection." };
@@ -216,7 +225,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               namespace: "$app",
               key: "function-configuration",
               type: "json",
-              value: JSON.stringify({ productIds: resolvedProductIds, collectionIds, percentage, blockedProductTypes }),
+              value: JSON.stringify({
+                productIds: resolvedProductIds,
+                collectionIds,
+                discountType,
+                ...(discountType === "fixedAmount" ? { fixedAmount } : { percentage }),
+                oncePerOrder,
+                blockedProductTypes,
+              }),
             },
           ],
         },
@@ -274,7 +290,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return {
       discountId,
       title,
+      discountType,
       percentage,
+      fixedAmount,
       codeCount: finalCodes.length,
       preUsedCount: preUsedCodes.length,
       firstCode,
@@ -293,7 +311,10 @@ export default function Index() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState("Bulk Discount");
+  const [discountType, setDiscountType] = useState<"percentage" | "fixedAmount">("percentage");
   const [percentage, setPercentage] = useState("20");
+  const [fixedAmount, setFixedAmount] = useState("10");
+  const [oncePerOrder, setOncePerOrder] = useState(true);
   const [codeMode, setCodeMode] = useState<"generate" | "import">("generate");
   const [endsAt, setEndsAt] = useState("");
   const [usageLimitOne, setUsageLimitOne] = useState(true);
@@ -343,7 +364,10 @@ export default function Index() {
   const handleSubmit = useCallback(() => {
     const formData = new FormData();
     formData.set("title", title);
+    formData.set("discountType", discountType);
     formData.set("percentage", percentage);
+    formData.set("fixedAmount", fixedAmount);
+    formData.set("oncePerOrder", oncePerOrder ? "1" : "0");
     formData.set("codeMode", codeMode);
     formData.set("endsAt", endsAt);
     formData.set("usageLimitOne", usageLimitOne ? "1" : "0");
@@ -366,7 +390,7 @@ export default function Index() {
       formData.set("productIds", JSON.stringify([]));
     }
     fetcher.submit(formData, { method: "POST", encType: "multipart/form-data" });
-  }, [fetcher, title, percentage, codeMode, csvFile, prefix, codeCount, codeLength, selectionType, selectedItems]);
+  }, [fetcher, title, discountType, percentage, fixedAmount, oncePerOrder, codeMode, csvFile, prefix, codeCount, codeLength, selectionType, selectedItems]);
 
   const handleReset = useCallback(() => {
     setTitle("Bulk Discount");
@@ -390,7 +414,7 @@ export default function Index() {
   const previewCode = sanitizedPrefix ? `${sanitizedPrefix}-${previewSuffix}` : "";
 
   const canSubmit =
-    !!percentage &&
+    (discountType === "percentage" ? !!percentage : !!fixedAmount) &&
     selectedItems.length > 0 &&
     (codeMode === "import" ? !!csvFile && !!csvPreview : !!prefix);
 
@@ -400,7 +424,9 @@ export default function Index() {
         <s-banner title={`Discount created: ${result.title}`} tone="success" onDismiss={handleReset}>
           <s-paragraph>
             {result.codeCount} active codes queued • e.g. {result.firstCode as string} •{" "}
-            {result.percentage}% off eligible products
+            {result.discountType === "fixedAmount"
+              ? `$${result.fixedAmount} off eligible products`
+              : `${result.percentage}% off eligible products`}
           </s-paragraph>
           {(result.preUsedCount as number) > 0 && (
             <s-paragraph>
@@ -425,15 +451,58 @@ export default function Index() {
             onInput={(e: InputEvent) => setTitle((e.target as HTMLInputElement).value)}
             helpText="Shown in the Shopify admin discounts list"
           />
-          <s-text-field
-            label="Percentage off"
-            type="number"
-            value={percentage}
-            min="1"
-            max="100"
-            suffix="%"
-            onInput={(e: InputEvent) => setPercentage((e.target as HTMLInputElement).value)}
-          />
+          <s-stack direction="block" gap="tight">
+            <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
+            <div style={{ width: "fit-content" }}>
+              <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
+                {(["percentage", "fixedAmount"] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setDiscountType(type)}
+                    style={{
+                      padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
+                      fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
+                      background: discountType === type ? "#fff" : "transparent",
+                      color: discountType === type ? "#202223" : "#6d7175",
+                      boxShadow: discountType === type ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                    }}
+                  >
+                    {type === "percentage" ? "Percentage" : "Fixed amount"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </s-stack>
+          {discountType === "percentage" ? (
+            <s-text-field
+              label="Percentage off"
+              type="number"
+              value={percentage}
+              min="1"
+              max="100"
+              suffix="%"
+              onInput={(e: InputEvent) => setPercentage((e.target as HTMLInputElement).value)}
+            />
+          ) : (
+            <s-text-field
+              label="Amount off"
+              type="number"
+              value={fixedAmount}
+              min="0.01"
+              step="0.01"
+              prefix="$"
+              onInput={(e: InputEvent) => setFixedAmount((e.target as HTMLInputElement).value)}
+            />
+          )}
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+            <input type="checkbox" checked={oncePerOrder} onChange={(e) => setOncePerOrder(e.target.checked)} />
+            Only apply discount once per order
+          </label>
+          <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
+            {oncePerOrder
+              ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
+              : "The discount will be taken off every eligible item in the cart."}
+          </s-text>
           <s-stack direction="block" gap="none">
             <s-text emphasis="bold" style={{ fontSize: "14px" }}>Expiration date</s-text>
             <input
@@ -563,7 +632,9 @@ export default function Index() {
 
       <s-section heading="Eligible items">
         <s-paragraph>
-          The discount applies to the highest-priced eligible item in the cart — 1 unit only.
+          {oncePerOrder
+            ? "The discount applies to the highest-priced eligible item in the cart — 1 unit only."
+            : "The discount applies to every eligible item in the cart."}
         </s-paragraph>
         <s-stack direction="block" gap="base">
           <div style={{ width: "fit-content" }}>
