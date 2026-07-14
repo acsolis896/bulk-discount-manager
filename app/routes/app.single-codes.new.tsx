@@ -394,11 +394,12 @@ export default function NewSingleCodePage() {
           </div>
         </div>
         <div style={{ marginTop: "16px" }}>
-          <s-text-field
-            label="Expiry date (optional)"
+          <div style={{ fontSize: "14px", fontWeight: 600 }}>Expiry date (optional)</div>
+          <input
             type="date"
             value={endsAt}
-            onInput={(e: { target: { value: string } }) => setEndsAt(e.target.value)}
+            onChange={(e) => setEndsAt(e.target.value)}
+            style={{ marginTop: "4px", padding: "6px 8px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", width: "200px" }}
           />
         </div>
       </s-section>
