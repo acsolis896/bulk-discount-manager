@@ -22,12 +22,12 @@ export function cartLinesDiscountsGenerateRun(input) {
   const blocked = (Array.isArray(blockedProductTypes) ? blockedProductTypes : ["GWP"])
     .map((t) => (t ?? "").toUpperCase());
 
-  const hasBlockedType = input.cart.lines.some((line) => {
+  const blockedLine = input.cart.lines.find((line) => {
     const productType = line.merchandise?.product?.productType;
     return productType != null && blocked.includes(productType.toUpperCase());
   });
 
-  if (hasBlockedType) {
+  if (blockedLine) {
     // Reject all rejectable entered discount codes so the code is removed
     // from the cart and the customer sees an error message
     const rejectableCodes = (input.enteredDiscountCodes ?? [])
@@ -35,12 +35,15 @@ export function cartLinesDiscountsGenerateRun(input) {
       .map((c) => ({ code: c.code }));
 
     if (rejectableCodes.length > 0) {
+      // Use the product's own casing (e.g. "Accessories") rather than the
+      // stored ALL-CAPS value, so the message doesn't read as shouting.
+      const matchedType = blockedLine.merchandise?.product?.productType;
       return {
         operations: [
           {
             enteredDiscountCodesReject: {
               codes: rejectableCodes,
-              message: "This discount code can't be used when a gift item is in your cart.",
+              message: `This discount code can't be used with ${matchedType} items in your cart.`,
             },
           },
         ],
