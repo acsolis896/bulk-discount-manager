@@ -19,11 +19,13 @@ export function cartLinesDiscountsGenerateRun(input) {
   }
 
   const { productIds, percentage, fixedAmount, discountType, oncePerOrder, blockedProductTypes } = config;
-  const blocked = Array.isArray(blockedProductTypes) ? blockedProductTypes : ["GWP"];
+  const blocked = (Array.isArray(blockedProductTypes) ? blockedProductTypes : ["GWP"])
+    .map((t) => (t ?? "").toUpperCase());
 
-  const hasBlockedType = input.cart.lines.some(
-    (line) => blocked.includes(line.merchandise?.product?.productType)
-  );
+  const hasBlockedType = input.cart.lines.some((line) => {
+    const productType = line.merchandise?.product?.productType;
+    return productType != null && blocked.includes(productType.toUpperCase());
+  });
 
   if (hasBlockedType) {
     // Reject all rejectable entered discount codes so the code is removed
