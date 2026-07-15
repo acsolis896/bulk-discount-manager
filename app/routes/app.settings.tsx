@@ -25,13 +25,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const intent = formData.get("intent") as string;
 
   if (intent === "add") {
-    const productType = (formData.get("productType") as string ?? "").trim().toUpperCase();
+    const productType = (formData.get("productType") as string ?? "").trim();
     if (!productType) return { error: "Product type is required." };
-    await db.blockedProductType.upsert({
-      where: { shop_productType: { shop: session.shop, productType } },
-      create: { shop: session.shop, productType },
-      update: {},
+    // Matching against the cart is case-insensitive, so guard against
+    // visually-duplicate rows like "Accessories" and "accessories" here
+    // rather than relying on the DB's case-sensitive unique constraint.
+    const existing = await db.blockedProductType.findMany({
+      where: { shop: session.shop },
+      select: { productType: true },
     });
+    const alreadyBlocked = existing.some(
+      (r: { productType: string }) => r.productType.toLowerCase() === productType.toLowerCase()
+    );
+    if (!alreadyBlocked) {
+      await db.blockedProductType.create({
+        data: { shop: session.shop, productType },
+      });
+    }
     return { ok: true };
   }
 
@@ -475,9 +485,9 @@ export default function SettingsPage() {
           <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "8px" }}>
             <input
               type="text"
-              placeholder="e.g. GWP"
+              placeholder="e.g. Accessories"
               value={newType}
-              onChange={(e) => setNewType(e.target.value.toUpperCase())}
+              onChange={(e) => setNewType(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAdd()}
               style={{ padding: "8px 12px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", flex: 1 }}
             />
