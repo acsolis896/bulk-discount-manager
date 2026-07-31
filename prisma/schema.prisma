@@ -34,6 +34,17 @@ model PreUsedCode {
   @@index([shop, discountId])
 }
 
+model IssuedCode {
+  id         String   @id @default(cuid())
+  shop       String
+  discountId String
+  code       String
+  createdAt  DateTime @default(now())
+
+  @@unique([shop, code])
+  @@index([shop, discountId])
+}
+
 model SingleCodeDiscount {
   id                  String   @id @default(cuid())
   shop                String

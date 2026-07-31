@@ -1,12 +1,32 @@
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useRef } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs, HeadersFunction } from "react-router";
 import { useLoaderData, useNavigate, useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { checkCodeQuota } from "../billing.server";
 
 type RedeemCode = { code: string; usageCount: number };
+type ParsedCode = { code: string; used: boolean };
+
+function parseCSVCodes(text: string): ParsedCode[] {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map((h) => h.trim().replace(/^["']|["']$/g, "").toLowerCase());
+  const codeIdx = headers.indexOf("code");
+  if (codeIdx === -1) return [];
+  const statusIdx = headers.indexOf("status");
+  return lines
+    .slice(1)
+    .map((line) => {
+      const cols = line.split(",");
+      const code = cols[codeIdx]?.trim().replace(/^["']|["']$/g, "").toUpperCase() ?? "";
+      const status = statusIdx >= 0 ? cols[statusIdx]?.trim().replace(/^["']|["']$/g, "").toLowerCase() : "";
+      return code ? { code, used: status === "used" } : null;
+    })
+    .filter((c): c is ParsedCode => c !== null);
+}
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
@@ -63,6 +83,32 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       orderBy: { createdAt: "asc" },
     });
     const preUsedCodes = preUsedRows.map((r) => r.code);
+
+    // Fetch known creation dates for codes we've tracked ourselves — Shopify's
+    // API doesn't expose a createdAt on individual redeem codes, so codes with
+    // no matching row here predate this tracking and are labeled "Original".
+    const issuedRows = await db.issuedCode.findMany({
+      where: { shop: session.shop, discountId: gid },
+      select: { code: true, createdAt: true },
+    });
+    const codeDates: Record<string, string> = {};
+    for (const row of issuedRows) {
+      codeDates[row.code] = row.createdAt.toISOString().slice(0, 10);
+    }
+
+    // Infer the prefix/length used to generate existing codes (format is
+    // always PREFIX-SUFFIX, and the random suffix never contains a hyphen),
+    // so "Add more codes" can reuse it without asking the merchant again.
+    let inferredPrefix: string | null = null;
+    let inferredCodeLength: number | null = null;
+    if (allCodes.length > 0) {
+      const sample = allCodes[0].code;
+      const idx = sample.lastIndexOf("-");
+      if (idx > 0 && idx < sample.length - 1) {
+        inferredPrefix = sample.slice(0, idx);
+        inferredCodeLength = sample.length - idx - 1;
+      }
+    }
 
     // Fetch metafield config to show eligible products
     const metafieldRes = await admin.graphql(
@@ -122,7 +168,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
     }
 
-    return { numericId, title, shop, codes: allCodes, totalCount, usedCount, preUsedCodes, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, error: null as string | null };
+    return { numericId, title, shop, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -132,6 +178,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       totalCount: 0,
       usedCount: 0,
       preUsedCodes: [] as string[],
+      codeDates: {} as Record<string, string>,
+      inferredPrefix: null as string | null,
+      inferredCodeLength: null as number | null,
       eligibleProducts: [] as { id: string; title: string }[],
       eligibleProductIds: [] as string[],
       eligibleCollections: [] as { id: string; title: string }[],
@@ -145,10 +194,102 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session, billing } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
   const gid = `gid://shopify/DiscountCodeNode/${params.id}`;
+
+  if (intent === "addCodes") {
+    const codeMode = String(formData.get("codeMode") || "generate");
+    let finalCodes: string[] = [];
+    let preUsedCodes: string[] = [];
+
+    if (codeMode === "import") {
+      const csvFile = formData.get("csvFile");
+      if (!csvFile || typeof csvFile === "string") {
+        return { error: "Please upload a CSV file." };
+      }
+      const text = await (csvFile as File).text();
+      const parsed = parseCSVCodes(text);
+      if (parsed.length === 0) {
+        return { error: 'No codes found. Make sure the CSV has a column named "Code".' };
+      }
+      if (parsed.length > 5000) {
+        return { error: "Maximum 5,000 codes per import." };
+      }
+      preUsedCodes = parsed.filter((c) => c.used).map((c) => c.code);
+      finalCodes = parsed.filter((c) => !c.used).map((c) => c.code);
+      if (finalCodes.length === 0 && preUsedCodes.length === 0) {
+        return { error: "No codes found in the CSV." };
+      }
+    } else {
+      const prefix = String(formData.get("prefix") || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9\-_]/g, "")
+        .replace(/^[\-_]+|[\-_]+$/g, "");
+      const codeCount = Math.min(Math.max(Number(formData.get("codeCount") || 100), 1), 5000);
+      const codeLength = Math.min(Math.max(Number(formData.get("codeLength") || 6), 4), 12);
+      if (!prefix) return { error: "Code prefix is required." };
+
+      const randomSuffix = () => {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let s = "";
+        for (let i = 0; i < codeLength; i++) s += chars[Math.floor(Math.random() * chars.length)];
+        return s;
+      };
+      const codeSet = new Set<string>();
+      while (codeSet.size < codeCount) codeSet.add(`${prefix}-${randomSuffix()}`);
+      finalCodes = Array.from(codeSet);
+    }
+
+    if (finalCodes.length > 0) {
+      const quota = await checkCodeQuota(admin, billing, finalCodes.length);
+      if (!quota.allowed) {
+        return {
+          error: `Your ${quota.tier} plan allows up to ${quota.limit} active discount codes (currently using ${quota.current}). Upgrade on the Plans page to create more.`,
+        };
+      }
+    }
+
+    if (preUsedCodes.length > 0) {
+      await db.preUsedCode.createMany({
+        data: preUsedCodes.map((code) => ({ shop: session.shop, discountId: gid, code })),
+        skipDuplicates: true,
+      });
+    }
+
+    let addedCount = 0;
+    const codesToAdd = finalCodes.map((code) => ({ code }));
+    for (let i = 0; i < codesToAdd.length; i += 250) {
+      const batch = codesToAdd.slice(i, i + 250);
+      const bulkRes = await admin.graphql(
+        `#graphql
+        mutation AddBulkCodes($discountId: ID!, $codes: [DiscountRedeemCodeInput!]!) {
+          discountRedeemCodeBulkAdd(discountId: $discountId, codes: $codes) {
+            bulkCreation { id codesCount }
+            userErrors { field message }
+          }
+        }`,
+        { variables: { discountId: gid, codes: batch } }
+      );
+      const bulkData = await bulkRes.json();
+      const bulkErrors = (bulkData.data?.discountRedeemCodeBulkAdd?.userErrors ?? [])
+        .filter((e: { message: string }) => !e.message.toLowerCase().includes("unique"));
+      if (bulkErrors.length > 0) {
+        return { error: `Adding codes: ${bulkErrors.map((e: { message: string }) => e.message).join(", ")}` };
+      }
+      addedCount += batch.length;
+    }
+
+    if (finalCodes.length > 0) {
+      await db.issuedCode.createMany({
+        data: finalCodes.map((code) => ({ shop: session.shop, discountId: gid, code })),
+        skipDuplicates: true,
+      });
+    }
+
+    return { addedCodes: true, addedCount, skippedCount: preUsedCodes.length };
+  }
 
   if (intent === "updateItems") {
     const productIds: string[] = JSON.parse(formData.get("productIds") as string ?? "[]");
@@ -246,13 +387,50 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function DiscountDetails() {
-  const { title, numericId, shop, codes, totalCount, usedCount, preUsedCodes, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, error } = useLoaderData<typeof loader>();
+  const { title, numericId, shop, codes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
   const unusedCount = Math.max(0, totalCount - usedCount - preUsedCodes.length);
   const [confirmCode, setConfirmCode] = useState<string | null>(null);
   const [editingItems, setEditingItems] = useState(false);
+
+  const [addCodeMode, setAddCodeMode] = useState<"generate" | "import">("generate");
+  const [addPrefix, setAddPrefix] = useState(inferredPrefix ?? "");
+  const [addCodeCount, setAddCodeCount] = useState("100");
+  const [addCodeLength, setAddCodeLength] = useState(String(inferredCodeLength ?? 6));
+  const [addCsvFile, setAddCsvFile] = useState<File | null>(null);
+  const [addCsvPreview, setAddCsvPreview] = useState<{ count: number; sample: string } | null>(null);
+  const addFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAddFileChange = useCallback(async (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0] ?? null;
+    setAddCsvFile(file);
+    if (!file) { setAddCsvPreview(null); return; }
+    const text = await file.text();
+    const codes = parseCSVCodes(text);
+    setAddCsvPreview(codes.length > 0 ? { count: codes.length, sample: codes[0]?.code ?? "" } : null);
+    if (codes.length === 0) setAddCsvFile(null);
+  }, []);
+
+  const handleAddCodes = useCallback(() => {
+    const form = new FormData();
+    form.append("intent", "addCodes");
+    form.append("codeMode", addCodeMode);
+    if (addCodeMode === "import" && addCsvFile) {
+      form.append("csvFile", addCsvFile);
+    } else {
+      form.append("prefix", addPrefix);
+      form.append("codeCount", addCodeCount);
+      form.append("codeLength", addCodeLength);
+    }
+    fetcher.submit(form, { method: "post", encType: "multipart/form-data" });
+    setAddCsvFile(null);
+    setAddCsvPreview(null);
+    if (addFileInputRef.current) addFileInputRef.current.value = "";
+  }, [fetcher, addCodeMode, addPrefix, addCodeCount, addCodeLength, addCsvFile]);
+
+  const canAddCodes = addCodeMode === "import" ? !!addCsvFile && !!addCsvPreview : !!addPrefix.trim();
 
   const handleEditItems = useCallback(async (mode: "product" | "collection") => {
     setEditingItems(true);
@@ -295,10 +473,11 @@ export default function DiscountDetails() {
 
   const handleExport = useCallback((unusedOnly = false) => {
     const filtered = unusedOnly ? codes.filter((c: RedeemCode) => c.usageCount === 0) : codes;
+    const createdLabel = (code: string) => codeDates[code] ?? "Original";
     const rows = [
-      "Code,Status",
-      ...filtered.map((c: RedeemCode) => `${c.code},${c.usageCount > 0 ? "Used" : "Unused"}`),
-      ...(unusedOnly ? [] : preUsedCodes.map((c: string) => `${c},Previously Used`)),
+      "Code,Status,Created",
+      ...filtered.map((c: RedeemCode) => `${c.code},${c.usageCount > 0 ? "Used" : "Unused"},${createdLabel(c.code)}`),
+      ...(unusedOnly ? [] : preUsedCodes.map((c: string) => `${c},Previously Used,${createdLabel(c)}`)),
     ];
     const blob = new Blob([rows.join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -307,7 +486,7 @@ export default function DiscountDetails() {
     a.download = `${title ?? "discount-codes"}${unusedOnly ? "-unused" : "-all"}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [codes, preUsedCodes, title]);
+  }, [codes, preUsedCodes, codeDates, title]);
 
   return (
     <s-page heading={title ?? "Discount"}>
@@ -430,6 +609,128 @@ export default function DiscountDetails() {
               Edit by collection
             </s-button>
           </s-stack>
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Add more codes">
+        <s-stack direction="block" gap="base">
+          {(fetcher.data as { addedCodes?: boolean })?.addedCodes && (
+            <s-banner tone="success">
+              <s-paragraph>
+                Added {(fetcher.data as { addedCount: number }).addedCount} code
+                {(fetcher.data as { addedCount: number }).addedCount !== 1 ? "s" : ""} to this discount.
+                {(fetcher.data as { skippedCount: number }).skippedCount > 0 &&
+                  ` ${(fetcher.data as { skippedCount: number }).skippedCount} previously-used code(s) were recorded but not added as active.`}
+                {" "}Shopify may take a few seconds to process them.
+              </s-paragraph>
+            </s-banner>
+          )}
+          {(fetcher.data as { error?: string })?.error && (
+            <s-banner tone="critical">
+              <s-paragraph>{(fetcher.data as { error: string }).error}</s-paragraph>
+            </s-banner>
+          )}
+
+          <div style={{ width: "fit-content" }}>
+            <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
+              {(["generate", "import"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setAddCodeMode(mode)}
+                  style={{
+                    padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
+                    fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
+                    background: addCodeMode === mode ? "#fff" : "transparent",
+                    color: addCodeMode === mode ? "#202223" : "#6d7175",
+                    boxShadow: addCodeMode === mode ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                  }}
+                >
+                  {mode === "generate" ? "Generate randomly" : "Import from CSV"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {addCodeMode === "generate" && inferredPrefix && (
+            <s-form-layout>
+              <s-paragraph>
+                New codes will reuse this set's existing prefix and format:{" "}
+                <strong>{inferredPrefix}-{"X".repeat(inferredCodeLength ?? 6)}</strong>
+              </s-paragraph>
+              <s-text-field
+                label="Number of codes"
+                type="number"
+                value={addCodeCount}
+                min="1"
+                max="5000"
+                onInput={(e: InputEvent) => setAddCodeCount((e.target as HTMLInputElement).value)}
+                helpText="Maximum 5,000 per batch"
+              />
+            </s-form-layout>
+          )}
+
+          {addCodeMode === "generate" && !inferredPrefix && (
+            <s-form-layout>
+              <s-paragraph>
+                Couldn't detect a consistent prefix from this set's existing codes — enter one to use for new codes.
+              </s-paragraph>
+              <s-text-field
+                label="Code prefix"
+                value={addPrefix}
+                onInput={(e: InputEvent) => setAddPrefix((e.target as HTMLInputElement).value)}
+                helpText="Letters and numbers only, e.g. BAJIO"
+              />
+              <s-text-field
+                label="Number of codes"
+                type="number"
+                value={addCodeCount}
+                min="1"
+                max="5000"
+                onInput={(e: InputEvent) => setAddCodeCount((e.target as HTMLInputElement).value)}
+                helpText="Maximum 5,000 per batch"
+              />
+              <s-text-field
+                label="Code length"
+                type="number"
+                value={addCodeLength}
+                min="4"
+                max="12"
+                onInput={(e: InputEvent) => setAddCodeLength((e.target as HTMLInputElement).value)}
+                helpText="Number of random characters after the prefix (4–12)"
+              />
+            </s-form-layout>
+          )}
+
+          {addCodeMode === "import" && (
+            <s-stack direction="block" gap="base">
+              <s-paragraph>
+                Upload a CSV file with a <strong>Code</strong> column. Each row becomes one discount code.
+              </s-paragraph>
+              <input
+                ref={addFileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleAddFileChange as unknown as React.ChangeEventHandler<HTMLInputElement>}
+                style={{ fontSize: "14px" }}
+              />
+              {addCsvPreview && (
+                <s-banner tone="success" title={`${addCsvPreview.count} codes detected`}>
+                  <s-paragraph>First code: {addCsvPreview.sample}. Codes marked "Used" will be uploaded to Shopify and flagged as previously used in the app.</s-paragraph>
+                </s-banner>
+              )}
+              {addCsvFile && !addCsvPreview && (
+                <s-banner tone="critical" title='No "Code" column found'>
+                  <s-paragraph>Make sure the CSV has a header row with a column named exactly "Code".</s-paragraph>
+                </s-banner>
+              )}
+            </s-stack>
+          )}
+
+          <div>
+            <s-button variant="primary" onClick={handleAddCodes} disabled={!canAddCodes || fetcher.state !== "idle"}>
+              {fetcher.state !== "idle" ? "Adding…" : "Add codes"}
+            </s-button>
+          </div>
         </s-stack>
       </s-section>
 

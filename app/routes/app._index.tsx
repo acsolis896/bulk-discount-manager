@@ -308,6 +308,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
 
+    // Record active codes with their creation date, so exports can show
+    // which codes were added when (Shopify doesn't expose this itself).
+    await db.issuedCode.createMany({
+      data: finalCodes.map((code) => ({ shop: session.shop, discountId, code })),
+      skipDuplicates: true,
+    });
+
     return {
       discountId,
       title,
