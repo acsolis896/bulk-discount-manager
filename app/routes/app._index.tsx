@@ -50,7 +50,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const oncePerOrder = formData.get("oncePerOrder") !== "0";
     const codeMode = String(formData.get("codeMode") || "generate");
     const endsAtRaw = String(formData.get("endsAt") || "");
-    const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
+    const endsAt = endsAtRaw ? new Date(`${endsAtRaw}T23:59:59.000Z`).toISOString() : null;
     const usageLimitOne = formData.get("usageLimitOne") === "1";
     const oncePerCustomer = formData.get("oncePerCustomer") === "1";
     const combinesWithProduct = formData.get("combinesWithProduct") === "1";

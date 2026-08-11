@@ -39,6 +39,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const allCodes: RedeemCode[] = [];
     let cursor: string | null = null;
     let title = "Discount";
+    let endsAt: string | null = null;
     let totalCount = 0;
 
     do {
@@ -49,6 +50,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             discount {
               ... on DiscountCodeApp {
                 title
+                endsAt
                 codes(first: 250, after: $after) {
                   nodes { code asyncUsageCount }
                   pageInfo { hasNextPage endCursor }
@@ -63,6 +65,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       const data = await res.json();
       const discount = data.data?.discountNode?.discount;
       if (discount?.title) title = discount.title;
+      if (discount?.endsAt !== undefined) endsAt = discount.endsAt;
       const codesPage = discount?.codes;
       for (const node of codesPage?.nodes ?? []) {
         allCodes.push({ code: node.code, usageCount: node.asyncUsageCount ?? 0 });
@@ -168,7 +171,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
     }
 
-    return { numericId, title, shop, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, error: null as string | null };
+    return { numericId, title, shop, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -186,6 +189,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       eligibleCollections: [] as { id: string; title: string }[],
       eligibleCollectionIds: [] as string[],
       discountType: "percentage" as "percentage" | "fixedAmount",
+      endsAt: null as string | null,
       percentage: null as number | null,
       fixedAmount: null as number | null,
       error: err instanceof Error ? err.message : String(err),
@@ -291,6 +295,29 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return { addedCodes: true, addedCount, skippedCount: preUsedCodes.length };
   }
 
+  if (intent === "updateEndsAt") {
+    const endsAtRaw = String(formData.get("endsAt") || "");
+    const endsAt = endsAtRaw ? new Date(`${endsAtRaw}T23:59:59.000Z`).toISOString() : null;
+    const appDiscountId = gid.replace("DiscountCodeNode", "DiscountCodeApp");
+
+    const res = await admin.graphql(
+      `#graphql
+      mutation UpdateDiscountEndsAt($id: ID!, $input: DiscountCodeAppInput!) {
+        discountCodeAppUpdate(id: $id, codeAppDiscount: $input) {
+          userErrors { field message }
+        }
+      }`,
+      { variables: { id: appDiscountId, input: { endsAt } } }
+    );
+    const data = await res.json();
+    const errors = data.data?.discountCodeAppUpdate?.userErrors ?? [];
+    if (errors.length > 0) {
+      return { error: `Updating expiration: ${errors.map((e: { message: string }) => e.message).join(", ")}` };
+    }
+
+    return { endsAtUpdated: true };
+  }
+
   if (intent === "updateItems") {
     const productIds: string[] = JSON.parse(formData.get("productIds") as string ?? "[]");
     const collectionIds: string[] = JSON.parse(formData.get("collectionIds") as string ?? "[]");
@@ -387,13 +414,22 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function DiscountDetails() {
-  const { title, numericId, shop, codes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, error } = useLoaderData<typeof loader>();
+  const { title, numericId, shop, codes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
   const unusedCount = Math.max(0, totalCount - usedCount - preUsedCodes.length);
   const [confirmCode, setConfirmCode] = useState<string | null>(null);
   const [editingItems, setEditingItems] = useState(false);
+
+  const [endsAtInput, setEndsAtInput] = useState(endsAt ? new Date(endsAt).toISOString().split("T")[0] : "");
+
+  const handleUpdateEndsAt = useCallback(() => {
+    const form = new FormData();
+    form.append("intent", "updateEndsAt");
+    form.append("endsAt", endsAtInput);
+    fetcher.submit(form, { method: "post" });
+  }, [fetcher, endsAtInput]);
 
   const [addCodeMode, setAddCodeMode] = useState<"generate" | "import">("generate");
   const [addPrefix, setAddPrefix] = useState(inferredPrefix ?? "");
@@ -539,6 +575,42 @@ export default function DiscountDetails() {
               </s-stack>
             </s-box>
           )}
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Expiration date">
+        <s-stack direction="block" gap="base">
+          {(fetcher.data as { endsAtUpdated?: boolean })?.endsAtUpdated && (
+            <s-banner tone="success">
+              <s-paragraph>Expiration date updated.</s-paragraph>
+            </s-banner>
+          )}
+          <s-paragraph>
+            {endsAt
+              ? `Currently expires ${new Date(endsAt).toLocaleDateString("en-US", { timeZone: "UTC" })}.`
+              : "No expiration date set."}
+          </s-paragraph>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <input
+              type="date"
+              value={endsAtInput}
+              onChange={(e) => setEndsAtInput(e.target.value)}
+              style={{ padding: "6px 8px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", width: "200px" }}
+            />
+            {endsAtInput && (
+              <button
+                onClick={() => setEndsAtInput("")}
+                style={{ background: "none", border: "none", color: "#6d7175", fontSize: "12px", cursor: "pointer", padding: 0 }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div>
+            <s-button variant="primary" onClick={handleUpdateEndsAt} disabled={fetcher.state !== "idle"}>
+              {fetcher.state !== "idle" ? "Saving…" : "Update expiration"}
+            </s-button>
+          </div>
         </s-stack>
       </s-section>
 
