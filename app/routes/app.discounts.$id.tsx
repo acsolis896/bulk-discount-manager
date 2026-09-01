@@ -400,11 +400,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const code = formData.get("code") as string;
 
-  // discountRedeemCodeBulkDelete is async — poll until the job completes
+  // discountCodeRedeemCodeBulkDelete is async — poll until the job completes
   const deleteRes = await admin.graphql(
     `#graphql
     mutation DisableCode($discountId: ID!, $search: String) {
-      discountRedeemCodeBulkDelete(discountId: $discountId, search: $search) {
+      discountCodeRedeemCodeBulkDelete(discountId: $discountId, search: $search) {
         job { id }
         userErrors { field message }
       }
@@ -412,7 +412,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     { variables: { discountId: gid, search: code } }
   );
   const deleteData = await deleteRes.json();
-  const jobId = deleteData.data?.discountRedeemCodeBulkDelete?.job?.id;
+  const jobId = deleteData.data?.discountCodeRedeemCodeBulkDelete?.job?.id;
 
   if (jobId) {
     for (let i = 0; i < 10; i++) {
@@ -857,16 +857,18 @@ export default function DiscountDetails() {
                 {confirmCode === c.code ? (
                   <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                     <span style={{ fontSize: "13px", color: "#d72c0d" }}>Delete permanently?</span>
-                    <fetcher.Form method="post" style={{ display: "inline" }}>
-                      <input type="hidden" name="code" value={c.code} />
-                      <button
-                        type="submit"
-                        onClick={() => setConfirmCode(null)}
-                        style={{ padding: "4px 10px", fontSize: "12px", background: "#d72c0d", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer" }}
-                      >
-                        Yes, delete
-                      </button>
-                    </fetcher.Form>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const form = new FormData();
+                        form.append("code", c.code);
+                        fetcher.submit(form, { method: "post" });
+                        setConfirmCode(null);
+                      }}
+                      style={{ padding: "4px 10px", fontSize: "12px", background: "#d72c0d", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer" }}
+                    >
+                      Yes, delete
+                    </button>
                     <button
                       onClick={() => setConfirmCode(null)}
                       style={{ padding: "4px 10px", fontSize: "12px", background: "transparent", border: "1px solid #ccc", borderRadius: "5px", cursor: "pointer" }}
