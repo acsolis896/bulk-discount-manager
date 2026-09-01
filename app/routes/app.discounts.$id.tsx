@@ -7,7 +7,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { checkCodeQuota } from "../billing.server";
 
-type RedeemCode = { id: string; code: string; usageCount: number };
+type RedeemCode = { code: string; usageCount: number };
 type ParsedCode = { code: string; used: boolean };
 
 function parseCSVCodes(text: string): ParsedCode[] {
@@ -52,7 +52,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 title
                 endsAt
                 codes(first: 250, after: $after) {
-                  nodes { id code asyncUsageCount }
+                  nodes { code asyncUsageCount }
                   pageInfo { hasNextPage endCursor }
                 }
               }
@@ -68,7 +68,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       if (discount?.endsAt !== undefined) endsAt = discount.endsAt;
       const codesPage = discount?.codes;
       for (const node of codesPage?.nodes ?? []) {
-        allCodes.push({ id: node.id, code: node.code, usageCount: node.asyncUsageCount ?? 0 });
+        allCodes.push({ code: node.code, usageCount: node.asyncUsageCount ?? 0 });
       }
       totalCount = allCodes.length;
       cursor = codesPage?.pageInfo?.hasNextPage ? codesPage.pageInfo.endCursor : null;
@@ -398,18 +398,35 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return { updated: true };
   }
 
-  const codeId = formData.get("codeId") as string;
+  const code = formData.get("code") as string;
 
-  if (codeId) {
-    await admin.graphql(
-      `#graphql
-      mutation DeleteCode($id: ID!) {
-        discountRedeemCodeDelete(id: $id) {
-          userErrors { field message }
-        }
-      }`,
-      { variables: { id: codeId } }
-    );
+  // discountRedeemCodeBulkDelete is async — poll until the job completes
+  const deleteRes = await admin.graphql(
+    `#graphql
+    mutation DisableCode($discountId: ID!, $search: String) {
+      discountRedeemCodeBulkDelete(discountId: $discountId, search: $search) {
+        job { id }
+        userErrors { field message }
+      }
+    }`,
+    { variables: { discountId: gid, search: code } }
+  );
+  const deleteData = await deleteRes.json();
+  const jobId = deleteData.data?.discountRedeemCodeBulkDelete?.job?.id;
+
+  if (jobId) {
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const jobRes = await admin.graphql(
+        `#graphql
+        query JobStatus($id: ID!) {
+          job(id: $id) { done }
+        }`,
+        { variables: { id: jobId } }
+      );
+      const jobData = await jobRes.json();
+      if (jobData.data?.job?.done) break;
+    }
   }
 
   return { ok: true };
@@ -841,7 +858,7 @@ export default function DiscountDetails() {
                   <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                     <span style={{ fontSize: "13px", color: "#d72c0d" }}>Delete permanently?</span>
                     <fetcher.Form method="post" style={{ display: "inline" }}>
-                      <input type="hidden" name="codeId" value={c.id} />
+                      <input type="hidden" name="code" value={c.code} />
                       <button
                         type="submit"
                         onClick={() => setConfirmCode(null)}
