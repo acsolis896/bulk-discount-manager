@@ -7,7 +7,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { checkCodeQuota } from "../billing.server";
 
-type RedeemCode = { code: string; usageCount: number };
+type RedeemCode = { id: string; code: string; usageCount: number };
 type ParsedCode = { code: string; used: boolean };
 
 function parseCSVCodes(text: string): ParsedCode[] {
@@ -52,7 +52,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 title
                 endsAt
                 codes(first: 250, after: $after) {
-                  nodes { code asyncUsageCount }
+                  nodes { id code asyncUsageCount }
                   pageInfo { hasNextPage endCursor }
                 }
               }
@@ -68,7 +68,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       if (discount?.endsAt !== undefined) endsAt = discount.endsAt;
       const codesPage = discount?.codes;
       for (const node of codesPage?.nodes ?? []) {
-        allCodes.push({ code: node.code, usageCount: node.asyncUsageCount ?? 0 });
+        allCodes.push({ id: node.id, code: node.code, usageCount: node.asyncUsageCount ?? 0 });
       }
       totalCount = allCodes.length;
       cursor = codesPage?.pageInfo?.hasNextPage ? codesPage.pageInfo.endCursor : null;
@@ -398,26 +398,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return { updated: true };
   }
 
-  const code = formData.get("code") as string;
-
-  // Look up the code's GID so we can use the synchronous single-code delete
-  const lookupRes = await admin.graphql(
-    `#graphql
-    query FindCodeId($discountId: ID!, $search: String) {
-      discountNode(id: $discountId) {
-        discount {
-          ... on DiscountCodeApp {
-            codes(first: 1, query: $search) {
-              nodes { id }
-            }
-          }
-        }
-      }
-    }`,
-    { variables: { discountId: gid, search: code } }
-  );
-  const lookupData = await lookupRes.json();
-  const codeId = lookupData.data?.discountNode?.discount?.codes?.nodes?.[0]?.id;
+  const codeId = formData.get("codeId") as string;
 
   if (codeId) {
     await admin.graphql(
@@ -860,7 +841,7 @@ export default function DiscountDetails() {
                   <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                     <span style={{ fontSize: "13px", color: "#d72c0d" }}>Delete permanently?</span>
                     <fetcher.Form method="post" style={{ display: "inline" }}>
-                      <input type="hidden" name="code" value={c.code} />
+                      <input type="hidden" name="codeId" value={c.id} />
                       <button
                         type="submit"
                         onClick={() => setConfirmCode(null)}
