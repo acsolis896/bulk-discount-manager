@@ -400,15 +400,36 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const code = formData.get("code") as string;
 
-  await admin.graphql(
+  // Look up the code's GID so we can use the synchronous single-code delete
+  const lookupRes = await admin.graphql(
     `#graphql
-    mutation DisableCode($discountId: ID!, $search: String) {
-      discountRedeemCodeBulkDelete(discountId: $discountId, search: $search) {
-        userErrors { field message }
+    query FindCodeId($discountId: ID!, $search: String) {
+      discountNode(id: $discountId) {
+        discount {
+          ... on DiscountCodeApp {
+            codes(first: 1, query: $search) {
+              nodes { id }
+            }
+          }
+        }
       }
     }`,
     { variables: { discountId: gid, search: code } }
   );
+  const lookupData = await lookupRes.json();
+  const codeId = lookupData.data?.discountNode?.discount?.codes?.nodes?.[0]?.id;
+
+  if (codeId) {
+    await admin.graphql(
+      `#graphql
+      mutation DeleteCode($id: ID!) {
+        discountRedeemCodeDelete(id: $id) {
+          userErrors { field message }
+        }
+      }`,
+      { variables: { id: codeId } }
+    );
+  }
 
   return { ok: true };
 };
