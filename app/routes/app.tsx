@@ -6,6 +6,11 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
 
+const TAWK_PROPERTY_ID = "6a98490aef935f3443550c67";
+const TAWK_WIDGET_ID = "1k1hdqkhp";
+
+type TawkWindow = { Tawk_API?: { toggle?: () => void } };
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
@@ -35,6 +40,22 @@ export default function App() {
     };
   }, [navigate]);
 
+  // Load the Tawk.to support chat widget once per page load.
+  useEffect(() => {
+    if ((window as unknown as TawkWindow).Tawk_API) return;
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = `https://embed.tawk.to/${TAWK_PROPERTY_ID}/${TAWK_WIDGET_ID}`;
+    script.charset = "UTF-8";
+    script.setAttribute("crossorigin", "*");
+    const firstScript = document.getElementsByTagName("script")[0];
+    firstScript?.parentNode?.insertBefore(script, firstScript);
+  }, []);
+
+  const handleContactSupport = () => {
+    (window as unknown as TawkWindow).Tawk_API?.toggle?.();
+  };
+
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
@@ -44,6 +65,25 @@ export default function App() {
         <s-link href="/app/settings">Rules</s-link>
         <s-link href="/app/plans">Plans</s-link>
       </s-app-nav>
+      <button
+        onClick={handleContactSupport}
+        style={{
+          position: "fixed",
+          bottom: "20px",
+          left: "20px",
+          zIndex: 999,
+          padding: "10px 16px",
+          borderRadius: "999px",
+          border: "1px solid #ccc",
+          background: "#fff",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          fontSize: "14px",
+          fontWeight: 500,
+          cursor: "pointer",
+        }}
+      >
+        Contact Support
+      </button>
       {isLoading ? (
         <s-page heading="Loading…">
           <s-section heading="">
