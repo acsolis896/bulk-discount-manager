@@ -59,11 +59,6 @@ export default function App() {
     (window as unknown as TawkWindow).Tawk_API?.toggle?.();
   };
 
-  const handleEmailSupport = () => {
-    setShowSupportMenu(false);
-    window.location.href = "mailto:support@asp-development.com";
-  };
-
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
@@ -96,16 +91,19 @@ export default function App() {
             >
               Live Chat
             </button>
-            <button
-              onClick={handleEmailSupport}
+            <a
+              href="mailto:support@asp-development.com"
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setShowSupportMenu(false)}
               style={{
-                display: "block", width: "100%", textAlign: "left",
+                display: "block", width: "100%", textAlign: "left", boxSizing: "border-box",
                 padding: "10px 14px", border: "none", borderTop: "1px solid #e1e3e5", background: "#fff",
-                fontSize: "14px", cursor: "pointer",
+                fontSize: "14px", cursor: "pointer", color: "inherit", textDecoration: "none",
               }}
             >
               Email Support
-            </button>
+            </a>
           </div>
         )}
         <button
