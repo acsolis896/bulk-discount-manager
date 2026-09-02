@@ -1,6 +1,6 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Outlet, useLoaderData, useRouteError, useNavigate, useNavigation } from "react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
@@ -52,8 +52,16 @@ export default function App() {
     firstScript?.parentNode?.insertBefore(script, firstScript);
   }, []);
 
-  const handleContactSupport = () => {
+  const [showSupportMenu, setShowSupportMenu] = useState(false);
+
+  const handleLiveChat = () => {
+    setShowSupportMenu(false);
     (window as unknown as TawkWindow).Tawk_API?.toggle?.();
+  };
+
+  const handleEmailSupport = () => {
+    setShowSupportMenu(false);
+    window.location.href = "mailto:support@asp-development.com";
   };
 
   return (
@@ -65,25 +73,57 @@ export default function App() {
         <s-link href="/app/settings">Rules</s-link>
         <s-link href="/app/plans">Plans</s-link>
       </s-app-nav>
-      <button
-        onClick={handleContactSupport}
-        style={{
-          position: "fixed",
-          bottom: "20px",
-          left: "20px",
-          zIndex: 999,
-          padding: "10px 16px",
-          borderRadius: "999px",
-          border: "1px solid #ccc",
-          background: "#fff",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-          fontSize: "14px",
-          fontWeight: 500,
-          cursor: "pointer",
-        }}
-      >
-        Contact Support
-      </button>
+      <div style={{ position: "fixed", bottom: "20px", left: "20px", zIndex: 999 }}>
+        {showSupportMenu && (
+          <div
+            style={{
+              marginBottom: "8px",
+              width: "180px",
+              background: "#fff",
+              borderRadius: "8px",
+              border: "1px solid #e1e3e5",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              overflow: "hidden",
+            }}
+          >
+            <button
+              onClick={handleLiveChat}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                padding: "10px 14px", border: "none", background: "#fff",
+                fontSize: "14px", cursor: "pointer",
+              }}
+            >
+              Live Chat
+            </button>
+            <button
+              onClick={handleEmailSupport}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                padding: "10px 14px", border: "none", borderTop: "1px solid #e1e3e5", background: "#fff",
+                fontSize: "14px", cursor: "pointer",
+              }}
+            >
+              Email Support
+            </button>
+          </div>
+        )}
+        <button
+          onClick={() => setShowSupportMenu((v) => !v)}
+          style={{
+            padding: "10px 16px",
+            borderRadius: "999px",
+            border: "1px solid #ccc",
+            background: "#fff",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            fontSize: "14px",
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          Contact Support
+        </button>
+      </div>
       {isLoading ? (
         <s-page heading="Loading…">
           <s-section heading="">
