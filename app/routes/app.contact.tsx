@@ -26,7 +26,7 @@ export default function ContactPage() {
             .
           </s-paragraph>
           <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
-            Support hours: Mon–Fri 9am–5pm, Sat–Sun 9am–12pm.
+            Support hours: Mon–Fri 9am–5pm EST, Sat–Sun 9am–12pm EST.
           </s-paragraph>
         </s-stack>
       </s-section>
