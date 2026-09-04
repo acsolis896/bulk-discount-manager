@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -368,6 +368,18 @@ export default function CreateBulkDiscount() {
   const result = fetcher.data as Record<string, unknown> | undefined;
   const hasError = result && "error" in result;
   const hasSuccess = result && "discountId" in result && !hasError;
+
+  // The success banner lives at the top of the page, but the Create button is
+  // at the bottom — most merchants won't know to scroll up to see it. A toast
+  // shows up regardless of scroll position, right where they're already
+  // looking after clicking the button.
+  const lastToastedDiscountId = useRef<string | null>(null);
+  useEffect(() => {
+    if (hasSuccess && result?.discountId && lastToastedDiscountId.current !== result.discountId) {
+      lastToastedDiscountId.current = result.discountId as string;
+      shopify.toast.show("Discount codes created");
+    }
+  }, [hasSuccess, result, shopify]);
 
   const handlePickItems = useCallback(async () => {
     const selected = await shopify.resourcePicker({
