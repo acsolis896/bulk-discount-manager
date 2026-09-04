@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { redirect, Form, useLoaderData } from "react-router";
+import { redirect, Form, useLoaderData, useNavigate } from "react-router";
 
 import { login } from "../../shopify.server";
 
@@ -35,6 +36,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function App() {
   const { showForm } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
+
+  // Shopify always embeds this app in an iframe — a genuine, un-embedded
+  // first visit to the raw app URL never is. If we're rendering this
+  // fallback page inside an iframe, we're actually mid-way through an
+  // already-embedded session that lost its params on some client-side
+  // navigation (server-side redirect handling for this case has proven
+  // unreliable for certain fetch types), so force a client-side redirect
+  // into the real embedded app instead of showing the manual login form.
+  useEffect(() => {
+    if (window.self !== window.top) {
+      navigate("/app", { replace: true });
+    }
+  }, [navigate]);
 
   return (
     <div className={styles.index}>
