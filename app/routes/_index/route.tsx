@@ -12,6 +12,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
+  // Temporary diagnostic: log what an un-embedded hit to the root route
+  // actually looks like, to find out whether Shopify is omitting the shop
+  // param entirely or something else is going wrong.
+  console.log(
+    `[root fallback] url=${request.url} referer=${request.headers.get("referer") ?? "none"}`
+  );
+
   return { showForm: Boolean(login) };
 };
 
