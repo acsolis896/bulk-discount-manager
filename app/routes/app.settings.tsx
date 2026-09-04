@@ -426,6 +426,11 @@ export default function SettingsPage() {
 
   return (
     <s-page heading="Discount Rules">
+      <style>
+        {`.blocked-type-row { transition: background-color 0.1s; }
+          .blocked-type-row:hover { background-color: var(--s-color-bg-subdued, #f6f6f7); }`}
+      </style>
+
       <s-section heading="Blocked product types">
         <s-stack direction="block" gap="base">
           <s-paragraph>
@@ -467,8 +472,11 @@ export default function SettingsPage() {
           )}
 
           {blockedTypes.map((t: { id: string; productType: string }) => (
-            <div key={t.id} style={{ display: "flex", alignItems: "center", padding: "12px", borderBottom: "1px solid #e1e3e5", gap: "12px" }}>
-              <span style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 500, flex: 1 }}>{t.productType}</span>
+            <div key={t.id} className="blocked-type-row" style={{ display: "flex", alignItems: "center", padding: "12px", borderBottom: "1px solid #e1e3e5", borderRadius: "6px", gap: "12px" }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "8px" }}>
+                <s-icon type="shield-check-mark" tone="neutral" size="small" />
+                <span style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 500 }}>{t.productType}</span>
+              </div>
               <div style={{ width: "80px", display: "flex", justifyContent: "flex-end" }}>
                 <button
                   onClick={() => handleRemove(t.id)}

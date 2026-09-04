@@ -17,28 +17,34 @@ export default function ContactPage() {
   return (
     <s-page heading="Contact Us">
       <s-section heading="Email">
-        <s-stack direction="block" gap="base">
-          <s-paragraph>
-            Reach us anytime at{" "}
-            <a href="mailto:support@asp-development.com" target="_top">
-              support@asp-development.com
-            </a>
-            .
-          </s-paragraph>
-          <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
-            Support hours: Mon–Fri 9am–5pm EST, Sat–Sun 9am–12pm EST.
-          </s-paragraph>
+        <s-stack direction="inline" gap="base" style={{ alignItems: "flex-start" }}>
+          <s-icon type="email" tone="info" />
+          <s-stack direction="block" gap="base">
+            <s-paragraph>
+              Reach us anytime at{" "}
+              <a href="mailto:support@asp-development.com" target="_top">
+                support@asp-development.com
+              </a>
+              .
+            </s-paragraph>
+            <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
+              Support hours: Mon–Fri 9am–5pm EST, Sat–Sun 9am–12pm EST.
+            </s-paragraph>
+          </s-stack>
         </s-stack>
       </s-section>
 
       <s-section heading="Live chat">
-        <s-stack direction="block" gap="base">
-          <s-paragraph>Chat with us directly during support hours.</s-paragraph>
-          <div>
-            <s-button variant="primary" onClick={handleLiveChat}>
-              Open Live Chat
-            </s-button>
-          </div>
+        <s-stack direction="inline" gap="base" style={{ alignItems: "flex-start" }}>
+          <s-icon type="chat" tone="info" />
+          <s-stack direction="block" gap="base">
+            <s-paragraph>Chat with us directly during support hours.</s-paragraph>
+            <div>
+              <s-button variant="primary" onClick={handleLiveChat}>
+                Open Live Chat
+              </s-button>
+            </div>
+          </s-stack>
         </s-stack>
       </s-section>
     </s-page>
