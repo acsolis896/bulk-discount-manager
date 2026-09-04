@@ -24,6 +24,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 type Card = { href: string; title: string; description: string; icon: string };
 
+const ICON_PURPLE = "#6B46C1";
+
 const CREATE_CARDS: Card[] = [
   {
     href: "/app/discounts/new",
@@ -83,7 +85,7 @@ export default function Home() {
       style={{ cursor: "pointer" }}
     >
       <s-stack direction="inline" gap="base" style={{ alignItems: "flex-start" }}>
-        <s-icon type={card.icon as never} tone="info" />
+        <s-icon type={card.icon as never} style={{ color: ICON_PURPLE }} />
         <s-stack direction="block" gap="none">
           <s-text emphasis="bold">{card.title}</s-text>
           <s-text style={{ fontSize: "13px", color: "#6d7175" }}>{card.description}</s-text>
