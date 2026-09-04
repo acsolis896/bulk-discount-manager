@@ -29,8 +29,8 @@ const SECTIONS = [
     description: "Generate thousands of unique discount codes in bulk, or import from a CSV.",
   },
   {
-    href: "/app/single-codes",
-    title: "Reusable codes",
+    href: "/app/single-codes/new",
+    title: "Create reusable codes",
     description: "Create a single shareable code, optionally targeted at a customer segment or tags.",
   },
   {
