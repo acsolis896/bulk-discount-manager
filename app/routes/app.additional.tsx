@@ -101,18 +101,29 @@ export default function DiscountSets() {
 
   return (
     <s-page heading="Discount Sets">
+      <style>
+        {`.set-row { transition: background-color 0.1s; }
+          .set-row:hover { background-color: var(--s-color-bg-subdued, #f6f6f7); }`}
+      </style>
+
       <s-section heading="Overview">
         <s-stack direction="inline" gap="base">
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="block" gap="none">
-              <s-text emphasis="bold" style={{ fontSize: "24px" }}>{sets.length}</s-text>
-              <s-text>Total sets</s-text>
+            <s-stack direction="inline" gap="tight" style={{ alignItems: "center" }}>
+              <s-icon type="collection-list" tone="info" />
+              <s-stack direction="block" gap="none">
+                <s-text emphasis="bold" style={{ fontSize: "24px" }}>{sets.length}</s-text>
+                <s-text>Total sets</s-text>
+              </s-stack>
             </s-stack>
           </s-box>
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="block" gap="none">
-              <s-text emphasis="bold" style={{ fontSize: "24px" }}>{activeSets}</s-text>
-              <s-text>Active</s-text>
+            <s-stack direction="inline" gap="tight" style={{ alignItems: "center" }}>
+              <s-icon type="status-active" tone="success" />
+              <s-stack direction="block" gap="none">
+                <s-text emphasis="bold" style={{ fontSize: "24px" }}>{activeSets}</s-text>
+                <s-text>Active</s-text>
+              </s-stack>
             </s-stack>
           </s-box>
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
@@ -155,8 +166,11 @@ export default function DiscountSets() {
             {sets.map((s: DiscountSet) => {
               const setUsageRate = s.totalCodes > 0 ? Math.round((s.usedCodes / s.totalCodes) * 100) : 0;
               return (
-                <div key={s.numericId} style={{ display: "flex", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", gap: "12px" }}>
-                  <span style={{ flex: 3, fontSize: "14px" }}>{s.title}</span>
+                <div key={s.numericId} className="set-row" style={{ display: "flex", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", borderRadius: "6px", gap: "12px" }}>
+                  <div style={{ flex: 3, display: "flex", alignItems: "center", gap: "8px" }}>
+                    <s-icon type={s.isReusableCode ? "discount-code" : "discount-add"} tone="neutral" size="small" />
+                    <span style={{ fontSize: "14px" }}>{s.title}</span>
+                  </div>
                   <div style={{ width: "80px" }}>
                     {s.status === "ACTIVE" ? (
                       <s-badge tone="success">Active</s-badge>
