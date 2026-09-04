@@ -538,15 +538,16 @@ export default function CreateBulkDiscount() {
             </s-stack>
           </div>
           <div style={{ marginTop: "16px" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
-              <input type="checkbox" checked={oncePerOrder} onChange={(e) => setOncePerOrder(e.target.checked)} />
-              Only apply discount once per order
-            </label>
-            <div style={{ fontSize: "12px", color: "#6d7175", marginTop: "4px" }}>
-              {oncePerOrder
-                ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
-                : "The discount will be taken off every eligible item in the cart."}
-            </div>
+            <s-checkbox
+              label="Only apply discount once per order"
+              checked={oncePerOrder}
+              onChange={(e: { target: { checked: boolean } }) => setOncePerOrder(e.target.checked)}
+              details={
+                oncePerOrder
+                  ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
+                  : "The discount will be taken off every eligible item in the cart."
+              }
+            />
           </div>
           <div style={{ marginTop: "16px" }}>
             <div style={{ fontSize: "14px", fontWeight: 600 }}>Expiration date</div>
@@ -560,22 +561,16 @@ export default function CreateBulkDiscount() {
           </div>
           <div style={{ marginTop: "16px" }}>
           <s-stack direction="block" gap="tight">
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={usageLimitOne}
-                onChange={(e) => setUsageLimitOne(e.target.checked)}
-              />
-              Limit number of times each code can be used in total (1)
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={oncePerCustomer}
-                onChange={(e) => setOncePerCustomer(e.target.checked)}
-              />
-              Limit to one use per customer
-            </label>
+            <s-checkbox
+              label="Limit number of times each code can be used in total (1)"
+              checked={usageLimitOne}
+              onChange={(e: { target: { checked: boolean } }) => setUsageLimitOne(e.target.checked)}
+            />
+            <s-checkbox
+              label="Limit to one use per customer"
+              checked={oncePerCustomer}
+              onChange={(e: { target: { checked: boolean } }) => setOncePerCustomer(e.target.checked)}
+            />
           </s-stack>
           </div>
         </s-form-layout>
@@ -767,18 +762,21 @@ export default function CreateBulkDiscount() {
       <s-section heading="Combinations">
         <s-stack direction="block" gap="tight">
           <s-paragraph>Choose whether this discount can be combined with other discount types.</s-paragraph>
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
-            <input type="checkbox" checked={combinesWithProduct} onChange={(e) => setCombinesWithProduct(e.target.checked)} />
-            Product discounts
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
-            <input type="checkbox" checked={combinesWithOrder} onChange={(e) => setCombinesWithOrder(e.target.checked)} />
-            Order discounts
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
-            <input type="checkbox" checked={combinesWithShipping} onChange={(e) => setCombinesWithShipping(e.target.checked)} />
-            Shipping discounts
-          </label>
+          <s-checkbox
+            label="Product discounts"
+            checked={combinesWithProduct}
+            onChange={(e: { target: { checked: boolean } }) => setCombinesWithProduct(e.target.checked)}
+          />
+          <s-checkbox
+            label="Order discounts"
+            checked={combinesWithOrder}
+            onChange={(e: { target: { checked: boolean } }) => setCombinesWithOrder(e.target.checked)}
+          />
+          <s-checkbox
+            label="Shipping discounts"
+            checked={combinesWithShipping}
+            onChange={(e: { target: { checked: boolean } }) => setCombinesWithShipping(e.target.checked)}
+          />
         </s-stack>
       </s-section>
 
