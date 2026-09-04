@@ -12,12 +12,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  // Temporary diagnostic: log what an un-embedded hit to the root route
-  // actually looks like, to find out whether Shopify is omitting the shop
-  // param entirely or something else is going wrong.
-  console.log(
-    `[root fallback] url=${request.url} referer=${request.headers.get("referer") ?? "none"}`
-  );
+  // A request to "/" with no shop param but a referer from our own app's
+  // origin is a client-side navigation from inside an already-embedded
+  // session (confirmed via logging — Shopify's own redirects always carry
+  // the shop/host/embedded params, so this only happens for in-app soft
+  // navigations that lost them). Send those into the embedded app instead
+  // of showing the manual login form, which is only meant for a genuine,
+  // un-embedded first visit.
+  const referer = request.headers.get("referer");
+  let refererOrigin: string | null = null;
+  try {
+    refererOrigin = referer ? new URL(referer).origin : null;
+  } catch {
+    refererOrigin = null;
+  }
+  if (refererOrigin === url.origin) {
+    throw redirect("/app");
+  }
 
   return { showForm: Boolean(login) };
 };
