@@ -562,7 +562,7 @@ export default function DiscountDetails() {
           <s-button onClick={() => window.open(`https://${shop}/admin/discounts/${numericId}`, "_blank")}>
             View in Shopify admin
           </s-button>
-          <s-button onClick={() => navigate("/app")}>Create another discount</s-button>
+          <s-button onClick={() => navigate("/app/discounts/new")}>Create another discount</s-button>
         </s-stack>
       </div>
 

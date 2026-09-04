@@ -140,7 +140,7 @@ export default function DiscountSets() {
         {sets.length === 0 ? (
           <s-stack direction="block" gap="base">
             <s-paragraph>No discount sets created yet.</s-paragraph>
-            <s-button onClick={() => navigate("/app")}>Create your first discount set</s-button>
+            <s-button onClick={() => navigate("/app/discounts/new")}>Create your first discount set</s-button>
           </s-stack>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
@@ -181,7 +181,7 @@ export default function DiscountSets() {
       </s-section>
 
       <s-stack direction="inline" gap="base">
-        <s-button variant="primary" onClick={() => navigate("/app")}>
+        <s-button variant="primary" onClick={() => navigate("/app/discounts/new")}>
           Create new discount set
         </s-button>
       </s-stack>

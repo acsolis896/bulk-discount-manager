@@ -55,7 +55,8 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
-        <s-link href="/app">Create bulk discounts</s-link>
+        <s-link href="/app">Home</s-link>
+        <s-link href="/app/discounts/new">Create bulk discounts</s-link>
         <s-link href="/app/single-codes">Reusable codes</s-link>
         <s-link href="/app/additional">Discount sets</s-link>
         <s-link href="/app/settings">Rules</s-link>
