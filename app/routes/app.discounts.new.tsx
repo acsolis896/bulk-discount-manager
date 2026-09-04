@@ -486,7 +486,6 @@ export default function CreateBulkDiscount() {
           {result.eligibilityWarning ? (
             <s-paragraph>Customer eligibility warning: {result.eligibilityWarning as string}</s-paragraph>
           ) : null}
-          <s-paragraph>Discount ID: {result.discountId as string}</s-paragraph>
         </s-banner>
       )}
 
