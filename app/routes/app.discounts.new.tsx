@@ -470,25 +470,6 @@ export default function CreateBulkDiscount() {
 
   return (
     <s-page heading="Create Bulk Discount Codes">
-      {hasSuccess && (
-        <s-banner title={`Discount created: ${result.title}`} tone="success" onDismiss={handleReset}>
-          <s-paragraph>
-            {result.codeCount} active codes queued • e.g. {result.firstCode as string} •{" "}
-            {result.discountType === "fixedAmount"
-              ? `$${result.fixedAmount} off eligible products`
-              : `${result.percentage}% off eligible products`}
-          </s-paragraph>
-          {(result.preUsedCount as number) > 0 && (
-            <s-paragraph>
-              {result.preUsedCount as number} previously used codes recorded for history.
-            </s-paragraph>
-          )}
-          {result.eligibilityWarning ? (
-            <s-paragraph>Customer eligibility warning: {result.eligibilityWarning as string}</s-paragraph>
-          ) : null}
-        </s-banner>
-      )}
-
       {hasError && (
         <s-banner title="Something went wrong" tone="critical">
           <s-paragraph>{result.error as string}</s-paragraph>
@@ -802,6 +783,31 @@ export default function CreateBulkDiscount() {
         </s-button>
         {hasSuccess && <s-button onClick={handleReset}>Create another</s-button>}
       </s-stack>
+
+      {hasSuccess && (
+        <s-banner title={`Discount created: ${result.title}`} tone="success" onDismiss={handleReset}>
+          <s-paragraph>
+            {result.codeCount} discount codes created • e.g. {result.firstCode as string} •{" "}
+            {result.discountType === "fixedAmount"
+              ? `$${result.fixedAmount} off eligible products`
+              : `${result.percentage}% off eligible products`}
+          </s-paragraph>
+          {(result.codeCount as number) > 100 && (
+            <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
+              Large batches are processed in the background — if any codes are missing from the
+              Discount sets page, check back in a minute.
+            </s-paragraph>
+          )}
+          {(result.preUsedCount as number) > 0 && (
+            <s-paragraph>
+              {result.preUsedCount as number} previously used codes recorded for history.
+            </s-paragraph>
+          )}
+          {result.eligibilityWarning ? (
+            <s-paragraph>Customer eligibility warning: {result.eligibilityWarning as string}</s-paragraph>
+          ) : null}
+        </s-banner>
+      )}
     </s-page>
   );
 }
