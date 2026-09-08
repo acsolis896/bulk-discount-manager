@@ -785,6 +785,7 @@ export default function CreateBulkDiscount() {
       </s-stack>
 
       {hasSuccess && (
+        <div style={{ marginTop: "16px" }}>
         <s-banner title={`Discount created: ${result.title}`} tone="success" onDismiss={handleReset}>
           <s-paragraph>
             {result.codeCount} discount codes created • e.g. {result.firstCode as string} •{" "}
@@ -807,6 +808,7 @@ export default function CreateBulkDiscount() {
             <s-paragraph>Customer eligibility warning: {result.eligibilityWarning as string}</s-paragraph>
           ) : null}
         </s-banner>
+        </div>
       )}
     </s-page>
   );
