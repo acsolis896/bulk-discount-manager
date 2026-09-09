@@ -499,7 +499,7 @@ export default function CreateBulkDiscount() {
           <div style={{ marginTop: "16px" }}>
             <s-stack direction="block" gap="tight">
               <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
-              <s-button-group gap="base">
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                 {(["percentage", "fixedAmount"] as const).map((type) => (
                   <s-button
                     key={type}
@@ -509,7 +509,7 @@ export default function CreateBulkDiscount() {
                     {type === "percentage" ? "Percentage" : "Fixed amount"}
                   </s-button>
                 ))}
-              </s-button-group>
+              </div>
               {discountType === "percentage" ? (
                 <s-text-field
                   label="Percentage off"
@@ -572,7 +572,7 @@ export default function CreateBulkDiscount() {
 
       <s-section heading="Codes">
         <s-stack direction="block" gap="base">
-          <s-button-group gap="base">
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {(["generate", "import"] as const).map((mode) => (
               <s-button
                 key={mode}
@@ -582,7 +582,7 @@ export default function CreateBulkDiscount() {
                 {mode === "generate" ? "Generate randomly" : "Import from CSV"}
               </s-button>
             ))}
-          </s-button-group>
+          </div>
 
           {codeMode === "generate" && (
             <s-form-layout>
@@ -651,7 +651,7 @@ export default function CreateBulkDiscount() {
             : "The discount applies to every eligible item in the cart."}
         </s-paragraph>
         <s-stack direction="block" gap="base">
-          <s-button-group gap="base">
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {(["product", "collection"] as const).map((type) => (
               <s-button
                 key={type}
@@ -661,7 +661,7 @@ export default function CreateBulkDiscount() {
                 {type === "product" ? "Products" : "Collections"}
               </s-button>
             ))}
-          </s-button-group>
+          </div>
           <s-button onClick={handlePickItems}>
             {selectedItems.length > 0
               ? `${selectedItems.length} ${selectionType}${selectedItems.length > 1 ? "s" : ""} selected — change`
@@ -682,7 +682,7 @@ export default function CreateBulkDiscount() {
       <s-section heading="Customer eligibility">
         <s-stack direction="block" gap="tight">
           <s-paragraph>Choose which customers can use these discount codes.</s-paragraph>
-          <s-button-group gap="base">
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {(["all", "tags", "segment"] as const).map((mode) => (
               <s-button
                 key={mode}
@@ -692,7 +692,7 @@ export default function CreateBulkDiscount() {
                 {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
               </s-button>
             ))}
-          </s-button-group>
+          </div>
 
           {eligibilityMode === "tags" && (
             <s-form-layout>

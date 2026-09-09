@@ -719,7 +719,7 @@ export default function DiscountDetails() {
             </s-banner>
           )}
 
-          <s-button-group gap="base">
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {(["generate", "import"] as const).map((mode) => (
               <s-button
                 key={mode}
@@ -729,7 +729,7 @@ export default function DiscountDetails() {
                 {mode === "generate" ? "Generate randomly" : "Import from CSV"}
               </s-button>
             ))}
-          </s-button-group>
+          </div>
 
           {addCodeMode === "generate" && inferredPrefix && (
             <s-form-layout>

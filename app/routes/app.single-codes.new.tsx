@@ -378,7 +378,7 @@ export default function NewSingleCodePage() {
         <div style={{ marginTop: "16px" }}>
           <s-stack direction="block" gap="tight">
             <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
-            <s-button-group gap="base">
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {(["percentage", "fixedAmount"] as const).map((type) => (
                 <s-button
                   key={type}
@@ -388,7 +388,7 @@ export default function NewSingleCodePage() {
                   {type === "percentage" ? "Percentage" : "Fixed amount"}
                 </s-button>
               ))}
-            </s-button-group>
+            </div>
             {discountType === "percentage" ? (
               <s-text-field
                 label="Discount percentage"
@@ -449,7 +449,7 @@ export default function NewSingleCodePage() {
       <s-section heading="Customer eligibility">
         <s-stack direction="block" gap="tight">
           <s-paragraph>Choose which customers can use this code.</s-paragraph>
-          <s-button-group gap="base">
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {(["all", "tags", "segment"] as const).map((mode) => (
               <s-button
                 key={mode}
@@ -459,7 +459,7 @@ export default function NewSingleCodePage() {
                 {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
               </s-button>
             ))}
-          </s-button-group>
+          </div>
 
           {eligibilityMode === "tags" && (
             <>
