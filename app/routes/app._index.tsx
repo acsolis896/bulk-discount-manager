@@ -2,24 +2,44 @@ import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import db from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
 
-  // Show a welcome/orientation message only until the merchant has created
-  // their first discount with this app.
+  // Drives both the welcome banner and the "Getting started" checklist below —
+  // asyncUsageCount tells us whether any code has actually been redeemed yet.
   const existingRes = await admin.graphql(
     `#graphql
     query HasAnyDiscounts {
-      discountNodes(first: 1, query: "function_id:discount-rejection-function-js") {
-        nodes { id }
+      discountNodes(first: 25, query: "function_id:discount-rejection-function-js") {
+        nodes {
+          id
+          discount {
+            ... on DiscountCodeApp { asyncUsageCount }
+          }
+        }
       }
     }`
   );
   const existingData = await existingRes.json();
-  const isFirstVisit = (existingData.data?.discountNodes?.nodes ?? []).length === 0;
+  const discountNodes = existingData.data?.discountNodes?.nodes ?? [];
+  const hasAnyDiscount = discountNodes.length > 0;
+  const hasAnyUsage = discountNodes.some(
+    (n: { discount?: { asyncUsageCount?: number } }) => (n.discount?.asyncUsageCount ?? 0) > 0
+  );
 
-  return { isFirstVisit };
+  const blockedTypeCount = await db.blockedProductType.count({ where: { shop: session.shop } });
+
+  const isFirstVisit = !hasAnyDiscount;
+  const checklist = [
+    { key: "create", label: "Create your first discount", done: hasAnyDiscount, href: "/app/discounts/new" },
+    { key: "rules", label: "Add a blocked product type rule (optional)", done: blockedTypeCount > 0, href: "/app/settings" },
+    { key: "usage", label: "See a code used at checkout", done: hasAnyUsage, href: "/app/additional" },
+  ];
+  const showChecklist = checklist.some((c) => !c.done);
+
+  return { isFirstVisit, checklist, showChecklist };
 };
 
 type Card = { href: string; title: string; description: string; icon: string };
@@ -70,7 +90,7 @@ const CONTACT_CARD: Card = {
 };
 
 export default function Home() {
-  const { isFirstVisit } = useLoaderData<typeof loader>();
+  const { isFirstVisit, checklist, showChecklist } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
 
   const renderCard = (card: Card) => (
@@ -110,6 +130,34 @@ export default function Home() {
             (like gift-with-purchase products) are in the cart.
           </s-paragraph>
         </s-banner>
+      )}
+
+      {showChecklist && (
+        <s-section heading="Getting started">
+          <s-stack direction="block" gap="tight">
+            {checklist.map((step) => (
+              <div
+                key={step.key}
+                onClick={() => navigate(step.href)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  opacity: step.done ? 0.6 : 1,
+                }}
+              >
+                <s-icon
+                  type={step.done ? "check-circle-filled" : "circle"}
+                  tone={step.done ? "success" : "neutral"}
+                />
+                <s-text style={step.done ? { textDecoration: "line-through" } : {}}>{step.label}</s-text>
+              </div>
+            ))}
+          </s-stack>
+        </s-section>
       )}
 
       <s-section heading="Create a discount">

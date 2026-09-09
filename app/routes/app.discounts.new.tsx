@@ -387,6 +387,10 @@ export default function CreateBulkDiscount() {
       shopify.toast.show(
         `${result.codeCount} discount codes created • e.g. ${result.firstCode} • ${valueSummary}`
       );
+      // Ask at the end of a successful workflow, per Shopify's guidance — the
+      // native modal handles its own eligibility/rate limiting, so this is
+      // safe to call unconditionally on every successful creation.
+      shopify.reviews.request().catch(() => {});
     } else if (hasError) {
       shopify.toast.show(result.error as string, { isError: true, duration: 8000 });
     }

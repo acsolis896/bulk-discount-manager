@@ -278,9 +278,10 @@ export default function NewSingleCodePage() {
 
   useEffect(() => {
     if (result?.success && result.numericId && !result.eligibilityWarning) {
+      shopify.reviews.request().catch(() => {});
       navigate(`/app/single-codes/${result.numericId}`);
     }
-  }, [result, navigate]);
+  }, [result, navigate, shopify]);
 
   const handlePickProducts = useCallback(async () => {
     const selected = await shopify.resourcePicker({
