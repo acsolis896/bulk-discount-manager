@@ -498,14 +498,14 @@ export default function SingleCodeDetailsPage() {
                   label="Required customer tag"
                   value={requiredTag}
                   placeholder="e.g. GUIDE50"
-                  helpText="Customers must have this tag to use the code"
+                  details="Customers must have this tag to use the code"
                   onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
                 />
                 <s-text-field
                   label="Blocked customer tag"
                   value={blockedTag}
                   placeholder="e.g. GUIDE50-USED"
-                  helpText="Customers with this tag will be rejected (usage limit reached)"
+                  details="Customers with this tag will be rejected (usage limit reached)"
                   onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
                 />
               </div>
@@ -557,7 +557,7 @@ export default function SingleCodeDetailsPage() {
                     value={percentage}
                     min="1"
                     max="100"
-                    helpText="Percentage off the eligible product"
+                    details="Percentage off the eligible product"
                     onInput={(e: { target: { value: string } }) => setPercentage(e.target.value)}
                   />
                 ) : (
@@ -568,7 +568,7 @@ export default function SingleCodeDetailsPage() {
                     min="0.01"
                     step="0.01"
                     prefix="$"
-                    helpText="Fixed amount off the eligible product"
+                    details="Fixed amount off the eligible product"
                     onInput={(e: { target: { value: string } }) => setFixedAmount(e.target.value)}
                   />
                 )}

@@ -487,7 +487,7 @@ export default function CreateBulkDiscount() {
             label="Title"
             value={title}
             onInput={(e: InputEvent) => setTitle((e.target as HTMLInputElement).value)}
-            helpText="The discount set title will be shown in the Shopify admin, not visible to customers at checkout"
+            details="The discount set title will be shown in the Shopify admin, not visible to customers at checkout"
           />
           <div style={{ marginTop: "16px" }}>
             <s-stack direction="block" gap="tight">
@@ -601,7 +601,7 @@ export default function CreateBulkDiscount() {
                 label="Code prefix"
                 value={prefix}
                 onInput={(e: InputEvent) => setPrefix((e.target as HTMLInputElement).value)}
-                helpText={previewCode ? `Preview: ${previewCode}` : "Letters and numbers only, e.g. BAJIO"}
+                details={previewCode ? `Preview: ${previewCode}` : "Letters and numbers only, e.g. BAJIO"}
               />
               <s-text-field
                 label="Number of codes"
@@ -610,7 +610,7 @@ export default function CreateBulkDiscount() {
                 min="1"
                 max="5000"
                 onInput={(e: InputEvent) => setCodeCount((e.target as HTMLInputElement).value)}
-                helpText="Maximum 5,000 per batch"
+                details="Maximum 5,000 per batch"
               />
               <s-text-field
                 label="Code length"
@@ -619,7 +619,7 @@ export default function CreateBulkDiscount() {
                 min="4"
                 max="12"
                 onInput={(e: InputEvent) => setCodeLength((e.target as HTMLInputElement).value)}
-                helpText="Number of random characters after the prefix (4–12)"
+                details="Number of random characters after the prefix (4–12)"
               />
             </s-form-layout>
           )}
@@ -723,14 +723,14 @@ export default function CreateBulkDiscount() {
                 label="Required customer tag"
                 value={requiredTag}
                 placeholder="e.g. VIP"
-                helpText="Customers must have this tag to use any of these codes"
+                details="Customers must have this tag to use any of these codes"
                 onInput={(e: InputEvent) => setRequiredTag((e.target as HTMLInputElement).value)}
               />
               <s-text-field
                 label="Blocked customer tag (optional)"
                 value={blockedTag}
                 placeholder="e.g. VIP-USED"
-                helpText="Customers with this tag will be excluded"
+                details="Customers with this tag will be excluded"
                 onInput={(e: InputEvent) => setBlockedTag((e.target as HTMLInputElement).value)}
               />
             </s-form-layout>
