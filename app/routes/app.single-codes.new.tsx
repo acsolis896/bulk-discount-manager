@@ -7,6 +7,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { checkCodeQuota } from "../billing.server";
 import { applyEligibility, listSegments } from "../eligibility.server";
+import { shouldRequestReviewAfterCreation } from "../review-prompt";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
@@ -278,7 +279,9 @@ export default function NewSingleCodePage() {
 
   useEffect(() => {
     if (result?.success && result.numericId && !result.eligibilityWarning) {
-      shopify.reviews.request().catch(() => {});
+      if (shouldRequestReviewAfterCreation()) {
+        shopify.reviews.request().catch(() => {});
+      }
       navigate(`/app/single-codes/${result.numericId}`);
     }
   }, [result, navigate, shopify]);
