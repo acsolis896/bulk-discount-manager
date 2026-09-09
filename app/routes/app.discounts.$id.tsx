@@ -609,20 +609,17 @@ export default function DiscountDetails() {
               ? `Currently expires ${new Date(endsAt).toLocaleDateString("en-US", { timeZone: "UTC" })}.`
               : "No expiration date set."}
           </s-paragraph>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <input
-              type="date"
+          <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
+            <s-date-field
+              label="New expiration date"
+              labelAccessibilityVisibility="exclusive"
               value={endsAtInput}
-              onChange={(e) => setEndsAtInput(e.target.value)}
-              style={{ padding: "6px 8px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", width: "200px" }}
+              onChange={(e: InputEvent) => setEndsAtInput((e.target as HTMLInputElement).value)}
             />
             {endsAtInput && (
-              <button
-                onClick={() => setEndsAtInput("")}
-                style={{ background: "none", border: "none", color: "#6d7175", fontSize: "12px", cursor: "pointer", padding: 0 }}
-              >
+              <s-button variant="tertiary" onClick={() => setEndsAtInput("")}>
                 Clear
-              </button>
+              </s-button>
             )}
           </div>
           <div>
@@ -722,25 +719,17 @@ export default function DiscountDetails() {
             </s-banner>
           )}
 
-          <div style={{ width: "fit-content" }}>
-            <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
-              {(["generate", "import"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setAddCodeMode(mode)}
-                  style={{
-                    padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
-                    fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
-                    background: addCodeMode === mode ? "#fff" : "transparent",
-                    color: addCodeMode === mode ? "#202223" : "#6d7175",
-                    boxShadow: addCodeMode === mode ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
-                  }}
-                >
-                  {mode === "generate" ? "Generate randomly" : "Import from CSV"}
-                </button>
-              ))}
-            </div>
-          </div>
+          <s-button-group gap="base">
+            {(["generate", "import"] as const).map((mode) => (
+              <s-button
+                key={mode}
+                variant={addCodeMode === mode ? "primary" : "secondary"}
+                onClick={() => setAddCodeMode(mode)}
+              >
+                {mode === "generate" ? "Generate randomly" : "Import from CSV"}
+              </s-button>
+            ))}
+          </s-button-group>
 
           {addCodeMode === "generate" && inferredPrefix && (
             <s-form-layout>
@@ -828,12 +817,12 @@ export default function DiscountDetails() {
       <s-section heading={`Codes${totalCount >= 2000 ? " (first 2,000)" : ""}`}>
         <s-stack direction="block" gap="base">
           {/* Search */}
-          <input
-            type="search"
+          <s-search-field
+            label="Search codes"
+            labelAccessibilityVisibility="exclusive"
             placeholder="Search codes…"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            style={{ padding: "8px 12px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box" }}
+            onInput={(e: InputEvent) => { setSearch((e.target as HTMLInputElement).value); setPage(0); }}
           />
 
           {/* Header row */}
@@ -857,38 +846,31 @@ export default function DiscountDetails() {
                 {confirmCode === c.code ? (
                   <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                     <span style={{ fontSize: "13px", color: "#d72c0d" }}>Delete permanently?</span>
-                    <button
-                      type="button"
+                    <s-button
+                      variant="primary"
+                      tone="critical"
                       onClick={() => {
                         const form = new FormData();
                         form.append("code", c.code);
                         fetcher.submit(form, { method: "post" });
                         setConfirmCode(null);
                       }}
-                      style={{ padding: "4px 10px", fontSize: "12px", background: "#d72c0d", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer" }}
                     >
                       Yes, delete
-                    </button>
-                    <button
-                      onClick={() => setConfirmCode(null)}
-                      style={{ padding: "4px 10px", fontSize: "12px", background: "transparent", border: "1px solid #ccc", borderRadius: "5px", cursor: "pointer" }}
-                    >
+                    </s-button>
+                    <s-button variant="tertiary" onClick={() => setConfirmCode(null)}>
                       Cancel
-                    </button>
+                    </s-button>
                   </div>
                 ) : (
-                  <button
+                  <s-button
+                    variant="secondary"
+                    tone="critical"
                     disabled={c.usageCount > 0}
                     onClick={() => setConfirmCode(c.code)}
-                    style={{
-                      padding: "4px 10px", fontSize: "12px", background: "transparent",
-                      border: "1px solid #ccc", borderRadius: "5px", cursor: c.usageCount > 0 ? "not-allowed" : "pointer",
-                      color: c.usageCount > 0 ? "#aaa" : "#d72c0d",
-                      borderColor: c.usageCount > 0 ? "#e1e3e5" : "#f5c6c2",
-                    }}
                   >
                     Disable
-                  </button>
+                  </s-button>
                 )}
               </div>
             </div>

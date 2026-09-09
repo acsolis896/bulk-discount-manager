@@ -378,25 +378,17 @@ export default function NewSingleCodePage() {
         <div style={{ marginTop: "16px" }}>
           <s-stack direction="block" gap="tight">
             <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
-            <div style={{ width: "fit-content" }}>
-              <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
-                {(["percentage", "fixedAmount"] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setDiscountType(type)}
-                    style={{
-                      padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
-                      fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
-                      background: discountType === type ? "#fff" : "transparent",
-                      color: discountType === type ? "#202223" : "#6d7175",
-                      boxShadow: discountType === type ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
-                    }}
-                  >
-                    {type === "percentage" ? "Percentage" : "Fixed amount"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <s-button-group gap="base">
+              {(["percentage", "fixedAmount"] as const).map((type) => (
+                <s-button
+                  key={type}
+                  variant={discountType === type ? "primary" : "secondary"}
+                  onClick={() => setDiscountType(type)}
+                >
+                  {type === "percentage" ? "Percentage" : "Fixed amount"}
+                </s-button>
+              ))}
+            </s-button-group>
             {discountType === "percentage" ? (
               <s-text-field
                 label="Discount percentage"
@@ -434,12 +426,10 @@ export default function NewSingleCodePage() {
           />
         </div>
         <div style={{ marginTop: "16px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 600 }}>Expiration date (optional)</div>
-          <input
-            type="date"
+          <s-date-field
+            label="Expiration date (optional)"
             value={endsAt}
-            onChange={(e) => setEndsAt(e.target.value)}
-            style={{ marginTop: "4px", padding: "6px 8px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", width: "200px" }}
+            onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
           />
         </div>
       </s-section>
@@ -459,25 +449,17 @@ export default function NewSingleCodePage() {
       <s-section heading="Customer eligibility">
         <s-stack direction="block" gap="tight">
           <s-paragraph>Choose which customers can use this code.</s-paragraph>
-          <div style={{ width: "fit-content" }}>
-            <div style={{ display: "inline-flex", background: "#f1f1f1", borderRadius: "8px", padding: "3px", gap: "2px" }}>
-              {(["all", "tags", "segment"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setEligibilityMode(mode)}
-                  style={{
-                    padding: "6px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
-                    fontSize: "14px", fontWeight: 500, transition: "all 0.15s",
-                    background: eligibilityMode === mode ? "#fff" : "transparent",
-                    color: eligibilityMode === mode ? "#202223" : "#6d7175",
-                    boxShadow: eligibilityMode === mode ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
-                  }}
-                >
-                  {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
-                </button>
-              ))}
-            </div>
-          </div>
+          <s-button-group gap="base">
+            {(["all", "tags", "segment"] as const).map((mode) => (
+              <s-button
+                key={mode}
+                variant={eligibilityMode === mode ? "primary" : "secondary"}
+                onClick={() => setEligibilityMode(mode)}
+              >
+                {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
+              </s-button>
+            ))}
+          </s-button-group>
 
           {eligibilityMode === "tags" && (
             <>
@@ -499,21 +481,16 @@ export default function NewSingleCodePage() {
           )}
 
           {eligibilityMode === "segment" && (
-            <div>
-              <label style={{ display: "block", fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>
-                Customer segment
-              </label>
-              <select
-                value={selectedSegmentId}
-                onChange={(e) => setSelectedSegmentId(e.target.value)}
-                style={{ padding: "6px 8px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", width: "300px" }}
-              >
-                <option value="">Select a segment…</option>
-                {segments.map((s: { id: string; name: string }) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
+            <s-select
+              label="Customer segment"
+              placeholder="Select a segment…"
+              value={selectedSegmentId}
+              onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
+            >
+              {segments.map((s: { id: string; name: string }) => (
+                <s-option key={s.id} value={s.id}>{s.name}</s-option>
+              ))}
+            </s-select>
           )}
         </s-stack>
       </s-section>

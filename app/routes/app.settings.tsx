@@ -478,27 +478,30 @@ export default function SettingsPage() {
                 <span style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 500 }}>{t.productType}</span>
               </div>
               <div style={{ width: "80px", display: "flex", justifyContent: "flex-end" }}>
-                <button
+                <s-button
+                  variant="secondary"
+                  tone="critical"
                   onClick={() => handleRemove(t.id)}
                   disabled={isSubmitting}
-                  style={{ padding: "4px 10px", fontSize: "12px", background: "transparent", border: "1px solid #f5c6c2", borderRadius: "5px", cursor: "pointer", color: "#d72c0d" }}
                 >
                   Remove
-                </button>
+                </s-button>
               </div>
             </div>
           ))}
 
           {/* Add new */}
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "8px" }}>
-            <input
-              type="text"
-              placeholder="e.g. Accessories"
-              value={newType}
-              onChange={(e) => setNewType(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              style={{ padding: "8px 12px", fontSize: "14px", borderRadius: "6px", border: "1px solid #ccc", flex: 1 }}
-            />
+          <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", marginTop: "8px" }}>
+            <div style={{ flex: 1 }}>
+              <s-text-field
+                label="Add product type"
+                labelAccessibilityVisibility="exclusive"
+                placeholder="e.g. Accessories"
+                value={newType}
+                onInput={(e: InputEvent) => setNewType((e.target as HTMLInputElement).value)}
+                onKeyDown={(e: KeyboardEvent) => e.key === "Enter" && handleAdd()}
+              />
+            </div>
             <s-button variant="primary" onClick={handleAdd} disabled={isSubmitting || !newType.trim()}>
               Add
             </s-button>
