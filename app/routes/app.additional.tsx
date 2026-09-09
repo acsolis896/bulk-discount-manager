@@ -16,21 +16,27 @@ type DiscountSet = {
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const loaderStart = Date.now();
   const { admin, session } = await authenticate.admin(request);
 
   // Reusable codes have no usage cap, unlike bulk sets where totalCodes is a
   // real ceiling — flag them so the UI can show "Unlimited" instead of a
   // misleading X/1 fraction, without hiding them from this list.
+  const dbStart = Date.now();
   const reusableCodeRows = await db.singleCodeDiscount.findMany({
     where: { shop: session.shop },
     select: { discountId: true },
   });
+  console.log(`[discount-sets timing] db query: ${Date.now() - dbStart}ms`);
   const reusableCodeIds = new Set(reusableCodeRows.map((r: { discountId: string }) => r.discountId.split("/").pop()));
 
   const sets: DiscountSet[] = [];
   let cursor: string | null = null;
+  let page = 0;
 
   do {
+    page += 1;
+    const pageStart = Date.now();
     const res = await admin.graphql(
       `#graphql
       query GetDiscountSets($after: String) {
@@ -55,6 +61,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
 
     const data = await res.json();
+    console.log(
+      `[discount-sets timing] page ${page}: ${Date.now() - pageStart}ms` +
+        (data.errors ? ` errors=${JSON.stringify(data.errors)}` : "") +
+        (data.extensions?.cost ? ` cost=${JSON.stringify(data.extensions.cost)}` : "")
+    );
     const nodes = data.data?.discountNodes?.nodes ?? [];
 
     for (const node of nodes) {
@@ -76,6 +87,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const pageInfo = data.data?.discountNodes?.pageInfo;
     cursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
   } while (cursor);
+
+  console.log(`[discount-sets timing] TOTAL: ${Date.now() - loaderStart}ms across ${page} page(s), ${sets.length} sets`);
 
   sets.sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
 
