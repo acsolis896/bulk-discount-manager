@@ -369,17 +369,23 @@ export default function CreateBulkDiscount() {
   const hasError = result && "error" in result;
   const hasSuccess = result && "discountId" in result && !hasError;
 
-  // The success banner lives at the top of the page, but the Create button is
-  // at the bottom — most merchants won't know to scroll up to see it. A toast
-  // shows up regardless of scroll position, right where they're already
-  // looking after clicking the button.
-  const lastToastedDiscountId = useRef<string | null>(null);
+  // The banner lives at the bottom of the page next to the Create button, but
+  // on a long form / short viewport it can still end up below the fold, and
+  // we can't reliably auto-scroll to it (Shopify resizes the embedded iframe
+  // to fit its content, so the actual scrolling happens on the outer admin
+  // page, which a cross-origin iframe can't scroll programmatically). A toast
+  // shows up regardless of scroll position since it's rendered by the admin
+  // shell itself, so it carries the key info directly.
+  const lastToastedResult = useRef<unknown>(null);
   useEffect(() => {
-    if (hasSuccess && result?.discountId && lastToastedDiscountId.current !== result.discountId) {
-      lastToastedDiscountId.current = result.discountId as string;
+    if (!result || result === lastToastedResult.current) return;
+    lastToastedResult.current = result;
+    if (hasSuccess) {
       shopify.toast.show("Discount codes created");
+    } else if (hasError) {
+      shopify.toast.show(result.error as string, { isError: true, duration: 8000 });
     }
-  }, [hasSuccess, result, shopify]);
+  }, [result, hasSuccess, hasError, shopify]);
 
   // Also scroll the detailed banner into view, in case it ends up below the
   // fold on a long form / short viewport.
