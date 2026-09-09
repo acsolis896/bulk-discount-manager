@@ -470,12 +470,6 @@ export default function CreateBulkDiscount() {
 
   return (
     <s-page heading="Create Bulk Discount Codes">
-      {hasError && (
-        <s-banner title="Something went wrong" tone="critical">
-          <s-paragraph>{result.error as string}</s-paragraph>
-        </s-banner>
-      )}
-
       <s-section heading="Discount details">
         <s-form-layout>
           <s-text-field
@@ -783,6 +777,14 @@ export default function CreateBulkDiscount() {
         </s-button>
         {hasSuccess && <s-button onClick={handleReset}>Create another</s-button>}
       </s-stack>
+
+      {hasError && (
+        <div style={{ marginTop: "16px" }}>
+          <s-banner title="Something went wrong" tone="critical">
+            <s-paragraph>{result.error as string}</s-paragraph>
+          </s-banner>
+        </div>
+      )}
 
       {hasSuccess && (
         <div style={{ marginTop: "16px" }}>
