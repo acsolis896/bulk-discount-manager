@@ -361,7 +361,7 @@ export default function NewSingleCodePage() {
           label="Title"
           value={title}
           placeholder="e.g. Guide 50% Discount"
-          helpText="Shown in the Shopify admin discounts list"
+          helpText="The discount title will be shown in the Shopify admin, not visible to customers at checkout"
           onInput={(e: { target: { value: string } }) => setTitle(e.target.value)}
         />
         <s-text-field

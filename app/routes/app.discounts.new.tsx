@@ -487,7 +487,7 @@ export default function CreateBulkDiscount() {
             label="Title"
             value={title}
             onInput={(e: InputEvent) => setTitle((e.target as HTMLInputElement).value)}
-            helpText="Shown in the Shopify admin discounts list"
+            helpText="The discount set title will be shown in the Shopify admin, not visible to customers at checkout"
           />
           <div style={{ marginTop: "16px" }}>
             <s-stack direction="block" gap="tight">
