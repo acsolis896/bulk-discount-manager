@@ -5,11 +5,18 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { FREE_PLAN_LIMIT, STARTER_PLAN_LIMIT } from "../billing";
 import { getCurrentPlan, countActiveCodes } from "../billing.server";
 
+// Matches the app handle Shopify shows in admin.shopify.com URLs for this
+// app (e.g. .../apps/bulk-discount-manager-7) — used to deep-link merchants
+// straight to the native plan selection page.
+const APP_HANDLE = "bulk-discount-manager-7";
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, billing } = await authenticate.admin(request);
+  const { admin, billing, session } = await authenticate.admin(request);
   const { tier, limit } = await getCurrentPlan(billing);
   const current = await countActiveCodes(admin, limit);
-  return { tier, limit, current };
+  const storeHandle = session.shop.replace(".myshopify.com", "");
+  const pricingUrl = `https://admin.shopify.com/store/${storeHandle}/charges/${APP_HANDLE}/pricing_plans`;
+  return { tier, limit, current, pricingUrl };
 };
 
 type PlanTier = "Free" | "Starter" | "Pro";
@@ -21,7 +28,7 @@ const PLANS: { tier: PlanTier; price: string; feature: string }[] = [
 ];
 
 export default function PlansPage() {
-  const { tier, limit, current } = useLoaderData<typeof loader>();
+  const { tier, limit, current, pricingUrl } = useLoaderData<typeof loader>();
 
   return (
     <s-page heading="Plans">
@@ -33,10 +40,11 @@ export default function PlansPage() {
               ? "Unlimited active discount codes."
               : `${current} / ${limit} active discount codes used.`}
           </s-paragraph>
-          <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
-            To subscribe, change, or cancel your plan, use the pricing page on this app's
-            Shopify App Store listing, or manage it from your Shopify admin's app settings.
-          </s-paragraph>
+          <div>
+            <s-button href={pricingUrl} target="_top" variant="primary">
+              Change plan
+            </s-button>
+          </div>
         </s-stack>
       </s-section>
 
