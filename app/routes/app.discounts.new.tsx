@@ -381,6 +381,15 @@ export default function CreateBulkDiscount() {
     }
   }, [hasSuccess, result, shopify]);
 
+  // Also scroll the detailed banner into view, in case it ends up below the
+  // fold on a long form / short viewport.
+  const messageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if ((hasSuccess || hasError) && messageRef.current) {
+      messageRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [result]);
+
   const handlePickItems = useCallback(async () => {
     const selected = await shopify.resourcePicker({
       type: selectionType,
@@ -779,7 +788,7 @@ export default function CreateBulkDiscount() {
       </s-stack>
 
       {hasError && (
-        <div style={{ marginTop: "16px" }}>
+        <div ref={messageRef} style={{ marginTop: "16px" }}>
           <s-banner title="Something went wrong" tone="critical">
             <s-paragraph>{result.error as string}</s-paragraph>
           </s-banner>
@@ -787,7 +796,7 @@ export default function CreateBulkDiscount() {
       )}
 
       {hasSuccess && (
-        <div style={{ marginTop: "16px" }}>
+        <div ref={messageRef} style={{ marginTop: "16px" }}>
         <s-banner title={`Discount created: ${result.title}`} tone="success" onDismiss={handleReset}>
           <s-paragraph>
             {result.codeCount} discount codes created • e.g. {result.firstCode as string} •{" "}
