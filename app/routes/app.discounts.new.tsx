@@ -603,26 +603,28 @@ export default function CreateBulkDiscount() {
                 onInput={(e: InputEvent) => setPrefix((e.target as HTMLInputElement).value)}
                 details={previewCode ? `Preview: ${previewCode}` : "Letters and numbers only, e.g. WELCOME — a dash and random characters will be added automatically"}
               />
-              <s-text-field
-                style={{ marginTop: "16px" }}
-                label="Number of codes"
-                type="number"
-                value={codeCount}
-                min="1"
-                max="5000"
-                onInput={(e: InputEvent) => setCodeCount((e.target as HTMLInputElement).value)}
-                details="Maximum 5,000 per batch"
-              />
-              <s-text-field
-                style={{ marginTop: "16px" }}
-                label="Code length"
-                type="number"
-                value={codeLength}
-                min="4"
-                max="12"
-                onInput={(e: InputEvent) => setCodeLength((e.target as HTMLInputElement).value)}
-                details="Number of random characters after the prefix (4–12)"
-              />
+              <div style={{ marginTop: "16px" }}>
+                <s-text-field
+                  label="Number of codes"
+                  type="number"
+                  value={codeCount}
+                  min="1"
+                  max="5000"
+                  onInput={(e: InputEvent) => setCodeCount((e.target as HTMLInputElement).value)}
+                  details="Maximum 5,000 per batch"
+                />
+              </div>
+              <div style={{ marginTop: "16px" }}>
+                <s-text-field
+                  label="Code length"
+                  type="number"
+                  value={codeLength}
+                  min="4"
+                  max="12"
+                  onInput={(e: InputEvent) => setCodeLength((e.target as HTMLInputElement).value)}
+                  details="Number of random characters after the prefix (4–12)"
+                />
+              </div>
             </s-form-layout>
           )}
 
