@@ -19,6 +19,138 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 };
 
+// Pushes the shop's current blocked-product-types list into every existing
+// discount's metafield. The Function reads a snapshot baked into each
+// discount at creation time, not a live DB lookup, so this has to re-write
+// every discount whenever the list changes — called automatically from
+// "add"/"remove" below rather than needing a separate button.
+async function syncBlockedProductTypesToDiscounts(
+  admin: Awaited<ReturnType<typeof authenticate.admin>>["admin"],
+  shop: string
+): Promise<{ updated: number; errors: string[] }> {
+  const rows = await db.blockedProductType.findMany({
+    where: { shop },
+    select: { productType: true },
+  });
+  const blockedProductTypes = rows.length > 0 ? rows.map((r: { productType: string }) => r.productType) : ["GWP"];
+
+  const dbCodes = await db.singleCodeDiscount.findMany({
+    where: { shop },
+    select: { discountId: true, code: true, configJson: true, eligibleCustomerIds: true, blockedCustomerIds: true, functionNodeId: true },
+  });
+  const codeMap = new Map(dbCodes.map((c: { code: string; discountId: string; configJson: string | null; eligibleCustomerIds: string | null; blockedCustomerIds: string | null; functionNodeId: string | null }) => [c.code.toUpperCase(), c]));
+
+  let cursor: string | null = null;
+  let updated = 0;
+  const errors: string[] = [];
+  const metafields: Array<{ ownerId: string; namespace: string; key: string; type: string; value: string }> = [];
+
+  try {
+    do {
+      const res = await admin.graphql(
+        `#graphql
+        query GetAllDiscounts($after: String) {
+          discountNodes(first: 50, after: $after, query: "function_id:discount-rejection-function-js") {
+            nodes {
+              id
+              discount {
+                ... on DiscountCodeApp {
+                  codes(first: 1) { nodes { code } }
+                }
+              }
+              metafield(namespace: "$app", key: "function-configuration") { value }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }`,
+        { variables: { after: cursor } }
+      );
+      const data = await res.json();
+      const nodes = data.data?.discountNodes?.nodes ?? [];
+
+      for (const node of nodes) {
+        // Skip non-code-discount nodes (e.g. DiscountAutomaticNode) — they cause silent metafieldsSet batch failures
+        if (!node.id.includes("DiscountCodeNode")) continue;
+        const discountCode = node.discount?.codes?.nodes?.[0]?.code?.toUpperCase() ?? null;
+        const dbRecord = discountCode ? codeMap.get(discountCode) : null;
+
+        if (dbRecord) {
+          let baseConfig: Record<string, unknown> = {};
+
+          if (dbRecord.configJson) {
+            try { baseConfig = JSON.parse(dbRecord.configJson); } catch { /* empty */ }
+          } else {
+            const fallbackRes = await admin.graphql(
+              `#graphql
+              query GetMF($id: ID!) {
+                discountNode(id: $id) {
+                  metafield(namespace: "$app", key: "function-configuration") { value }
+                }
+              }`,
+              { variables: { id: dbRecord.discountId } }
+            );
+            const fallbackData = await fallbackRes.json();
+            const fallbackValue = fallbackData.data?.discountNode?.metafield?.value;
+            try { if (fallbackValue) baseConfig = JSON.parse(fallbackValue); } catch { /* empty */ }
+            if (Object.keys(baseConfig).length > 0) {
+              await db.singleCodeDiscount.updateMany({
+                where: { shop, discountId: dbRecord.discountId },
+                data: { configJson: JSON.stringify(baseConfig) },
+              });
+            }
+          }
+
+          const eligibleCustomerIds = dbRecord.eligibleCustomerIds ? JSON.parse(dbRecord.eligibleCustomerIds) : undefined;
+          const blockedCustomerIds = dbRecord.blockedCustomerIds ? JSON.parse(dbRecord.blockedCustomerIds) : undefined;
+          const fullConfig: Record<string, unknown> = { ...baseConfig, blockedProductTypes };
+          if (eligibleCustomerIds !== undefined) fullConfig.eligibleCustomerIds = eligibleCustomerIds;
+          if (blockedCustomerIds !== undefined) fullConfig.blockedCustomerIds = blockedCustomerIds;
+
+          if (node.id !== dbRecord.functionNodeId) {
+            await db.singleCodeDiscount.updateMany({
+              where: { shop, discountId: dbRecord.discountId },
+              data: { functionNodeId: node.id },
+            });
+          }
+
+          metafields.push({ ownerId: node.id, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify(fullConfig) });
+        } else {
+          let config: Record<string, unknown> = {};
+          try { if (node.metafield?.value) config = JSON.parse(node.metafield.value); } catch { /* empty */ }
+          metafields.push({ ownerId: node.id, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify({ ...config, blockedProductTypes }) });
+        }
+      }
+
+      const pageInfo = data.data?.discountNodes?.pageInfo;
+      cursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
+    } while (cursor);
+
+    for (let i = 0; i < metafields.length; i += 25) {
+      const batch = metafields.slice(i, i + 25);
+      const updateRes = await admin.graphql(
+        `#graphql
+        mutation SyncMetafields($metafields: [MetafieldsSetInput!]!) {
+          metafieldsSet(metafields: $metafields) {
+            userErrors { field message }
+          }
+        }`,
+        { variables: { metafields: batch } }
+      );
+      const updateData = await updateRes.json();
+      const updateErrors = updateData.data?.metafieldsSet?.userErrors ?? [];
+      if (updateErrors.length > 0) {
+        errors.push(...updateErrors.map((e: { message: string }) => e.message));
+      } else {
+        updated += batch.length;
+      }
+    }
+  } catch (err: unknown) {
+    errors.push(err instanceof Error ? err.message : String(err));
+  }
+
+  return { updated, errors };
+}
+
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
@@ -42,138 +174,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         data: { shop: session.shop, productType },
       });
     }
+    const { errors } = await syncBlockedProductTypesToDiscounts(admin, session.shop);
+    if (errors.length > 0) return { error: `Added, but failed to apply to ${errors.length} existing discount(s): ${errors.join("; ")}` };
     return { ok: true };
   }
 
   if (intent === "remove") {
     const id = formData.get("id") as string;
     await db.blockedProductType.deleteMany({ where: { id, shop: session.shop } });
+    const { errors } = await syncBlockedProductTypesToDiscounts(admin, session.shop);
+    if (errors.length > 0) return { error: `Removed, but failed to apply to ${errors.length} existing discount(s): ${errors.join("; ")}` };
     return { ok: true };
-  }
-
-  if (intent === "sync") {
-    const rows = await db.blockedProductType.findMany({
-      where: { shop: session.shop },
-      select: { productType: true },
-    });
-    const blockedProductTypes = rows.length > 0 ? rows.map((r: { productType: string }) => r.productType) : ["GWP"];
-
-    const dbCodes = await db.singleCodeDiscount.findMany({
-      where: { shop: session.shop },
-      select: { discountId: true, code: true, configJson: true, eligibleCustomerIds: true, blockedCustomerIds: true, functionNodeId: true },
-    });
-    const codeMap = new Map(dbCodes.map((c: { code: string; discountId: string; configJson: string | null; eligibleCustomerIds: string | null; blockedCustomerIds: string | null; functionNodeId: string | null }) => [c.code.toUpperCase(), c]));
-
-    let cursor: string | null = null;
-    let updated = 0;
-    const errors: string[] = [];
-    const metafields: Array<{ ownerId: string; namespace: string; key: string; type: string; value: string }> = [];
-
-    try {
-      do {
-        const res = await admin.graphql(
-          `#graphql
-          query GetAllDiscounts($after: String) {
-            discountNodes(first: 50, after: $after, query: "function_id:discount-rejection-function-js") {
-              nodes {
-                id
-                discount {
-                  ... on DiscountCodeApp {
-                    codes(first: 1) { nodes { code } }
-                  }
-                }
-                metafield(namespace: "$app", key: "function-configuration") { value }
-              }
-              pageInfo { hasNextPage endCursor }
-            }
-          }`,
-          { variables: { after: cursor } }
-        );
-        const data = await res.json();
-        const nodes = data.data?.discountNodes?.nodes ?? [];
-
-        for (const node of nodes) {
-          // Skip non-code-discount nodes (e.g. DiscountAutomaticNode) — they cause silent metafieldsSet batch failures
-          if (!node.id.includes("DiscountCodeNode")) continue;
-          const discountCode = node.discount?.codes?.nodes?.[0]?.code?.toUpperCase() ?? null;
-          const dbRecord = discountCode ? codeMap.get(discountCode) : null;
-
-          if (dbRecord) {
-            let baseConfig: Record<string, unknown> = {};
-
-            if (dbRecord.configJson) {
-              try { baseConfig = JSON.parse(dbRecord.configJson); } catch { /* empty */ }
-            } else {
-              const fallbackRes = await admin.graphql(
-                `#graphql
-                query GetMF($id: ID!) {
-                  discountNode(id: $id) {
-                    metafield(namespace: "$app", key: "function-configuration") { value }
-                  }
-                }`,
-                { variables: { id: dbRecord.discountId } }
-              );
-              const fallbackData = await fallbackRes.json();
-              const fallbackValue = fallbackData.data?.discountNode?.metafield?.value;
-              try { if (fallbackValue) baseConfig = JSON.parse(fallbackValue); } catch { /* empty */ }
-              if (Object.keys(baseConfig).length > 0) {
-                await db.singleCodeDiscount.updateMany({
-                  where: { shop: session.shop, discountId: dbRecord.discountId },
-                  data: { configJson: JSON.stringify(baseConfig) },
-                });
-              }
-            }
-
-            const eligibleCustomerIds = dbRecord.eligibleCustomerIds ? JSON.parse(dbRecord.eligibleCustomerIds) : undefined;
-            const blockedCustomerIds = dbRecord.blockedCustomerIds ? JSON.parse(dbRecord.blockedCustomerIds) : undefined;
-            const fullConfig: Record<string, unknown> = { ...baseConfig, blockedProductTypes };
-            if (eligibleCustomerIds !== undefined) fullConfig.eligibleCustomerIds = eligibleCustomerIds;
-            if (blockedCustomerIds !== undefined) fullConfig.blockedCustomerIds = blockedCustomerIds;
-
-            if (node.id !== dbRecord.functionNodeId) {
-              await db.singleCodeDiscount.updateMany({
-                where: { shop: session.shop, discountId: dbRecord.discountId },
-                data: { functionNodeId: node.id },
-              });
-            }
-
-            metafields.push({ ownerId: node.id, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify(fullConfig) });
-          } else {
-            let config: Record<string, unknown> = {};
-            try { if (node.metafield?.value) config = JSON.parse(node.metafield.value); } catch { /* empty */ }
-            metafields.push({ ownerId: node.id, namespace: "$app", key: "function-configuration", type: "json", value: JSON.stringify({ ...config, blockedProductTypes }) });
-          }
-        }
-
-        const pageInfo = data.data?.discountNodes?.pageInfo;
-        cursor = pageInfo?.hasNextPage ? pageInfo.endCursor : null;
-      } while (cursor);
-
-      for (let i = 0; i < metafields.length; i += 25) {
-        const batch = metafields.slice(i, i + 25);
-        const updateRes = await admin.graphql(
-          `#graphql
-          mutation SyncMetafields($metafields: [MetafieldsSetInput!]!) {
-            metafieldsSet(metafields: $metafields) {
-              userErrors { field message }
-            }
-          }`,
-          { variables: { metafields: batch } }
-        );
-        const updateData = await updateRes.json();
-        const updateErrors = updateData.data?.metafieldsSet?.userErrors ?? [];
-        if (updateErrors.length > 0) {
-          errors.push(...updateErrors.map((e: { message: string }) => e.message));
-        } else {
-          updated += batch.length;
-        }
-      }
-    } catch (err: unknown) {
-      return { error: `Sync failed: ${err instanceof Error ? err.message : String(err)}` };
-    }
-
-    if (errors.length > 0) return { error: `Synced ${updated} discounts, but ${errors.length} failed: ${errors.join("; ")}` };
-    return { synced: updated };
   }
 
   if (intent === "syncCustomers") {
@@ -383,7 +394,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const intent = fetcher.formData?.get("intent");
-    if (isFetcherBusy && (intent === "sync" || intent === "syncCustomers")) {
+    if (isFetcherBusy && (intent === "add" || intent === "remove" || intent === "syncCustomers")) {
       setForcedIdle(false);
       syncTimeoutRef.current = setTimeout(() => setForcedIdle(true), 60000);
     } else {
@@ -412,12 +423,6 @@ export default function SettingsPage() {
     fetcher.submit(form, { method: "post" });
   };
 
-  const handleSync = () => {
-    const form = new FormData();
-    form.append("intent", "sync");
-    fetcher.submit(form, { method: "post" });
-  };
-
   const handleSyncCustomers = () => {
     const form = new FormData();
     form.append("intent", "syncCustomers");
@@ -435,7 +440,8 @@ export default function SettingsPage() {
         <s-stack direction="block" gap="base">
           <s-paragraph>
             Discount codes will not apply when any item in the cart has one of the following product types.
-            Product types are set on products in the Shopify admin under the product details.
+            Product types are set on products in the Shopify admin under the product details. Changes here
+            apply to every discount created with this app automatically — no extra step needed.
           </s-paragraph>
 
           {dbError && (
@@ -446,11 +452,6 @@ export default function SettingsPage() {
           {(result as { error?: string })?.error && (
             <s-banner tone="critical">
               <s-paragraph>{(result as { error: string }).error}</s-paragraph>
-            </s-banner>
-          )}
-          {(result as { synced?: number })?.synced !== undefined && (
-            <s-banner tone="success">
-              <s-paragraph>Synced: updated {(result as { synced: number }).synced} discount set{(result as { synced: number }).synced !== 1 ? "s" : ""} with the current blocked types.</s-paragraph>
             </s-banner>
           )}
           {(result as { syncedCustomers?: number })?.syncedCustomers !== undefined && (
@@ -484,7 +485,9 @@ export default function SettingsPage() {
                   onClick={() => handleRemove(t.id)}
                   disabled={isSubmitting}
                 >
-                  Remove
+                  {isSubmitting && fetcher.formData?.get("intent") === "remove" && fetcher.formData?.get("id") === t.id
+                    ? "Removing…"
+                    : "Remove"}
                 </s-button>
               </div>
             </div>
@@ -503,21 +506,7 @@ export default function SettingsPage() {
               />
             </div>
             <s-button variant="primary" onClick={handleAdd} disabled={isSubmitting || !newType.trim()}>
-              Add
-            </s-button>
-          </div>
-        </s-stack>
-      </s-section>
-
-      <s-section heading="Sync to existing discounts">
-        <s-stack direction="block" gap="base">
-          <s-paragraph>
-            After changing blocked product types, click Sync to update all existing discount sets.
-            This applies the current blocked types list to every discount created with this app.
-          </s-paragraph>
-          <div>
-            <s-button variant="primary" onClick={handleSync} disabled={isSubmitting}>
-              {isSubmitting && (fetcher.formData?.get("intent") === "sync") ? "Syncing…" : "Sync to all discounts"}
+              {isSubmitting && fetcher.formData?.get("intent") === "add" ? "Adding…" : "Add"}
             </s-button>
           </div>
         </s-stack>
