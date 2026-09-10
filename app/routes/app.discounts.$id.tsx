@@ -28,6 +28,10 @@ function parseCSVCodes(text: string): ParsedCode[] {
     .filter((c): c is ParsedCode => c !== null);
 }
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     const { admin, session } = await authenticate.admin(request);
@@ -39,7 +43,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const allCodes: RedeemCode[] = [];
     let cursor: string | null = null;
     let title = "Discount";
+    let status = "ACTIVE";
+    let startsAt: string | null = null;
     let endsAt: string | null = null;
+    let usageLimit: number | null = null;
+    let appliesOncePerCustomer = false;
+    let combinesWith = { productDiscounts: false, orderDiscounts: false, shippingDiscounts: false };
     let totalCount = 0;
 
     do {
@@ -50,7 +59,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             discount {
               ... on DiscountCodeApp {
                 title
+                status
+                startsAt
                 endsAt
+                usageLimit
+                appliesOncePerCustomer
+                combinesWith { productDiscounts orderDiscounts shippingDiscounts }
                 codes(first: 250, after: $after) {
                   nodes { code asyncUsageCount }
                   pageInfo { hasNextPage endCursor }
@@ -65,7 +79,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       const data = await res.json();
       const discount = data.data?.discountNode?.discount;
       if (discount?.title) title = discount.title;
+      if (discount?.status) status = discount.status;
+      if (discount?.startsAt !== undefined) startsAt = discount.startsAt;
       if (discount?.endsAt !== undefined) endsAt = discount.endsAt;
+      if (discount?.usageLimit !== undefined) usageLimit = discount.usageLimit;
+      if (discount?.appliesOncePerCustomer !== undefined) appliesOncePerCustomer = discount.appliesOncePerCustomer;
+      if (discount?.combinesWith) combinesWith = discount.combinesWith;
       const codesPage = discount?.codes;
       for (const node of codesPage?.nodes ?? []) {
         allCodes.push({ code: node.code, usageCount: node.asyncUsageCount ?? 0 });
@@ -130,6 +149,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     let percentage: number | null = null;
     let fixedAmount: number | null = null;
     let discountType: "percentage" | "fixedAmount" = "percentage";
+    let oncePerOrder = true;
     try {
       if (rawConfig) {
         const cfg = JSON.parse(rawConfig);
@@ -138,6 +158,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         percentage = cfg.percentage ?? null;
         fixedAmount = cfg.fixedAmount ?? null;
         discountType = cfg.discountType === "fixedAmount" ? "fixedAmount" : "percentage";
+        oncePerOrder = cfg.oncePerOrder !== false;
       }
     } catch { /* ignore */ }
 
@@ -171,12 +192,18 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
     }
 
-    return { numericId, title, shop, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error: null as string | null };
+    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
       title: "Discount",
       shop: "",
+      status: "ACTIVE" as string,
+      startsAt: null as string | null,
+      usageLimit: null as number | null,
+      appliesOncePerCustomer: false,
+      combinesWith: { productDiscounts: false, orderDiscounts: false, shippingDiscounts: false },
+      oncePerOrder: true,
       codes: [] as RedeemCode[],
       totalCount: 0,
       usedCount: 0,
@@ -433,7 +460,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function DiscountDetails() {
-  const { title, numericId, shop, codes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
+  const { title, numericId, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, codes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -543,6 +570,33 @@ export default function DiscountDetails() {
     URL.revokeObjectURL(url);
   }, [codes, preUsedCodes, codeDates, title]);
 
+  const combos: string[] = [];
+  if (combinesWith.productDiscounts) combos.push("product discounts");
+  if (combinesWith.orderDiscounts) combos.push("order discounts");
+  if (combinesWith.shippingDiscounts) combos.push("shipping discounts");
+
+  const detailLines = [
+    discountType === "fixedAmount" ? `$${fixedAmount} off eligible items` : `${percentage}% off eligible items`,
+    oncePerOrder
+      ? "Applies to the highest-priced eligible item in the cart only"
+      : "Applies to every eligible item in the cart",
+    eligibleCollections.length > 0
+      ? `Applies to ${eligibleCollections.length} collection${eligibleCollections.length === 1 ? "" : "s"}`
+      : eligibleProducts.length > 0
+        ? `Applies to ${eligibleProducts.length} product${eligibleProducts.length === 1 ? "" : "s"}`
+        : "No eligible items configured",
+    usageLimit != null ? `Limit of ${usageLimit} use${usageLimit === 1 ? "" : "s"} total` : "No total usage limit",
+    appliesOncePerCustomer ? "Limited to one use per customer" : "No per-customer usage limit",
+    combos.length > 0 ? `Combines with ${combos.join(", ")}` : "Can't combine with other discounts",
+    startsAt
+      ? `Active from ${formatDate(startsAt)}${endsAt ? ` to ${formatDate(endsAt)}` : " — no end date"}`
+      : endsAt
+        ? `Ends ${formatDate(endsAt)}`
+        : "No date restrictions",
+  ];
+
+  const usageRate = totalCount > 0 ? Math.round((usedCount / totalCount) * 100) : 0;
+
   return (
     <s-page heading={title ?? "Discount"}>
       {error && (
@@ -566,12 +620,40 @@ export default function DiscountDetails() {
         </s-stack>
       </div>
 
+      <s-section heading="Details">
+        <s-stack direction="block" gap="base">
+          <div>
+            {status === "ACTIVE" ? (
+              <s-badge tone="success">Active</s-badge>
+            ) : status === "EXPIRED" ? (
+              <s-badge tone="critical">Expired</s-badge>
+            ) : (
+              <s-badge>{status.charAt(0) + status.slice(1).toLowerCase()}</s-badge>
+            )}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {detailLines.map((line, i) => (
+              <div key={i} style={{ display: "flex", gap: "8px", fontSize: "14px", color: "#202223" }}>
+                <span style={{ color: "#6d7175" }}>•</span>
+                <span>{line}</span>
+              </div>
+            ))}
+          </div>
+        </s-stack>
+      </s-section>
+
       <s-section heading="Summary">
         <s-stack direction="inline" gap="base">
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
             <s-stack direction="block" gap="none">
               <s-text emphasis="bold">{totalCount}</s-text>
               <s-text>Total codes</s-text>
+            </s-stack>
+          </s-box>
+          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+            <s-stack direction="block" gap="none">
+              <s-text emphasis="bold">{usageRate}%</s-text>
+              <s-text>Usage rate</s-text>
             </s-stack>
           </s-box>
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
