@@ -576,6 +576,7 @@ export default function DiscountDetails() {
   if (combinesWith.shippingDiscounts) combos.push("shipping discounts");
 
   const detailLines = [
+    ...(inferredPrefix ? [`Code prefix: ${inferredPrefix}`] : []),
     discountType === "fixedAmount" ? `$${fixedAmount} off eligible items` : `${percentage}% off eligible items`,
     oncePerOrder
       ? "Applies to the highest-priced eligible item in the cart only"
@@ -639,6 +640,9 @@ export default function DiscountDetails() {
               </div>
             ))}
           </div>
+          <div>
+            <s-link href="#codes-section">View codes ↓</s-link>
+          </div>
         </s-stack>
       </s-section>
 
@@ -658,14 +662,14 @@ export default function DiscountDetails() {
           </s-box>
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
             <s-stack direction="block" gap="none">
-              <s-text emphasis="bold">{usedCount}</s-text>
-              <s-text>Used</s-text>
+              <s-text emphasis="bold">{unusedCount}</s-text>
+              <s-text>Available</s-text>
             </s-stack>
           </s-box>
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
             <s-stack direction="block" gap="none">
-              <s-text emphasis="bold">{unusedCount}</s-text>
-              <s-text>Remaining</s-text>
+              <s-text emphasis="bold">{usedCount}</s-text>
+              <s-text>Used</s-text>
             </s-stack>
           </s-box>
           {preUsedCodes.length > 0 && (
@@ -896,7 +900,7 @@ export default function DiscountDetails() {
         </s-stack>
       </s-section>
 
-      <s-section heading={`Codes${totalCount >= 2000 ? " (first 2,000)" : ""}`}>
+      <s-section id="codes-section" heading={`Codes${totalCount >= 2000 ? " (first 2,000)" : ""}`}>
         <s-stack direction="block" gap="base">
           {/* Search */}
           <s-search-field
