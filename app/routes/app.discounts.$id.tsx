@@ -614,7 +614,10 @@ export default function DiscountDetails() {
           <s-button onClick={() => handleExport(true)} disabled={unusedCount === 0}>
             Export unused only
           </s-button>
-          <s-button onClick={() => window.open(`https://${shop}/admin/discounts/${numericId}`, "_blank")}>
+          <s-button
+            href={`https://admin.shopify.com/store/${shop.replace(".myshopify.com", "")}/discounts/${numericId}`}
+            target="_blank"
+          >
             View in Shopify admin
           </s-button>
           <s-button onClick={() => navigate("/app/discounts/new")}>Create another discount</s-button>
