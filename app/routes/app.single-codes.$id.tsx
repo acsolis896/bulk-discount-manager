@@ -384,192 +384,203 @@ export default function SingleCodeDetailsPage() {
         </s-banner>
       )}
 
-      <s-section heading="Overview">
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <div style={{ display: "flex", gap: "24px" }}>
-            <div>
-              <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Code</div>
-              <span style={{ fontFamily: "monospace", fontSize: "18px", fontWeight: 600 }}>{loaderData.code}</span>
-            </div>
-            <div>
-              <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Status</div>
-              {status === "ACTIVE" ? (
-                <s-badge tone="success">Active</s-badge>
-              ) : status === "EXPIRED" ? (
-                <s-badge tone="critical">Expired</s-badge>
-              ) : (
-                <s-badge>{status.charAt(0) + status.slice(1).toLowerCase()}</s-badge>
-              )}
-            </div>
-            <div>
-              <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Times used</div>
-              <span style={{ fontSize: "16px", fontWeight: 500 }}>{loaderData.usageCount}</span>
-            </div>
-            <div>
-              <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Discount</div>
-              <span style={{ fontSize: "16px", fontWeight: 500 }}>
-                {loaderData.discountType === "fixedAmount" ? `$${loaderData.fixedAmount}` : `${loaderData.percentage}%`}
-              </span>
-            </div>
-          </div>
-          {loaderData.endsAt && (
-            <div style={{ fontSize: "13px", color: "#6d7175" }}>
-              Expires: {new Date(loaderData.endsAt).toLocaleDateString()}
-            </div>
-          )}
-        </div>
-      </s-section>
+      <style>
+        {`.discount-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+          @media (max-width: 900px) { .discount-detail-grid { grid-template-columns: 1fr; } }`}
+      </style>
 
-      <s-section heading="Eligible items">
-        {!editing ? (
-          <>
-            {hasCollections ? (
-              <s-paragraph>{displayedCollections.join(", ")}</s-paragraph>
-            ) : productIds.length > 0 ? (
-              <s-paragraph>{productIds.length} product{productIds.length > 1 ? "s" : ""}</s-paragraph>
-            ) : (
-              <s-paragraph>No items configured.</s-paragraph>
-            )}
-          </>
-        ) : (
-          <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-            <s-button onClick={handlePickCollections}>Browse collections</s-button>
-            <s-button onClick={handlePickProducts}>Browse products</s-button>
-          </div>
-        )}
-        {editing && (
-          <s-paragraph>
-            {collectionIds.length > 0
-              ? `${collectionIds.length} collection${collectionIds.length > 1 ? "s" : ""}: ${collectionTitles.join(", ")}`
-              : productIds.length > 0
-                ? `${productIds.length} product${productIds.length > 1 ? "s" : ""}: ${productTitles.join(", ")}`
-                : "None selected"}
-          </s-paragraph>
-        )}
-      </s-section>
-
-      <s-section heading="Customer eligibility">
-        {!editing ? (
-          <div>
-            {loaderData.eligibilityMode === "all" && <span>All customers</span>}
-            {loaderData.eligibilityMode === "tags" && (
+      <div className="discount-detail-grid">
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
+          <s-section heading="Overview">
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div style={{ display: "flex", gap: "24px" }}>
                 <div>
-                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Required tag</div>
-                  <span style={{ fontFamily: "monospace" }}>{loaderData.requiredTag || "—"}</span>
+                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Code</div>
+                  <span style={{ fontFamily: "monospace", fontSize: "18px", fontWeight: 600 }}>{loaderData.code}</span>
                 </div>
                 <div>
-                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Blocked tag</div>
-                  <span style={{ fontFamily: "monospace" }}>{loaderData.blockedTag || "—"}</span>
+                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Status</div>
+                  {status === "ACTIVE" ? (
+                    <s-badge tone="success">Active</s-badge>
+                  ) : status === "EXPIRED" ? (
+                    <s-badge tone="critical">Expired</s-badge>
+                  ) : (
+                    <s-badge>{status.charAt(0) + status.slice(1).toLowerCase()}</s-badge>
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Times used</div>
+                  <span style={{ fontSize: "16px", fontWeight: 500 }}>{loaderData.usageCount}</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Discount</div>
+                  <span style={{ fontSize: "16px", fontWeight: 500 }}>
+                    {loaderData.discountType === "fixedAmount" ? `$${loaderData.fixedAmount}` : `${loaderData.percentage}%`}
+                  </span>
                 </div>
               </div>
-            )}
-            {loaderData.eligibilityMode === "segment" && (
-              <span>
-                {loaderData.segments.find((s: { id: string; name: string }) => s.id === loaderData.segmentId)?.name ?? "Segment"}
-              </span>
-            )}
-          </div>
-        ) : (
-          <>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {(["all", "tags", "segment"] as const).map((mode) => (
-                <s-button
-                  key={mode}
-                  variant={eligibilityMode === mode ? "primary" : "secondary"}
-                  onClick={() => setEligibilityMode(mode)}
-                >
-                  {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
-                </s-button>
-              ))}
+              {loaderData.endsAt && (
+                <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                  Expires: {new Date(loaderData.endsAt).toLocaleDateString()}
+                </div>
+              )}
             </div>
+          </s-section>
+        </div>
 
-            {eligibilityMode === "tags" && (
-              <div style={{ marginTop: "16px" }}>
-                <s-text-field
-                  label="Required customer tag"
-                  value={requiredTag}
-                  placeholder="e.g. GUIDE50"
-                  details="Customers must have this tag to use the code"
-                  onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
-                />
-                <s-text-field
-                  label="Blocked customer tag"
-                  value={blockedTag}
-                  placeholder="e.g. GUIDE50-USED"
-                  details="Customers with this tag will be rejected (usage limit reached)"
-                  onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
-                />
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
+          <s-section heading="Eligible items">
+            {!editing ? (
+              <>
+                {hasCollections ? (
+                  <s-paragraph>{displayedCollections.join(", ")}</s-paragraph>
+                ) : productIds.length > 0 ? (
+                  <s-paragraph>{productIds.length} product{productIds.length > 1 ? "s" : ""}</s-paragraph>
+                ) : (
+                  <s-paragraph>No items configured.</s-paragraph>
+                )}
+              </>
+            ) : (
+              <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                <s-button onClick={handlePickCollections}>Browse collections</s-button>
+                <s-button onClick={handlePickProducts}>Browse products</s-button>
               </div>
             )}
-
-            {eligibilityMode === "segment" && (
-              <div style={{ marginTop: "16px" }}>
-                <s-select
-                  label="Customer segment"
-                  placeholder="Select a segment…"
-                  value={selectedSegmentId}
-                  onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
-                >
-                  {loaderData.segments.map((s: { id: string; name: string }) => (
-                    <s-option key={s.id} value={s.id}>{s.name}</s-option>
-                  ))}
-                </s-select>
-              </div>
+            {editing && (
+              <s-paragraph>
+                {collectionIds.length > 0
+                  ? `${collectionIds.length} collection${collectionIds.length > 1 ? "s" : ""}: ${collectionTitles.join(", ")}`
+                  : productIds.length > 0
+                    ? `${productIds.length} product${productIds.length > 1 ? "s" : ""}: ${productTitles.join(", ")}`
+                    : "None selected"}
+              </s-paragraph>
             )}
-            <div style={{ marginTop: "16px" }}>
-              <s-stack direction="block" gap="tight">
-                <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
+          </s-section>
+
+          <s-section heading="Customer eligibility">
+            {!editing ? (
+              <div>
+                {loaderData.eligibilityMode === "all" && <span>All customers</span>}
+                {loaderData.eligibilityMode === "tags" && (
+                  <div style={{ display: "flex", gap: "24px" }}>
+                    <div>
+                      <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Required tag</div>
+                      <span style={{ fontFamily: "monospace" }}>{loaderData.requiredTag || "—"}</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Blocked tag</div>
+                      <span style={{ fontFamily: "monospace" }}>{loaderData.blockedTag || "—"}</span>
+                    </div>
+                  </div>
+                )}
+                {loaderData.eligibilityMode === "segment" && (
+                  <span>
+                    {loaderData.segments.find((s: { id: string; name: string }) => s.id === loaderData.segmentId)?.name ?? "Segment"}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  {(["percentage", "fixedAmount"] as const).map((type) => (
+                  {(["all", "tags", "segment"] as const).map((mode) => (
                     <s-button
-                      key={type}
-                      variant={discountType === type ? "primary" : "secondary"}
-                      onClick={() => setDiscountType(type)}
+                      key={mode}
+                      variant={eligibilityMode === mode ? "primary" : "secondary"}
+                      onClick={() => setEligibilityMode(mode)}
                     >
-                      {type === "percentage" ? "Percentage" : "Fixed amount"}
+                      {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
                     </s-button>
                   ))}
                 </div>
-                {discountType === "percentage" ? (
-                  <s-text-field
-                    label="Discount percentage"
-                    type="number"
-                    value={percentage}
-                    min="1"
-                    max="100"
-                    details="Percentage off the eligible product"
-                    onInput={(e: { target: { value: string } }) => setPercentage(e.target.value)}
-                  />
-                ) : (
-                  <s-text-field
-                    label="Amount off"
-                    type="number"
-                    value={fixedAmount}
-                    min="0.01"
-                    step="0.01"
-                    prefix="$"
-                    details="Fixed amount off the eligible product"
-                    onInput={(e: { target: { value: string } }) => setFixedAmount(e.target.value)}
-                  />
+
+                {eligibilityMode === "tags" && (
+                  <div style={{ marginTop: "16px" }}>
+                    <s-text-field
+                      label="Required customer tag"
+                      value={requiredTag}
+                      placeholder="e.g. GUIDE50"
+                      details="Customers must have this tag to use the code"
+                      onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
+                    />
+                    <s-text-field
+                      label="Blocked customer tag"
+                      value={blockedTag}
+                      placeholder="e.g. GUIDE50-USED"
+                      details="Customers with this tag will be rejected (usage limit reached)"
+                      onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
+                    />
+                  </div>
                 )}
-              </s-stack>
-            </div>
-            <div style={{ marginTop: "16px" }}>
-              <s-checkbox
-                label="Only apply discount once per order"
-                checked={oncePerOrder}
-                onChange={(e: { target: { checked: boolean } }) => setOncePerOrder(e.target.checked)}
-                details={
-                  oncePerOrder
-                    ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
-                    : "The discount will be taken off every eligible item in the cart."
-                }
-              />
-            </div>
-          </>
-        )}
-      </s-section>
+
+                {eligibilityMode === "segment" && (
+                  <div style={{ marginTop: "16px" }}>
+                    <s-select
+                      label="Customer segment"
+                      placeholder="Select a segment…"
+                      value={selectedSegmentId}
+                      onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
+                    >
+                      {loaderData.segments.map((s: { id: string; name: string }) => (
+                        <s-option key={s.id} value={s.id}>{s.name}</s-option>
+                      ))}
+                    </s-select>
+                  </div>
+                )}
+                <div style={{ marginTop: "16px" }}>
+                  <s-stack direction="block" gap="tight">
+                    <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      {(["percentage", "fixedAmount"] as const).map((type) => (
+                        <s-button
+                          key={type}
+                          variant={discountType === type ? "primary" : "secondary"}
+                          onClick={() => setDiscountType(type)}
+                        >
+                          {type === "percentage" ? "Percentage" : "Fixed amount"}
+                        </s-button>
+                      ))}
+                    </div>
+                    {discountType === "percentage" ? (
+                      <s-text-field
+                        label="Discount percentage"
+                        type="number"
+                        value={percentage}
+                        min="1"
+                        max="100"
+                        details="Percentage off the eligible product"
+                        onInput={(e: { target: { value: string } }) => setPercentage(e.target.value)}
+                      />
+                    ) : (
+                      <s-text-field
+                        label="Amount off"
+                        type="number"
+                        value={fixedAmount}
+                        min="0.01"
+                        step="0.01"
+                        prefix="$"
+                        details="Fixed amount off the eligible product"
+                        onInput={(e: { target: { value: string } }) => setFixedAmount(e.target.value)}
+                      />
+                    )}
+                  </s-stack>
+                </div>
+                <div style={{ marginTop: "16px" }}>
+                  <s-checkbox
+                    label="Only apply discount once per order"
+                    checked={oncePerOrder}
+                    onChange={(e: { target: { checked: boolean } }) => setOncePerOrder(e.target.checked)}
+                    details={
+                      oncePerOrder
+                        ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
+                        : "The discount will be taken off every eligible item in the cart."
+                    }
+                  />
+                </div>
+              </>
+            )}
+          </s-section>
+        </div>
+      </div>
 
       <div style={{ display: "flex", gap: "8px", marginTop: "16px", justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: "8px" }}>
