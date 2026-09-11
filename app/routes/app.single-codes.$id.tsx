@@ -362,8 +362,6 @@ export default function SingleCodeDetailsPage() {
   };
 
   const status = loaderData.status;
-  const displayedCollections = collectionTitles.length > 0 ? collectionTitles : loaderData.collectionTitles;
-  const hasCollections = collectionIds.length > 0;
 
   return (
     <s-page heading={loaderData.title}>
@@ -424,43 +422,6 @@ export default function SingleCodeDetailsPage() {
                 </div>
               )}
             </div>
-          </s-section>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
-          <s-section heading="Eligible items">
-            {hasCollections ? (
-              <s-paragraph>{displayedCollections.join(", ")}</s-paragraph>
-            ) : productIds.length > 0 ? (
-              <s-paragraph>{productIds.length} product{productIds.length > 1 ? "s" : ""}</s-paragraph>
-            ) : (
-              <s-paragraph>No items configured.</s-paragraph>
-            )}
-          </s-section>
-
-          <s-section heading="Customer eligibility">
-            <s-stack direction="block" gap="base">
-              <div>
-                {loaderData.eligibilityMode === "all" && <span>All customers</span>}
-                {loaderData.eligibilityMode === "tags" && (
-                  <div style={{ display: "flex", gap: "24px" }}>
-                    <div>
-                      <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Required tag</div>
-                      <span style={{ fontFamily: "monospace" }}>{loaderData.requiredTag || "—"}</span>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Blocked tag</div>
-                      <span style={{ fontFamily: "monospace" }}>{loaderData.blockedTag || "—"}</span>
-                    </div>
-                  </div>
-                )}
-                {loaderData.eligibilityMode === "segment" && (
-                  <span>
-                    {loaderData.segments.find((s: { id: string; name: string }) => s.id === loaderData.segmentId)?.name ?? "Segment"}
-                  </span>
-                )}
-              </div>
-            </s-stack>
           </s-section>
         </div>
 
