@@ -460,7 +460,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function DiscountDetails() {
-  const { title, numericId, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, codes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
+  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, codes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -613,12 +613,6 @@ export default function DiscountDetails() {
           </s-button>
           <s-button onClick={() => handleExport(true)} disabled={unusedCount === 0}>
             Export unused only
-          </s-button>
-          <s-button
-            href={`https://admin.shopify.com/store/${shop.replace(".myshopify.com", "")}/discounts/${numericId}`}
-            target="_blank"
-          >
-            View in Shopify admin
           </s-button>
           <s-button onClick={() => navigate("/app/discounts/new")}>Create another discount</s-button>
         </s-stack>
