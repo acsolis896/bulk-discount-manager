@@ -621,427 +621,435 @@ export default function DiscountDetails() {
         </s-stack>
       </div>
 
-      <s-section heading="Details">
-        <s-stack direction="block" gap="base">
-          <div>
-            {status === "ACTIVE" ? (
-              <s-badge tone="success">Active</s-badge>
-            ) : status === "EXPIRED" ? (
-              <s-badge tone="critical">Expired</s-badge>
-            ) : (
-              <s-badge>{status.charAt(0) + status.slice(1).toLowerCase()}</s-badge>
-            )}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {detailLines.map((line, i) => (
-              <div key={i} style={{ display: "flex", gap: "8px", fontSize: "14px", color: "#202223" }}>
-                <span style={{ color: "#6d7175" }}>•</span>
-                <span>{line}</span>
-              </div>
-            ))}
-          </div>
-          <div>
-            <s-link href="#codes-section">View codes ↓</s-link>
-          </div>
-        </s-stack>
-      </s-section>
+      <style>
+        {`.discount-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+          @media (max-width: 900px) { .discount-detail-grid { grid-template-columns: 1fr; } }`}
+      </style>
 
-      <s-section heading="Summary">
-        <s-stack direction="inline" gap="base">
-          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="block" gap="none">
-              <s-text emphasis="bold">{totalCount}</s-text>
-              <s-text>Total codes</s-text>
-            </s-stack>
-          </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="block" gap="none">
-              <s-text emphasis="bold">{usageRate}%</s-text>
-              <s-text>Usage rate</s-text>
-            </s-stack>
-          </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="block" gap="none">
-              <s-text emphasis="bold">{unusedCount}</s-text>
-              <s-text>Available</s-text>
-            </s-stack>
-          </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="block" gap="none">
-              <s-text emphasis="bold">{usedCount}</s-text>
-              <s-text>Used</s-text>
-            </s-stack>
-          </s-box>
-          {preUsedCodes.length > 0 && (
-            <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-              <s-stack direction="block" gap="none">
-                <s-text emphasis="bold">{preUsedCodes.length}</s-text>
-                <s-text>Previously used</s-text>
-              </s-stack>
-            </s-box>
-          )}
-        </s-stack>
-      </s-section>
-
-      <s-section heading="Expiration date">
-        <s-stack direction="block" gap="base">
-          {(fetcher.data as { endsAtUpdated?: boolean })?.endsAtUpdated && (
-            <s-banner tone="success">
-              <s-paragraph>Expiration date updated.</s-paragraph>
-            </s-banner>
-          )}
-          <s-paragraph>
-            {endsAt
-              ? `Currently expires ${new Date(endsAt).toLocaleDateString("en-US", { timeZone: "UTC" })}.`
-              : "No expiration date set."}
-          </s-paragraph>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
-            <s-date-field
-              label="New expiration date"
-              labelAccessibilityVisibility="exclusive"
-              value={endsAtInput}
-              onChange={(e: InputEvent) => setEndsAtInput((e.target as HTMLInputElement).value)}
-            />
-            {endsAtInput && (
-              <s-button variant="tertiary" onClick={() => setEndsAtInput("")}>
-                Clear
-              </s-button>
-            )}
-          </div>
-          <div>
-            <s-button variant="primary" onClick={handleUpdateEndsAt} disabled={fetcher.state !== "idle"}>
-              {fetcher.state !== "idle" ? "Saving…" : "Update expiration"}
-            </s-button>
-          </div>
-        </s-stack>
-      </s-section>
-
-      <s-section heading="Eligible items">
-        <s-stack direction="block" gap="base">
-          <s-paragraph>
-            The discount applies to the highest-priced eligible item in the cart — 1 unit only.
-            {discountType === "fixedAmount"
-              ? fixedAmount !== null && <> (${fixedAmount} off)</>
-              : percentage !== null && <> ({percentage}% off)</>}
-          </s-paragraph>
-
-          {(fetcher.data as { updated?: boolean })?.updated && (
-            <s-banner tone="success">
-              <s-paragraph>Eligible items updated successfully.</s-paragraph>
-            </s-banner>
-          )}
-          {(fetcher.data as { error?: string })?.error && (
-            <s-banner tone="critical">
-              <s-paragraph>{(fetcher.data as { error: string }).error}</s-paragraph>
-            </s-banner>
-          )}
-
-          {eligibleCollections.length > 0 ? (
-            <>
-              <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Collection</span>
-              </div>
-              {eligibleCollections.map((c: { id: string; title: string }) => (
-                <div key={c.id} style={{ display: "flex", alignItems: "center", padding: "12px", borderBottom: "1px solid #e1e3e5" }}>
-                  <span style={{ fontSize: "14px", flex: 1 }}>{c.title}</span>
-                </div>
-              ))}
-              {eligibleCollectionIds.length > 50 && (
-                <div style={{ padding: "8px 12px", fontSize: "13px", color: "#6d7175" }}>
-                  Showing 50 of {eligibleCollectionIds.length} collections.
-                </div>
+      <div className="discount-detail-grid">
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
+          <s-section heading="Summary">
+            <s-stack direction="inline" gap="base">
+              <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                <s-stack direction="block" gap="none">
+                  <s-text emphasis="bold">{totalCount}</s-text>
+                  <s-text>Total codes</s-text>
+                </s-stack>
+              </s-box>
+              <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                <s-stack direction="block" gap="none">
+                  <s-text emphasis="bold">{usageRate}%</s-text>
+                  <s-text>Usage rate</s-text>
+                </s-stack>
+              </s-box>
+              <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                <s-stack direction="block" gap="none">
+                  <s-text emphasis="bold">{unusedCount}</s-text>
+                  <s-text>Available</s-text>
+                </s-stack>
+              </s-box>
+              <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                <s-stack direction="block" gap="none">
+                  <s-text emphasis="bold">{usedCount}</s-text>
+                  <s-text>Used</s-text>
+                </s-stack>
+              </s-box>
+              {preUsedCodes.length > 0 && (
+                <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                  <s-stack direction="block" gap="none">
+                    <s-text emphasis="bold">{preUsedCodes.length}</s-text>
+                    <s-text>Previously used</s-text>
+                  </s-stack>
+                </s-box>
               )}
-            </>
-          ) : (
-            <>
-              <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Product</span>
-              </div>
-              {eligibleProducts.length === 0 && (
-                <div style={{ padding: "12px", color: "#6d7175", fontSize: "14px" }}>
-                  No eligible products configured.
-                </div>
-              )}
-              {eligibleProducts.map((p: { id: string; title: string }) => (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", padding: "12px", borderBottom: "1px solid #e1e3e5" }}>
-                  <span style={{ fontSize: "14px", flex: 1 }}>{p.title}</span>
-                </div>
-              ))}
-              {eligibleProductIds.length > 50 && (
-                <div style={{ padding: "8px 12px", fontSize: "13px", color: "#6d7175" }}>
-                  Showing 50 of {eligibleProductIds.length} eligible products.
-                </div>
-              )}
-            </>
-          )}
+            </s-stack>
+          </s-section>
 
-          <s-stack direction="inline" gap="base">
-            <s-button onClick={() => handleEditItems("product")} disabled={editingItems}>
-              {editingItems ? "Opening picker…" : "Edit by products"}
-            </s-button>
-            <s-button onClick={() => handleEditItems("collection")} disabled={editingItems}>
-              Edit by collection
-            </s-button>
-          </s-stack>
-        </s-stack>
-      </s-section>
-
-      <s-section heading="Add more codes">
-        <s-stack direction="block" gap="base">
-          {(fetcher.data as { addedCodes?: boolean })?.addedCodes && (
-            <s-banner tone="success">
-              <s-paragraph>
-                Added {(fetcher.data as { addedCount: number }).addedCount} code
-                {(fetcher.data as { addedCount: number }).addedCount !== 1 ? "s" : ""} to this discount.
-                {(fetcher.data as { skippedCount: number }).skippedCount > 0 &&
-                  ` ${(fetcher.data as { skippedCount: number }).skippedCount} previously-used code(s) were recorded but not added as active.`}
-                {" "}Shopify may take a few seconds to process them.
-              </s-paragraph>
-            </s-banner>
-          )}
-          {(fetcher.data as { error?: string })?.error && (
-            <s-banner tone="critical">
-              <s-paragraph>{(fetcher.data as { error: string }).error}</s-paragraph>
-            </s-banner>
-          )}
-
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {(["generate", "import"] as const).map((mode) => (
-              <s-button
-                key={mode}
-                variant={addCodeMode === mode ? "primary" : "secondary"}
-                onClick={() => setAddCodeMode(mode)}
-              >
-                {mode === "generate" ? "Generate randomly" : "Import from CSV"}
-              </s-button>
-            ))}
-          </div>
-
-          {addCodeMode === "generate" && inferredPrefix && (
-            <s-form-layout>
-              <s-paragraph>
-                New codes will reuse this set's existing prefix and format:{" "}
-                <strong>{inferredPrefix}-{"X".repeat(inferredCodeLength ?? 6)}</strong>
-              </s-paragraph>
-              <s-text-field
-                label="Number of codes"
-                type="number"
-                value={addCodeCount}
-                min="1"
-                max="5000"
-                onInput={(e: InputEvent) => setAddCodeCount((e.target as HTMLInputElement).value)}
-                details="Maximum 5,000 per batch"
-              />
-            </s-form-layout>
-          )}
-
-          {addCodeMode === "generate" && !inferredPrefix && (
-            <s-form-layout>
-              <s-paragraph>
-                Couldn't detect a consistent prefix from this set's existing codes — enter one to use for new codes.
-              </s-paragraph>
-              <s-text-field
-                label="Code prefix"
-                value={addPrefix}
-                onInput={(e: InputEvent) => setAddPrefix((e.target as HTMLInputElement).value)}
-                details="Letters and numbers only, e.g. BAJIO"
-              />
-              <s-text-field
-                label="Number of codes"
-                type="number"
-                value={addCodeCount}
-                min="1"
-                max="5000"
-                onInput={(e: InputEvent) => setAddCodeCount((e.target as HTMLInputElement).value)}
-                details="Maximum 5,000 per batch"
-              />
-              <s-text-field
-                label="Code length"
-                type="number"
-                value={addCodeLength}
-                min="4"
-                max="12"
-                onInput={(e: InputEvent) => setAddCodeLength((e.target as HTMLInputElement).value)}
-                details="Number of random characters after the prefix (4–12)"
-              />
-            </s-form-layout>
-          )}
-
-          {addCodeMode === "import" && (
+          <s-section heading={`Codes${totalCount >= 2000 ? " (first 2,000)" : ""}`}>
             <s-stack direction="block" gap="base">
-              <s-paragraph>
-                Upload a CSV file with a <strong>Code</strong> column. Each row becomes one discount code.
-              </s-paragraph>
-              <input
-                ref={addFileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={handleAddFileChange as unknown as React.ChangeEventHandler<HTMLInputElement>}
-                style={{ fontSize: "14px" }}
+              {/* Search */}
+              <s-search-field
+                label="Search codes"
+                labelAccessibilityVisibility="exclusive"
+                placeholder="Search codes…"
+                value={search}
+                onInput={(e: InputEvent) => { setSearch((e.target as HTMLInputElement).value); setPage(0); }}
               />
-              {addCsvPreview && (
-                <s-banner tone="success" title={`${addCsvPreview.count} codes detected`}>
-                  <s-paragraph>First code: {addCsvPreview.sample}. Codes marked "Used" will be uploaded to Shopify and flagged as previously used in the app.</s-paragraph>
-                </s-banner>
+
+              {/* Header row */}
+              <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Code</span>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "90px", textAlign: "center" }}>Status</span>
+                <span style={{ width: "68px" }}></span>
+              </div>
+
+              {pagedCodes.map((c: RedeemCode) => (
+                <div key={c.code} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", gap: "12px" }}>
+                  <span style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em", flex: 1 }}>{c.code}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ width: "90px", display: "flex", justifyContent: "center" }}>
+                      {c.usageCount > 0 ? (
+                        <s-badge tone="success">Used</s-badge>
+                      ) : (
+                        <s-badge>Unused</s-badge>
+                      )}
+                    </div>
+                    {confirmCode === c.code ? (
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        <span style={{ fontSize: "13px", color: "#d72c0d" }}>Delete permanently?</span>
+                        <s-button
+                          variant="primary"
+                          tone="critical"
+                          onClick={() => {
+                            const form = new FormData();
+                            form.append("code", c.code);
+                            fetcher.submit(form, { method: "post" });
+                            setConfirmCode(null);
+                          }}
+                        >
+                          Yes, delete
+                        </s-button>
+                        <s-button variant="tertiary" onClick={() => setConfirmCode(null)}>
+                          Cancel
+                        </s-button>
+                      </div>
+                    ) : (
+                      <s-button
+                        variant="secondary"
+                        tone="critical"
+                        disabled={c.usageCount > 0}
+                        onClick={() => setConfirmCode(c.code)}
+                      >
+                        Disable
+                      </s-button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {codes.length === 0 && (
+                <s-paragraph>No codes found. Bulk codes may still be processing — refresh in a few seconds.</s-paragraph>
               )}
-              {addCsvFile && !addCsvPreview && (
-                <s-banner tone="critical" title='No "Code" column found'>
-                  <s-paragraph>Make sure the CSV has a header row with a column named exactly "Code".</s-paragraph>
-                </s-banner>
+              {filteredCodes.length === 0 && codes.length > 0 && (
+                <s-paragraph>No codes match your search.</s-paragraph>
+              )}
+
+              {/* Pagination */}
+              {filteredCodes.length > 0 && (
+                <s-stack direction="inline" gap="base" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                  <s-button
+                    disabled={safePage === 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  >
+                    ← Previous
+                  </s-button>
+                  <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
+                    {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, filteredCodes.length)} of {filteredCodes.length}
+                  </s-text>
+                  <s-button
+                    disabled={safePage >= totalPages - 1}
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  >
+                    Next →
+                  </s-button>
+                </s-stack>
+              )}
+
+              {codes.length > 0 && !search && (
+                <s-paragraph style={{ color: "#6d7175", fontSize: "13px" }}>
+                  Not seeing all codes? Shopify processes bulk uploads in the background — refresh in 30–60 seconds if the count looks low.
+                </s-paragraph>
               )}
             </s-stack>
-          )}
+          </s-section>
 
-          <div>
-            <s-button variant="primary" onClick={handleAddCodes} disabled={!canAddCodes || fetcher.state !== "idle"}>
-              {fetcher.state !== "idle" ? "Adding…" : "Add codes"}
-            </s-button>
-          </div>
-        </s-stack>
-      </s-section>
+          {preUsedCodes.length > 0 && (
+            <s-section heading="Previously used codes (historical)">
+              <s-stack direction="block" gap="base">
+                <s-paragraph>
+                  These codes were imported as already used and are not active in Shopify.
+                </s-paragraph>
 
-      <s-section id="codes-section" heading={`Codes${totalCount >= 2000 ? " (first 2,000)" : ""}`}>
-        <s-stack direction="block" gap="base">
-          {/* Search */}
-          <s-search-field
-            label="Search codes"
-            labelAccessibilityVisibility="exclusive"
-            placeholder="Search codes…"
-            value={search}
-            onInput={(e: InputEvent) => { setSearch((e.target as HTMLInputElement).value); setPage(0); }}
-          />
-
-          {/* Header row */}
-          <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Code</span>
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "90px", textAlign: "center" }}>Status</span>
-            <span style={{ width: "68px" }}></span>
-          </div>
-
-          {pagedCodes.map((c: RedeemCode) => (
-            <div key={c.code} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", gap: "12px" }}>
-              <span style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em", flex: 1 }}>{c.code}</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ width: "90px", display: "flex", justifyContent: "center" }}>
-                  {c.usageCount > 0 ? (
-                    <s-badge tone="success">Used</s-badge>
-                  ) : (
-                    <s-badge>Unused</s-badge>
-                  )}
+                {/* Header row */}
+                <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Code</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "120px", textAlign: "center" }}>Status</span>
                 </div>
-                {confirmCode === c.code ? (
-                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                    <span style={{ fontSize: "13px", color: "#d72c0d" }}>Delete permanently?</span>
-                    <s-button
-                      variant="primary"
-                      tone="critical"
-                      onClick={() => {
-                        const form = new FormData();
-                        form.append("code", c.code);
-                        fetcher.submit(form, { method: "post" });
-                        setConfirmCode(null);
-                      }}
-                    >
-                      Yes, delete
-                    </s-button>
-                    <s-button variant="tertiary" onClick={() => setConfirmCode(null)}>
-                      Cancel
-                    </s-button>
+
+                {pagedPreUsedCodes.map((c: string) => (
+                  <div key={c} style={{ display: "flex", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", gap: "12px" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em", flex: 1 }}>{c}</span>
+                    <div style={{ width: "120px", display: "flex", justifyContent: "center" }}>
+                      <s-badge tone="critical">Previously Used</s-badge>
+                    </div>
                   </div>
+                ))}
+
+                {preUsedCodes.length > PAGE_SIZE && (
+                  <s-stack direction="inline" gap="base" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                    <s-button
+                      disabled={safePreUsedPage === 0}
+                      onClick={() => setPreUsedPage((p) => Math.max(0, p - 1))}
+                    >
+                      ← Previous
+                    </s-button>
+                    <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
+                      {safePreUsedPage * PAGE_SIZE + 1}–{Math.min((safePreUsedPage + 1) * PAGE_SIZE, preUsedCodes.length)} of {preUsedCodes.length}
+                    </s-text>
+                    <s-button
+                      disabled={safePreUsedPage >= preUsedTotalPages - 1}
+                      onClick={() => setPreUsedPage((p) => Math.min(preUsedTotalPages - 1, p + 1))}
+                    >
+                      Next →
+                    </s-button>
+                  </s-stack>
+                )}
+              </s-stack>
+            </s-section>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
+          <s-section heading="Details">
+            <s-stack direction="block" gap="base">
+              <div>
+                {status === "ACTIVE" ? (
+                  <s-badge tone="success">Active</s-badge>
+                ) : status === "EXPIRED" ? (
+                  <s-badge tone="critical">Expired</s-badge>
                 ) : (
-                  <s-button
-                    variant="secondary"
-                    tone="critical"
-                    disabled={c.usageCount > 0}
-                    onClick={() => setConfirmCode(c.code)}
-                  >
-                    Disable
+                  <s-badge>{status.charAt(0) + status.slice(1).toLowerCase()}</s-badge>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {detailLines.map((line, i) => (
+                  <div key={i} style={{ display: "flex", gap: "8px", fontSize: "14px", color: "#202223" }}>
+                    <span style={{ color: "#6d7175" }}>•</span>
+                    <span>{line}</span>
+                  </div>
+                ))}
+              </div>
+            </s-stack>
+          </s-section>
+
+          <s-section heading="Expiration date">
+            <s-stack direction="block" gap="base">
+              {(fetcher.data as { endsAtUpdated?: boolean })?.endsAtUpdated && (
+                <s-banner tone="success">
+                  <s-paragraph>Expiration date updated.</s-paragraph>
+                </s-banner>
+              )}
+              <s-paragraph>
+                {endsAt
+                  ? `Currently expires ${new Date(endsAt).toLocaleDateString("en-US", { timeZone: "UTC" })}.`
+                  : "No expiration date set."}
+              </s-paragraph>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
+                <s-date-field
+                  label="New expiration date"
+                  labelAccessibilityVisibility="exclusive"
+                  value={endsAtInput}
+                  onChange={(e: InputEvent) => setEndsAtInput((e.target as HTMLInputElement).value)}
+                />
+                {endsAtInput && (
+                  <s-button variant="tertiary" onClick={() => setEndsAtInput("")}>
+                    Clear
                   </s-button>
                 )}
               </div>
-            </div>
-          ))}
-
-          {codes.length === 0 && (
-            <s-paragraph>No codes found. Bulk codes may still be processing — refresh in a few seconds.</s-paragraph>
-          )}
-          {filteredCodes.length === 0 && codes.length > 0 && (
-            <s-paragraph>No codes match your search.</s-paragraph>
-          )}
-
-          {/* Pagination */}
-          {filteredCodes.length > 0 && (
-            <s-stack direction="inline" gap="base" style={{ alignItems: "center", justifyContent: "space-between" }}>
-              <s-button
-                disabled={safePage === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                ← Previous
-              </s-button>
-              <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
-                {safePage * PAGE_SIZE + 1}–{Math.min((safePage + 1) * PAGE_SIZE, filteredCodes.length)} of {filteredCodes.length}
-              </s-text>
-              <s-button
-                disabled={safePage >= totalPages - 1}
-                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              >
-                Next →
-              </s-button>
-            </s-stack>
-          )}
-
-          {codes.length > 0 && !search && (
-            <s-paragraph style={{ color: "#6d7175", fontSize: "13px" }}>
-              Not seeing all codes? Shopify processes bulk uploads in the background — refresh in 30–60 seconds if the count looks low.
-            </s-paragraph>
-          )}
-        </s-stack>
-      </s-section>
-
-      {preUsedCodes.length > 0 && (
-        <s-section heading="Previously used codes (historical)">
-          <s-stack direction="block" gap="base">
-            <s-paragraph>
-              These codes were imported as already used and are not active in Shopify.
-            </s-paragraph>
-
-            {/* Header row */}
-            <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px" }}>
-              <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Code</span>
-              <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "120px", textAlign: "center" }}>Status</span>
-            </div>
-
-            {pagedPreUsedCodes.map((c: string) => (
-              <div key={c} style={{ display: "flex", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", gap: "12px" }}>
-                <span style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em", flex: 1 }}>{c}</span>
-                <div style={{ width: "120px", display: "flex", justifyContent: "center" }}>
-                  <s-badge tone="critical">Previously Used</s-badge>
-                </div>
-              </div>
-            ))}
-
-            {preUsedCodes.length > PAGE_SIZE && (
-              <s-stack direction="inline" gap="base" style={{ alignItems: "center", justifyContent: "space-between" }}>
-                <s-button
-                  disabled={safePreUsedPage === 0}
-                  onClick={() => setPreUsedPage((p) => Math.max(0, p - 1))}
-                >
-                  ← Previous
+              <div>
+                <s-button variant="primary" onClick={handleUpdateEndsAt} disabled={fetcher.state !== "idle"}>
+                  {fetcher.state !== "idle" ? "Saving…" : "Update expiration"}
                 </s-button>
-                <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
-                  {safePreUsedPage * PAGE_SIZE + 1}–{Math.min((safePreUsedPage + 1) * PAGE_SIZE, preUsedCodes.length)} of {preUsedCodes.length}
-                </s-text>
-                <s-button
-                  disabled={safePreUsedPage >= preUsedTotalPages - 1}
-                  onClick={() => setPreUsedPage((p) => Math.min(preUsedTotalPages - 1, p + 1))}
-                >
-                  Next →
+              </div>
+            </s-stack>
+          </s-section>
+
+          <s-section heading="Eligible items">
+            <s-stack direction="block" gap="base">
+              <s-paragraph>
+                The discount applies to the highest-priced eligible item in the cart — 1 unit only.
+                {discountType === "fixedAmount"
+                  ? fixedAmount !== null && <> (${fixedAmount} off)</>
+                  : percentage !== null && <> ({percentage}% off)</>}
+              </s-paragraph>
+
+              {(fetcher.data as { updated?: boolean })?.updated && (
+                <s-banner tone="success">
+                  <s-paragraph>Eligible items updated successfully.</s-paragraph>
+                </s-banner>
+              )}
+              {(fetcher.data as { error?: string })?.error && (
+                <s-banner tone="critical">
+                  <s-paragraph>{(fetcher.data as { error: string }).error}</s-paragraph>
+                </s-banner>
+              )}
+
+              {eligibleCollections.length > 0 ? (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Collection</span>
+                  </div>
+                  {eligibleCollections.map((c: { id: string; title: string }) => (
+                    <div key={c.id} style={{ display: "flex", alignItems: "center", padding: "12px", borderBottom: "1px solid #e1e3e5" }}>
+                      <span style={{ fontSize: "14px", flex: 1 }}>{c.title}</span>
+                    </div>
+                  ))}
+                  {eligibleCollectionIds.length > 50 && (
+                    <div style={{ padding: "8px 12px", fontSize: "13px", color: "#6d7175" }}>
+                      Showing 50 of {eligibleCollectionIds.length} collections.
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Product</span>
+                  </div>
+                  {eligibleProducts.length === 0 && (
+                    <div style={{ padding: "12px", color: "#6d7175", fontSize: "14px" }}>
+                      No eligible products configured.
+                    </div>
+                  )}
+                  {eligibleProducts.map((p: { id: string; title: string }) => (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", padding: "12px", borderBottom: "1px solid #e1e3e5" }}>
+                      <span style={{ fontSize: "14px", flex: 1 }}>{p.title}</span>
+                    </div>
+                  ))}
+                  {eligibleProductIds.length > 50 && (
+                    <div style={{ padding: "8px 12px", fontSize: "13px", color: "#6d7175" }}>
+                      Showing 50 of {eligibleProductIds.length} eligible products.
+                    </div>
+                  )}
+                </>
+              )}
+
+              <s-stack direction="inline" gap="base">
+                <s-button onClick={() => handleEditItems("product")} disabled={editingItems}>
+                  {editingItems ? "Opening picker…" : "Edit by products"}
+                </s-button>
+                <s-button onClick={() => handleEditItems("collection")} disabled={editingItems}>
+                  Edit by collection
                 </s-button>
               </s-stack>
-            )}
-          </s-stack>
-        </s-section>
-      )}
+            </s-stack>
+          </s-section>
+
+          <s-section heading="Add more codes">
+            <s-stack direction="block" gap="base">
+              {(fetcher.data as { addedCodes?: boolean })?.addedCodes && (
+                <s-banner tone="success">
+                  <s-paragraph>
+                    Added {(fetcher.data as { addedCount: number }).addedCount} code
+                    {(fetcher.data as { addedCount: number }).addedCount !== 1 ? "s" : ""} to this discount.
+                    {(fetcher.data as { skippedCount: number }).skippedCount > 0 &&
+                      ` ${(fetcher.data as { skippedCount: number }).skippedCount} previously-used code(s) were recorded but not added as active.`}
+                    {" "}Shopify may take a few seconds to process them.
+                  </s-paragraph>
+                </s-banner>
+              )}
+              {(fetcher.data as { error?: string })?.error && (
+                <s-banner tone="critical">
+                  <s-paragraph>{(fetcher.data as { error: string }).error}</s-paragraph>
+                </s-banner>
+              )}
+
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {(["generate", "import"] as const).map((mode) => (
+                  <s-button
+                    key={mode}
+                    variant={addCodeMode === mode ? "primary" : "secondary"}
+                    onClick={() => setAddCodeMode(mode)}
+                  >
+                    {mode === "generate" ? "Generate randomly" : "Import from CSV"}
+                  </s-button>
+                ))}
+              </div>
+
+              {addCodeMode === "generate" && inferredPrefix && (
+                <s-form-layout>
+                  <s-paragraph>
+                    New codes will reuse this set's existing prefix and format:{" "}
+                    <strong>{inferredPrefix}-{"X".repeat(inferredCodeLength ?? 6)}</strong>
+                  </s-paragraph>
+                  <s-text-field
+                    label="Number of codes"
+                    type="number"
+                    value={addCodeCount}
+                    min="1"
+                    max="5000"
+                    onInput={(e: InputEvent) => setAddCodeCount((e.target as HTMLInputElement).value)}
+                    details="Maximum 5,000 per batch"
+                  />
+                </s-form-layout>
+              )}
+
+              {addCodeMode === "generate" && !inferredPrefix && (
+                <s-form-layout>
+                  <s-paragraph>
+                    Couldn't detect a consistent prefix from this set's existing codes — enter one to use for new codes.
+                  </s-paragraph>
+                  <s-text-field
+                    label="Code prefix"
+                    value={addPrefix}
+                    onInput={(e: InputEvent) => setAddPrefix((e.target as HTMLInputElement).value)}
+                    details="Letters and numbers only, e.g. BAJIO"
+                  />
+                  <s-text-field
+                    label="Number of codes"
+                    type="number"
+                    value={addCodeCount}
+                    min="1"
+                    max="5000"
+                    onInput={(e: InputEvent) => setAddCodeCount((e.target as HTMLInputElement).value)}
+                    details="Maximum 5,000 per batch"
+                  />
+                  <s-text-field
+                    label="Code length"
+                    type="number"
+                    value={addCodeLength}
+                    min="4"
+                    max="12"
+                    onInput={(e: InputEvent) => setAddCodeLength((e.target as HTMLInputElement).value)}
+                    details="Number of random characters after the prefix (4–12)"
+                  />
+                </s-form-layout>
+              )}
+
+              {addCodeMode === "import" && (
+                <s-stack direction="block" gap="base">
+                  <s-paragraph>
+                    Upload a CSV file with a <strong>Code</strong> column. Each row becomes one discount code.
+                  </s-paragraph>
+                  <input
+                    ref={addFileInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={handleAddFileChange as unknown as React.ChangeEventHandler<HTMLInputElement>}
+                    style={{ fontSize: "14px" }}
+                  />
+                  {addCsvPreview && (
+                    <s-banner tone="success" title={`${addCsvPreview.count} codes detected`}>
+                      <s-paragraph>First code: {addCsvPreview.sample}. Codes marked "Used" will be uploaded to Shopify and flagged as previously used in the app.</s-paragraph>
+                    </s-banner>
+                  )}
+                  {addCsvFile && !addCsvPreview && (
+                    <s-banner tone="critical" title='No "Code" column found'>
+                      <s-paragraph>Make sure the CSV has a header row with a column named exactly "Code".</s-paragraph>
+                    </s-banner>
+                  )}
+                </s-stack>
+              )}
+
+              <div>
+                <s-button variant="primary" onClick={handleAddCodes} disabled={!canAddCodes || fetcher.state !== "idle"}>
+                  {fetcher.state !== "idle" ? "Adding…" : "Add codes"}
+                </s-button>
+              </div>
+            </s-stack>
+          </s-section>
+        </div>
+      </div>
     </s-page>
   );
 }
