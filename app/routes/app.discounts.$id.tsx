@@ -1016,7 +1016,12 @@ export default function DiscountDetails() {
               {addCodeMode === "import" && (
                 <s-stack direction="block" gap="base">
                   <s-paragraph>
-                    Upload a CSV file with a <strong>Code</strong> column. Each row becomes one discount code.
+                    Upload a CSV file with a header row and a column named <strong>Code</strong> — each row
+                    becomes one discount code, converted to uppercase automatically. Maximum 5,000 codes per file.
+                  </s-paragraph>
+                  <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
+                    Optional: add a <strong>Status</strong> column and mark rows "Used" to record them as
+                    already-redeemed instead of active codes.
                   </s-paragraph>
                   <input
                     ref={addFileInputRef}
