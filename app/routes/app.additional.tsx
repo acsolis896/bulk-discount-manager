@@ -185,7 +185,13 @@ export default function DiscountSets() {
                   </span>
                   <span style={{ flex: 2, fontSize: "14px", color: "#6d7175" }}>{formatDate(s.endsAt)}</span>
                   <div style={{ width: "60px" }}>
-                    <s-button onClick={() => navigate(`/app/discounts/${s.numericId}`)}>View</s-button>
+                    <s-button
+                      onClick={() =>
+                        navigate(s.isReusableCode ? `/app/single-codes/${s.numericId}` : `/app/discounts/${s.numericId}`)
+                      }
+                    >
+                      View
+                    </s-button>
                   </div>
                 </div>
               );
