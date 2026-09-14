@@ -57,11 +57,28 @@ model SingleCodeDiscount {
   configJson          String?
   eligibleCustomerIds String?
   blockedCustomerIds  String?
+  usesPerCustomerLimit Int?
   functionNodeId      String?
   createdAt           DateTime @default(now())
 
   @@unique([shop, discountId])
   @@index([shop])
+}
+
+// Tracks how many times each customer has redeemed a given reusable code, so
+// a code can cap usage per customer (e.g. "5 uses each") — something
+// Shopify's discount API has no native support for beyond a flat
+// once-per-customer toggle. Populated by the orders/create webhook.
+model CodeUsageCount {
+  id         String   @id @default(cuid())
+  shop       String
+  discountId String
+  customerId String
+  count      Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([shop, discountId, customerId])
+  @@index([shop, discountId])
 }
 
 model Session {

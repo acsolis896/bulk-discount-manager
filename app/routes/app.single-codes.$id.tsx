@@ -114,6 +114,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     collectionIds,
     collectionTitles,
     blockedProductTypes: (config.blockedProductTypes as string[]) ?? [],
+    usesPerCustomerLimit: row.usesPerCustomerLimit,
+    usageCappedCount: Array.isArray(config.usageCappedCustomerIds) ? config.usageCappedCustomerIds.length : 0,
   };
 };
 
@@ -137,6 +139,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const oncePerOrder = formData.get("oncePerOrder") !== "0";
     const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
     const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
+    const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
+    const parsedUsesLimit = usesPerCustomerLimitRaw ? Number(usesPerCustomerLimitRaw) : null;
+    if (parsedUsesLimit !== null && (!Number.isFinite(parsedUsesLimit) || parsedUsesLimit < 1)) {
+      return { error: "Uses per customer must be a whole number of 1 or more." };
+    }
+    const usesPerCustomerLimit = parsedUsesLimit !== null ? Math.floor(parsedUsesLimit) : null;
 
     if (discountType === "percentage") {
       if (!percentage || percentage < 1 || percentage > 100) return { error: "Percentage must be between 1 and 100." };
@@ -202,6 +210,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       oncePerOrder,
       requiredTag,
       blockedTag,
+      usesPerCustomerLimit,
+      // Removing the limit lifts the cap for everyone it applied to.
+      usageCappedCustomerIds: usesPerCustomerLimit === null ? [] : (existing.usageCappedCustomerIds ?? []),
     };
 
     // Write to both construction node and real function node (if different)
@@ -240,6 +251,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       blockedProductTypes: existing.blockedProductTypes ?? ["GWP"],
       requiredTag,
       blockedTag,
+      usesPerCustomerLimit,
+      usageCappedCustomerIds: usesPerCustomerLimit === null ? [] : (existing.usageCappedCustomerIds ?? []),
     });
 
     let eligibilityWarning: string | null = null;
@@ -263,10 +276,46 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         eligibilityMode,
         segmentId: eligibilityMode === "segment" ? selectedSegmentId : null,
         configJson: baseConfigJson,
+        usesPerCustomerLimit,
       },
     });
 
     return { success: true, eligibilityWarning };
+  }
+
+  if (intent === "resetUsage") {
+    const dbRow = await db.singleCodeDiscount.findFirst({ where: { shop: session.shop, discountId }, select: { functionNodeId: true, configJson: true } });
+    if (!dbRow) return { error: "Discount not found." };
+
+    await db.codeUsageCount.deleteMany({ where: { shop: session.shop, discountId } });
+
+    let existing: Record<string, unknown> = {};
+    try { if (dbRow.configJson) existing = JSON.parse(dbRow.configJson); } catch { /* empty */ }
+    const clearedConfig = { ...existing, usageCappedCustomerIds: [] };
+    const clearedConfigJson = JSON.stringify(clearedConfig);
+
+    const writeTargets = [discountId];
+    if (dbRow.functionNodeId && dbRow.functionNodeId !== discountId) writeTargets.push(dbRow.functionNodeId);
+    for (const ownerId of writeTargets) {
+      const res = await admin.graphql(
+        `#graphql
+        mutation SetDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
+          metafieldsSet(metafields: $metafields) {
+            userErrors { field message }
+          }
+        }`,
+        { variables: { metafields: [{ ownerId, namespace: "$app", key: "function-configuration", type: "json", value: clearedConfigJson }] } }
+      );
+      const resData = await res.json();
+      const errors = resData.data?.metafieldsSet?.userErrors ?? [];
+      if (errors.length > 0) {
+        return { error: `Failed to reset: ${errors.map((e: { message: string }) => e.message).join(", ")}` };
+      }
+    }
+
+    await db.singleCodeDiscount.updateMany({ where: { shop: session.shop, discountId }, data: { configJson: clearedConfigJson } });
+
+    return { usageReset: true };
   }
 
   if (intent === "delete") {
@@ -308,12 +357,14 @@ export default function SingleCodeDetailsPage() {
   const [productTitles, setProductTitles] = useState<string[]>([]);
   const [collectionIds, setCollectionIds] = useState<string[]>(loaderData.collectionIds);
   const [collectionTitles, setCollectionTitles] = useState<string[]>(loaderData.collectionTitles);
+  const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState(String(loaderData.usesPerCustomerLimit ?? ""));
 
   const isSaving = fetcher.state !== "idle";
-  const result = fetcher.data as { error?: string; success?: boolean; deleted?: boolean; eligibilityWarning?: string | null } | undefined;
+  const result = fetcher.data as { error?: string; success?: boolean; deleted?: boolean; eligibilityWarning?: string | null; usageReset?: boolean } | undefined;
 
   useEffect(() => {
     if (result?.success && !result.eligibilityWarning) shopify.toast.show("Changes saved");
+    if (result?.usageReset) shopify.toast.show("Usage counts reset");
     if (result?.deleted) navigate("/app/single-codes");
   }, [result, shopify, navigate]);
 
@@ -358,6 +409,14 @@ export default function SingleCodeDetailsPage() {
     form.set("oncePerOrder", oncePerOrder ? "1" : "0");
     form.set("productIds", JSON.stringify(productIds));
     form.set("collectionIds", JSON.stringify(collectionIds));
+    form.set("usesPerCustomerLimit", usesPerCustomerLimit);
+    fetcher.submit(form, { method: "post" });
+  };
+
+  const handleResetUsage = () => {
+    if (!confirm("Reset usage counts for this code? Every customer will be able to redeem it again, up to the limit.")) return;
+    const form = new FormData();
+    form.set("intent", "resetUsage");
     fetcher.submit(form, { method: "post" });
   };
 
@@ -528,6 +587,27 @@ export default function SingleCodeDetailsPage() {
                 }
               />
             </div>
+            <div style={{ marginTop: "16px" }}>
+              <s-text-field
+                label="Limit uses per customer (optional)"
+                type="number"
+                value={usesPerCustomerLimit}
+                min="1"
+                placeholder="Unlimited"
+                details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code."
+                onInput={(e: InputEvent) => setUsesPerCustomerLimit((e.target as HTMLInputElement).value)}
+              />
+            </div>
+            {loaderData.usesPerCustomerLimit != null && (
+              <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
+                <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
+                  {loaderData.usageCappedCount} customer{loaderData.usageCappedCount === 1 ? "" : "s"} currently at the limit
+                </s-text>
+                <s-button variant="tertiary" onClick={handleResetUsage} disabled={isSaving}>
+                  Reset usage counts
+                </s-button>
+              </div>
+            )}
         </s-section>
       </div>
 

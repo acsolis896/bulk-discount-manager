@@ -1,5 +1,10 @@
 query CartLinesDiscountsGenerateRunInput {
   cart {
+    buyerIdentity {
+      customer {
+        id
+      }
+    }
     lines {
       id
       quantity

@@ -18,7 +18,38 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const { productIds, percentage, fixedAmount, discountType, oncePerOrder, blockedProductTypes } = config;
+  const { productIds, percentage, fixedAmount, discountType, oncePerOrder, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
+
+  const rejectableCodes = () =>
+    (input.enteredDiscountCodes ?? []).filter((c) => c.rejectable).map((c) => ({ code: c.code }));
+
+  // A customer tagged as blocked (via the Rules page) or who has hit a
+  // per-customer usage cap on this reusable code is rejected outright,
+  // before any cart contents are even considered.
+  const buyerCustomerId = input.cart.buyerIdentity?.customer?.id ?? null;
+  if (buyerCustomerId) {
+    const isBlocked = Array.isArray(blockedCustomerIds) && blockedCustomerIds.includes(buyerCustomerId);
+    const isUsageCapped = Array.isArray(usageCappedCustomerIds) && usageCappedCustomerIds.includes(buyerCustomerId);
+    if (isBlocked || isUsageCapped) {
+      const codes = rejectableCodes();
+      if (codes.length > 0) {
+        return {
+          operations: [
+            {
+              enteredDiscountCodesReject: {
+                codes,
+                message: isUsageCapped
+                  ? "This discount code has reached its usage limit for your account."
+                  : "This discount code isn't available for your account.",
+              },
+            },
+          ],
+        };
+      }
+      return { operations: [] };
+    }
+  }
+
   const blocked = (Array.isArray(blockedProductTypes) ? blockedProductTypes : ["GWP"])
     .map((t) => (t ?? "").toUpperCase());
 
@@ -28,13 +59,8 @@ export function cartLinesDiscountsGenerateRun(input) {
   });
 
   if (blockedLine) {
-    // Reject all rejectable entered discount codes so the code is removed
-    // from the cart and the customer sees an error message
-    const rejectableCodes = (input.enteredDiscountCodes ?? [])
-      .filter((c) => c.rejectable)
-      .map((c) => ({ code: c.code }));
-
-    if (rejectableCodes.length > 0) {
+    const codes = rejectableCodes();
+    if (codes.length > 0) {
       // Use the product's own casing (e.g. "Accessories") rather than the
       // stored ALL-CAPS value, so the message doesn't read as shouting.
       const matchedType = blockedLine.merchandise?.product?.productType;
@@ -42,7 +68,7 @@ export function cartLinesDiscountsGenerateRun(input) {
         operations: [
           {
             enteredDiscountCodesReject: {
-              codes: rejectableCodes,
+              codes,
               message: `This discount code can't be used with ${matchedType} items in your cart.`,
             },
           },

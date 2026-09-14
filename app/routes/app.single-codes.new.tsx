@@ -25,6 +25,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const percentage = Number(formData.get("percentage") || 0);
   const fixedAmount = Number(formData.get("fixedAmount") || 0);
   const oncePerOrder = formData.get("oncePerOrder") !== "0";
+  const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
+  const parsedUsesLimit = usesPerCustomerLimitRaw ? Number(usesPerCustomerLimitRaw) : null;
+  if (parsedUsesLimit !== null && (!Number.isFinite(parsedUsesLimit) || parsedUsesLimit < 1)) {
+    return { error: "Uses per customer must be a whole number of 1 or more." };
+  }
+  const usesPerCustomerLimit = parsedUsesLimit !== null ? Math.floor(parsedUsesLimit) : null;
   const eligibilityMode = (["all", "tags", "segment"] as const).includes(String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
     ? (String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
     : "all";
@@ -142,6 +148,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     blockedProductTypes,
     requiredTag,
     blockedTag,
+    ...(usesPerCustomerLimit !== null ? { usesPerCustomerLimit, usageCappedCustomerIds: [] } : {}),
   });
   const mfRes = await admin.graphql(
     `#graphql
@@ -241,6 +248,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       eligibilityMode,
       segmentId: eligibilityMode === "segment" ? selectedSegmentId : null,
       configJson: metafieldConfig,
+      usesPerCustomerLimit,
       functionNodeId: functionNodeId !== nodeDiscountId ? functionNodeId : null,
     },
   });
@@ -260,6 +268,7 @@ export default function NewSingleCodePage() {
   const [percentage, setPercentage] = useState("50");
   const [fixedAmount, setFixedAmount] = useState("10");
   const [oncePerOrder, setOncePerOrder] = useState(true);
+  const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState("");
   const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">("all");
   const [requiredTag, setRequiredTag] = useState("");
   const [blockedTag, setBlockedTag] = useState("");
@@ -324,6 +333,7 @@ export default function NewSingleCodePage() {
     form.set("percentage", percentage);
     form.set("fixedAmount", fixedAmount);
     form.set("oncePerOrder", oncePerOrder ? "1" : "0");
+    form.set("usesPerCustomerLimit", usesPerCustomerLimit);
     form.set("eligibilityMode", eligibilityMode);
     form.set("requiredTag", requiredTag);
     form.set("blockedTag", blockedTag);
@@ -423,6 +433,17 @@ export default function NewSingleCodePage() {
                 ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
                 : "The discount will be taken off every eligible item in the cart."
             }
+          />
+        </div>
+        <div style={{ marginTop: "16px" }}>
+          <s-text-field
+            label="Limit uses per customer (optional)"
+            type="number"
+            value={usesPerCustomerLimit}
+            min="1"
+            placeholder="Unlimited"
+            details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code — e.g. 5."
+            onInput={(e: InputEvent) => setUsesPerCustomerLimit((e.target as HTMLInputElement).value)}
           />
         </div>
         <div style={{ marginTop: "16px" }}>
