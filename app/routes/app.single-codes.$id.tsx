@@ -381,52 +381,44 @@ export default function SingleCodeDetailsPage() {
         </s-banner>
       )}
 
-      <style>
-        {`.discount-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
-          @media (max-width: 900px) { .discount-detail-grid { grid-template-columns: 1fr; } }`}
-      </style>
-
-      <div className="discount-detail-grid">
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
-          <s-section heading="Overview">
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div style={{ display: "flex", gap: "24px" }}>
-                <div>
-                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Code</div>
-                  <span style={{ fontFamily: "monospace", fontSize: "18px", fontWeight: 600 }}>{loaderData.code}</span>
-                </div>
-                <div>
-                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Status</div>
-                  {status === "ACTIVE" ? (
-                    <s-badge tone="success">Active</s-badge>
-                  ) : status === "EXPIRED" ? (
-                    <s-badge tone="critical">Expired</s-badge>
-                  ) : (
-                    <s-badge>{status.charAt(0) + status.slice(1).toLowerCase()}</s-badge>
-                  )}
-                </div>
-                <div>
-                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Times used</div>
-                  <span style={{ fontSize: "16px", fontWeight: 500 }}>{loaderData.usageCount}</span>
-                </div>
-                <div>
-                  <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Discount</div>
-                  <span style={{ fontSize: "16px", fontWeight: 500 }}>
-                    {loaderData.discountType === "fixedAmount" ? `$${loaderData.fixedAmount}` : `${loaderData.percentage}%`}
-                  </span>
-                </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <s-section heading="Overview">
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", gap: "24px" }}>
+              <div>
+                <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Code</div>
+                <span style={{ fontFamily: "monospace", fontSize: "18px", fontWeight: 600 }}>{loaderData.code}</span>
               </div>
-              {loaderData.endsAt && (
-                <div style={{ fontSize: "13px", color: "#6d7175" }}>
-                  Expires: {new Date(loaderData.endsAt).toLocaleDateString()}
-                </div>
-              )}
+              <div>
+                <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Status</div>
+                {status === "ACTIVE" ? (
+                  <s-badge tone="success">Active</s-badge>
+                ) : status === "EXPIRED" ? (
+                  <s-badge tone="critical">Expired</s-badge>
+                ) : (
+                  <s-badge>{status.charAt(0) + status.slice(1).toLowerCase()}</s-badge>
+                )}
+              </div>
+              <div>
+                <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Times used</div>
+                <span style={{ fontSize: "16px", fontWeight: 500 }}>{loaderData.usageCount}</span>
+              </div>
+              <div>
+                <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Discount</div>
+                <span style={{ fontSize: "16px", fontWeight: 500 }}>
+                  {loaderData.discountType === "fixedAmount" ? `$${loaderData.fixedAmount}` : `${loaderData.percentage}%`}
+                </span>
+              </div>
             </div>
-          </s-section>
-        </div>
+            {loaderData.endsAt && (
+              <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                Expires: {new Date(loaderData.endsAt).toLocaleDateString()}
+              </div>
+            )}
+          </div>
+        </s-section>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
-          <s-section heading="Edit eligible items">
+        <s-section heading="Edit eligible items">
             <s-paragraph>
               {collectionIds.length > 0
                 ? `${collectionIds.length} collection${collectionIds.length > 1 ? "s" : ""}: ${collectionTitles.join(", ")}`
@@ -536,8 +528,7 @@ export default function SingleCodeDetailsPage() {
                 }
               />
             </div>
-          </s-section>
-        </div>
+        </s-section>
       </div>
 
       <div style={{ display: "flex", gap: "8px", marginTop: "16px", justifyContent: "space-between" }}>
