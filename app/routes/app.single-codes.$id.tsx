@@ -90,6 +90,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     collectionTitles = (colData.data?.nodes ?? []).map((n: { title?: string }) => n?.title ?? "").filter(Boolean);
   }
 
+  // Revenue/last-used come from our own order-webhook ledger — Shopify
+  // exposes a usage count (asyncUsageCount above) but no revenue per code.
+  const redemptionTotals = await db.codeRedemption.aggregate({
+    where: { shop: session.shop, discountId },
+    _sum: { totalPrice: true },
+    _max: { createdAt: true },
+  });
+  const revenue = redemptionTotals._sum.totalPrice ?? 0;
+  const lastUsed = redemptionTotals._max.createdAt ? redemptionTotals._max.createdAt.toISOString() : null;
+
   return {
     dbId: row.id,
     discountId,
@@ -103,6 +113,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     title: discount?.title ?? row.code,
     status: discount?.status ?? "UNKNOWN",
     usageCount: discount?.asyncUsageCount ?? 0,
+    revenue,
+    lastUsed,
     startsAt: discount?.startsAt ?? null,
     endsAt: discount?.endsAt ?? null,
     combinesWith: discount?.combinesWith ?? { productDiscounts: false, orderDiscounts: false, shippingDiscounts: false },
@@ -468,12 +480,25 @@ export default function SingleCodeDetailsPage() {
                   {loaderData.discountType === "fixedAmount" ? `$${loaderData.fixedAmount}` : `${loaderData.percentage}%`}
                 </span>
               </div>
+              <div>
+                <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Revenue</div>
+                <span style={{ fontSize: "16px", fontWeight: 500 }}>${loaderData.revenue.toFixed(2)}</span>
+              </div>
+              <div>
+                <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Last used</div>
+                <span style={{ fontSize: "16px", fontWeight: 500 }}>
+                  {loaderData.lastUsed ? new Date(loaderData.lastUsed).toLocaleDateString() : "—"}
+                </span>
+              </div>
             </div>
             {loaderData.endsAt && (
               <div style={{ fontSize: "13px", color: "#6d7175" }}>
                 Expires: {new Date(loaderData.endsAt).toLocaleDateString()}
               </div>
             )}
+            <div style={{ fontSize: "12px", color: "#6d7175" }}>
+              Revenue only counts orders placed since code performance tracking started.
+            </div>
           </div>
         </s-section>
 

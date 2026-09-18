@@ -9,6 +9,7 @@ import { checkCodeQuota } from "../billing.server";
 
 type RedeemCode = { code: string; usageCount: number };
 type ParsedCode = { code: string; used: boolean };
+type CodePerformanceRow = { code: string; uses: number; revenue: number; lastUsed: string | null };
 
 function parseCSVCodes(text: string): ParsedCode[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -118,6 +119,33 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       codeDates[row.code] = row.createdAt.toISOString().slice(0, 10);
     }
 
+    // Revenue per code comes only from our own order-webhook ledger — Shopify
+    // exposes usage counts per code but no revenue. Merge it onto allCodes
+    // (which already has each code's real usage count from Shopify) so uses
+    // stay authoritative while revenue/lastUsed come from our tracking.
+    const redemptionTotals = await db.codeRedemption.groupBy({
+      by: ["code"],
+      where: { shop, discountId: gid },
+      _sum: { totalPrice: true },
+      _max: { createdAt: true },
+    });
+    const revenueByCode: Record<string, { revenue: number; lastUsed: string | null }> = {};
+    for (const r of redemptionTotals) {
+      revenueByCode[r.code] = {
+        revenue: r._sum.totalPrice ?? 0,
+        lastUsed: r._max.createdAt ? r._max.createdAt.toISOString() : null,
+      };
+    }
+    const codePerformance = allCodes
+      .filter((c) => c.usageCount > 0)
+      .map((c) => ({
+        code: c.code,
+        uses: c.usageCount,
+        revenue: revenueByCode[c.code]?.revenue ?? 0,
+        lastUsed: revenueByCode[c.code]?.lastUsed ?? null,
+      }))
+      .sort((a, b) => b.uses - a.uses);
+
     // Infer the prefix/length used to generate existing codes (format is
     // always PREFIX-SUFFIX, and the random suffix never contains a hyphen),
     // so "Add more codes" can reuse it without asking the merchant again.
@@ -192,7 +220,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
     }
 
-    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error: null as string | null };
+    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -209,6 +237,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       usedCount: 0,
       preUsedCodes: [] as string[],
       codeDates: {} as Record<string, string>,
+      codePerformance: [] as CodePerformanceRow[],
       inferredPrefix: null as string | null,
       inferredCodeLength: null as number | null,
       eligibleProducts: [] as { id: string; title: string }[],
@@ -460,7 +489,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function DiscountDetails() {
-  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, codes, totalCount, usedCount, preUsedCodes, codeDates, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
+  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -552,6 +581,32 @@ export default function DiscountDetails() {
   const totalPages = Math.max(1, Math.ceil(filteredCodes.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
   const pagedCodes = filteredCodes.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+
+  const [perfSearch, setPerfSearch] = useState("");
+  const [perfPage, setPerfPage] = useState(0);
+  const filteredPerformance = useMemo(() => {
+    const q = perfSearch.trim().toUpperCase();
+    return q ? codePerformance.filter((c: CodePerformanceRow) => c.code.includes(q)) : codePerformance;
+  }, [codePerformance, perfSearch]);
+  const perfTotalPages = Math.max(1, Math.ceil(filteredPerformance.length / PAGE_SIZE));
+  const safePerfPage = Math.min(perfPage, perfTotalPages - 1);
+  const pagedPerformance = filteredPerformance.slice(safePerfPage * PAGE_SIZE, safePerfPage * PAGE_SIZE + PAGE_SIZE);
+
+  const handleExportPerformance = useCallback(() => {
+    const rows = [
+      "Code,Uses,Revenue,Last Used",
+      ...codePerformance.map(
+        (c: CodePerformanceRow) => `${c.code},${c.uses},${c.revenue.toFixed(2)},${c.lastUsed ? c.lastUsed.slice(0, 10) : ""}`
+      ),
+    ];
+    const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title ?? "discount"}-code-performance.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [codePerformance, title]);
 
   const handleExport = useCallback((unusedOnly = false) => {
     const filtered = unusedOnly ? codes.filter((c: RedeemCode) => c.usageCount === 0) : codes;
@@ -759,6 +814,77 @@ export default function DiscountDetails() {
               )}
             </s-stack>
           </s-section>
+
+          {codePerformance.length > 0 && (
+            <s-section heading="Code performance">
+              <s-stack direction="block" gap="base">
+                <s-paragraph style={{ color: "#6d7175", fontSize: "13px" }}>
+                  Ranked by uses. Revenue is the gross total of orders that used each code — useful for
+                  seeing which creator, rep, or sponsor code is converting.
+                </s-paragraph>
+
+                <s-stack direction="inline" gap="base" style={{ alignItems: "center" }}>
+                  <div style={{ flex: 1 }}>
+                    <s-search-field
+                      label="Search codes"
+                      labelAccessibilityVisibility="exclusive"
+                      placeholder="Search codes…"
+                      value={perfSearch}
+                      onInput={(e: InputEvent) => { setPerfSearch((e.target as HTMLInputElement).value); setPerfPage(0); }}
+                    />
+                  </div>
+                  <s-button onClick={handleExportPerformance}>Export performance (CSV)</s-button>
+                </s-stack>
+
+                <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Code</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "70px", textAlign: "right" }}>Uses</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "100px", textAlign: "right" }}>Revenue</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "100px", textAlign: "right" }}>Last used</span>
+                </div>
+
+                {pagedPerformance.map((c: CodePerformanceRow) => (
+                  <div key={c.code} style={{ display: "flex", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", gap: "12px" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em", flex: 1 }}>{c.code}</span>
+                    <span style={{ width: "70px", textAlign: "right" }}>{c.uses}</span>
+                    <span style={{ width: "100px", textAlign: "right" }}>${c.revenue.toFixed(2)}</span>
+                    <span style={{ width: "100px", textAlign: "right", fontSize: "13px", color: "#6d7175" }}>
+                      {c.lastUsed ? formatDate(c.lastUsed) : "—"}
+                    </span>
+                  </div>
+                ))}
+
+                {filteredPerformance.length === 0 && (
+                  <s-paragraph>No codes match your search.</s-paragraph>
+                )}
+
+                {filteredPerformance.length > 0 && (
+                  <s-stack direction="inline" gap="base" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                    <s-button
+                      disabled={safePerfPage === 0}
+                      onClick={() => setPerfPage((p) => Math.max(0, p - 1))}
+                    >
+                      ← Previous
+                    </s-button>
+                    <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
+                      {safePerfPage * PAGE_SIZE + 1}–{Math.min((safePerfPage + 1) * PAGE_SIZE, filteredPerformance.length)} of {filteredPerformance.length}
+                    </s-text>
+                    <s-button
+                      disabled={safePerfPage >= perfTotalPages - 1}
+                      onClick={() => setPerfPage((p) => Math.min(perfTotalPages - 1, p + 1))}
+                    >
+                      Next →
+                    </s-button>
+                  </s-stack>
+                )}
+
+                <s-paragraph style={{ color: "#6d7175", fontSize: "13px" }}>
+                  Only orders placed since this feature shipped are counted — revenue won't include
+                  historical orders from before code performance tracking started.
+                </s-paragraph>
+              </s-stack>
+            </s-section>
+          )}
 
           {preUsedCodes.length > 0 && (
             <s-section heading="Previously used codes (historical)">

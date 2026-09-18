@@ -81,6 +81,27 @@ model CodeUsageCount {
   @@index([shop, discountId])
 }
 
+// One row per (order, code) redemption, populated by the orders/create
+// webhook. Shopify exposes a per-code usage count natively but no per-code
+// revenue, so this is the only source for the "Code performance" reporting
+// on the discount detail pages.
+model CodeRedemption {
+  id         String   @id @default(cuid())
+  shop       String
+  discountId String
+  code       String
+  orderId    String
+  orderName  String
+  totalPrice Float
+  currency   String
+  customerId String?
+  createdAt  DateTime @default(now())
+
+  @@unique([shop, orderId, code])
+  @@index([shop, discountId])
+  @@index([shop, code])
+}
+
 model Session {
   id            String    @id
   shop          String

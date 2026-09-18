@@ -3,6 +3,10 @@ import { authenticate } from "../shopify.server";
 import db from "../db.server";
 
 type OrderPayload = {
+  id?: number;
+  name?: string;
+  total_price?: string;
+  currency?: string;
   discount_codes?: { code: string }[];
   customer?: { id: number } | null;
 };
@@ -14,13 +18,52 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const order = payload as OrderPayload;
   const discountCodes = order.discount_codes ?? [];
+
+  if (discountCodes.length === 0) return new Response();
+
   const customerId = order.customer?.id;
+  const customerGid = customerId ? `gid://shopify/Customer/${customerId}` : null;
 
-  // Can't attribute usage to a specific customer without an account — nothing
-  // to track for this order.
-  if (!customerId || discountCodes.length === 0) return new Response();
+  // Record a redemption row for every code on this order, regardless of
+  // whether it's attributable to a customer — this feeds the "Code
+  // performance" reporting on the discount detail pages and shouldn't drop
+  // guest checkouts.
+  if (order.id != null) {
+    for (const { code } of discountCodes) {
+      const upperCode = code.toUpperCase();
+      const singleCode = await db.singleCodeDiscount.findFirst({
+        where: { shop: session.shop, code: upperCode },
+        select: { discountId: true },
+      });
+      const issuedCode = singleCode
+        ? null
+        : await db.issuedCode.findFirst({
+            where: { shop: session.shop, code: upperCode },
+            select: { discountId: true },
+          });
+      const discountId = singleCode?.discountId ?? issuedCode?.discountId;
+      if (!discountId) continue;
 
-  const customerGid = `gid://shopify/Customer/${customerId}`;
+      await db.codeRedemption.upsert({
+        where: { shop_orderId_code: { shop: session.shop, orderId: String(order.id), code: upperCode } },
+        create: {
+          shop: session.shop,
+          discountId,
+          code: upperCode,
+          orderId: String(order.id),
+          orderName: order.name ?? "",
+          totalPrice: Number(order.total_price) || 0,
+          currency: order.currency ?? "",
+          customerId: customerGid,
+        },
+        update: {},
+      });
+    }
+  }
+
+  // Can't attribute per-customer usage without an account — nothing more to
+  // track for this order.
+  if (!customerGid) return new Response();
 
   for (const { code } of discountCodes) {
     const upperCode = code.toUpperCase();
