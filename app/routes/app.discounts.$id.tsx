@@ -120,29 +120,34 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
 
     // Revenue per code comes only from our own order-webhook ledger — Shopify
-    // exposes usage counts per code but no revenue. Merge it onto allCodes
-    // (which already has each code's real usage count from Shopify) so uses
-    // stay authoritative while revenue/lastUsed come from our tracking.
+    // exposes usage counts per code but no revenue. Shopify's usageCount is
+    // computed asynchronously and can lag well behind an actual order, while
+    // our webhook writes a row the moment the order comes in — so a code's
+    // "uses" is the higher of the two, and a code shows up here as soon as
+    // EITHER signal has seen it (not just Shopify's, which is what was
+    // hiding freshly-used codes until Shopify's count caught up).
     const redemptionTotals = await db.codeRedemption.groupBy({
       by: ["code"],
       where: { shop, discountId: gid },
       _sum: { totalPrice: true },
       _max: { createdAt: true },
+      _count: { _all: true },
     });
-    const revenueByCode: Record<string, { revenue: number; lastUsed: string | null }> = {};
+    const redemptionByCode: Record<string, { revenue: number; lastUsed: string | null; count: number }> = {};
     for (const r of redemptionTotals) {
-      revenueByCode[r.code] = {
+      redemptionByCode[r.code] = {
         revenue: r._sum.totalPrice ?? 0,
         lastUsed: r._max.createdAt ? r._max.createdAt.toISOString() : null,
+        count: r._count._all,
       };
     }
     const codePerformance = allCodes
-      .filter((c) => c.usageCount > 0)
+      .filter((c) => c.usageCount > 0 || (redemptionByCode[c.code]?.count ?? 0) > 0)
       .map((c) => ({
         code: c.code,
-        uses: c.usageCount,
-        revenue: revenueByCode[c.code]?.revenue ?? 0,
-        lastUsed: revenueByCode[c.code]?.lastUsed ?? null,
+        uses: Math.max(c.usageCount, redemptionByCode[c.code]?.count ?? 0),
+        revenue: redemptionByCode[c.code]?.revenue ?? 0,
+        lastUsed: redemptionByCode[c.code]?.lastUsed ?? null,
       }))
       .sort((a, b) => b.uses - a.uses);
 
