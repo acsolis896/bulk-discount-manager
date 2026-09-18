@@ -722,6 +722,77 @@ export default function DiscountDetails() {
             </s-stack>
           </s-section>
 
+          {codePerformance.length > 0 && (
+            <s-section heading="Code performance">
+              <s-stack direction="block" gap="base">
+                <s-paragraph style={{ color: "#6d7175", fontSize: "13px" }}>
+                  Ranked by uses. Revenue is the gross total of orders that used each code — useful for
+                  seeing which creator, rep, or sponsor code is converting.
+                </s-paragraph>
+
+                <s-stack direction="inline" gap="base" style={{ alignItems: "center" }}>
+                  <div style={{ flex: 1 }}>
+                    <s-search-field
+                      label="Search codes"
+                      labelAccessibilityVisibility="exclusive"
+                      placeholder="Search codes…"
+                      value={perfSearch}
+                      onInput={(e: InputEvent) => { setPerfSearch((e.target as HTMLInputElement).value); setPerfPage(0); }}
+                    />
+                  </div>
+                  <s-button onClick={handleExportPerformance}>Export performance (CSV)</s-button>
+                </s-stack>
+
+                <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Code</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "70px", textAlign: "right" }}>Uses</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "100px", textAlign: "right" }}>Revenue</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "100px", textAlign: "right" }}>Last used</span>
+                </div>
+
+                {pagedPerformance.map((c: CodePerformanceRow) => (
+                  <div key={c.code} style={{ display: "flex", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", gap: "12px" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em", flex: 1 }}>{c.code}</span>
+                    <span style={{ width: "70px", textAlign: "right" }}>{c.uses}</span>
+                    <span style={{ width: "100px", textAlign: "right" }}>${c.revenue.toFixed(2)}</span>
+                    <span style={{ width: "100px", textAlign: "right", fontSize: "13px", color: "#6d7175" }}>
+                      {c.lastUsed ? formatDate(c.lastUsed) : "—"}
+                    </span>
+                  </div>
+                ))}
+
+                {filteredPerformance.length === 0 && (
+                  <s-paragraph>No codes match your search.</s-paragraph>
+                )}
+
+                {filteredPerformance.length > 0 && (
+                  <s-stack direction="inline" gap="base" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                    <s-button
+                      disabled={safePerfPage === 0}
+                      onClick={() => setPerfPage((p) => Math.max(0, p - 1))}
+                    >
+                      ← Previous
+                    </s-button>
+                    <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
+                      {safePerfPage * PAGE_SIZE + 1}–{Math.min((safePerfPage + 1) * PAGE_SIZE, filteredPerformance.length)} of {filteredPerformance.length}
+                    </s-text>
+                    <s-button
+                      disabled={safePerfPage >= perfTotalPages - 1}
+                      onClick={() => setPerfPage((p) => Math.min(perfTotalPages - 1, p + 1))}
+                    >
+                      Next →
+                    </s-button>
+                  </s-stack>
+                )}
+
+                <s-paragraph style={{ color: "#6d7175", fontSize: "13px" }}>
+                  Only orders placed since this feature shipped are counted — revenue won't include
+                  historical orders from before code performance tracking started.
+                </s-paragraph>
+              </s-stack>
+            </s-section>
+          )}
+
           <s-section heading={`Codes${totalCount >= 2000 ? " (first 2,000)" : ""}`}>
             <s-stack direction="block" gap="base">
               {/* Search */}
@@ -819,77 +890,6 @@ export default function DiscountDetails() {
               )}
             </s-stack>
           </s-section>
-
-          {codePerformance.length > 0 && (
-            <s-section heading="Code performance">
-              <s-stack direction="block" gap="base">
-                <s-paragraph style={{ color: "#6d7175", fontSize: "13px" }}>
-                  Ranked by uses. Revenue is the gross total of orders that used each code — useful for
-                  seeing which creator, rep, or sponsor code is converting.
-                </s-paragraph>
-
-                <s-stack direction="inline" gap="base" style={{ alignItems: "center" }}>
-                  <div style={{ flex: 1 }}>
-                    <s-search-field
-                      label="Search codes"
-                      labelAccessibilityVisibility="exclusive"
-                      placeholder="Search codes…"
-                      value={perfSearch}
-                      onInput={(e: InputEvent) => { setPerfSearch((e.target as HTMLInputElement).value); setPerfPage(0); }}
-                    />
-                  </div>
-                  <s-button onClick={handleExportPerformance}>Export performance (CSV)</s-button>
-                </s-stack>
-
-                <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Code</span>
-                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "70px", textAlign: "right" }}>Uses</span>
-                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "100px", textAlign: "right" }}>Revenue</span>
-                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "100px", textAlign: "right" }}>Last used</span>
-                </div>
-
-                {pagedPerformance.map((c: CodePerformanceRow) => (
-                  <div key={c.code} style={{ display: "flex", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", gap: "12px" }}>
-                    <span style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em", flex: 1 }}>{c.code}</span>
-                    <span style={{ width: "70px", textAlign: "right" }}>{c.uses}</span>
-                    <span style={{ width: "100px", textAlign: "right" }}>${c.revenue.toFixed(2)}</span>
-                    <span style={{ width: "100px", textAlign: "right", fontSize: "13px", color: "#6d7175" }}>
-                      {c.lastUsed ? formatDate(c.lastUsed) : "—"}
-                    </span>
-                  </div>
-                ))}
-
-                {filteredPerformance.length === 0 && (
-                  <s-paragraph>No codes match your search.</s-paragraph>
-                )}
-
-                {filteredPerformance.length > 0 && (
-                  <s-stack direction="inline" gap="base" style={{ alignItems: "center", justifyContent: "space-between" }}>
-                    <s-button
-                      disabled={safePerfPage === 0}
-                      onClick={() => setPerfPage((p) => Math.max(0, p - 1))}
-                    >
-                      ← Previous
-                    </s-button>
-                    <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
-                      {safePerfPage * PAGE_SIZE + 1}–{Math.min((safePerfPage + 1) * PAGE_SIZE, filteredPerformance.length)} of {filteredPerformance.length}
-                    </s-text>
-                    <s-button
-                      disabled={safePerfPage >= perfTotalPages - 1}
-                      onClick={() => setPerfPage((p) => Math.min(perfTotalPages - 1, p + 1))}
-                    >
-                      Next →
-                    </s-button>
-                  </s-stack>
-                )}
-
-                <s-paragraph style={{ color: "#6d7175", fontSize: "13px" }}>
-                  Only orders placed since this feature shipped are counted — revenue won't include
-                  historical orders from before code performance tracking started.
-                </s-paragraph>
-              </s-stack>
-            </s-section>
-          )}
 
           {preUsedCodes.length > 0 && (
             <s-section heading="Previously used codes (historical)">
