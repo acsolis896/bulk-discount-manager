@@ -167,6 +167,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     // Expand collections
     let resolvedProductIds = [...productIds];
+    const collectionErrorMessages: string[] = [];
     if (collectionIds.length > 0) {
       for (const collectionId of collectionIds) {
         let cursor: string | null = null;
@@ -184,13 +185,30 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             { variables: { id: collectionId, after: cursor } }
           );
           const colData = await colRes.json();
-          const products = colData.data?.collection?.products;
+          if (colData.errors) {
+            console.error(`CollectionProducts query failed for ${collectionId}:`, JSON.stringify(colData.errors));
+            collectionErrorMessages.push(colData.errors[0]?.message ?? "Unknown error");
+            break;
+          }
+          if (!colData.data?.collection) {
+            console.error(`Collection not found or inaccessible: ${collectionId}`, JSON.stringify(colData));
+            collectionErrorMessages.push("collection not found");
+            break;
+          }
+          const products = colData.data.collection.products;
           for (const p of products?.nodes ?? []) {
             if (!resolvedProductIds.includes(p.id)) resolvedProductIds.push(p.id);
           }
           cursor = products?.pageInfo?.hasNextPage ? products.pageInfo.endCursor : null;
         } while (cursor);
       }
+    }
+    if (collectionIds.length > 0 && resolvedProductIds.length === 0) {
+      return {
+        error: collectionErrorMessages.length > 0
+          ? `Couldn't read the selected collection(s): ${collectionErrorMessages[0]}. Please try again in a moment.`
+          : "No products found in the selected collections. If you just created or edited this collection, wait a few minutes for Shopify to finish updating it, then try again.",
+      };
     }
 
     // Look up functionNodeId from DB

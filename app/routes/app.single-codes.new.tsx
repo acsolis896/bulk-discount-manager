@@ -63,6 +63,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   // Expand collections to product IDs
   let resolvedProductIds = [...productIds];
+  const collectionErrorMessages: string[] = [];
   if (collectionIds.length > 0) {
     for (const collectionId of collectionIds) {
       let cursor: string | null = null;
@@ -80,7 +81,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           { variables: { id: collectionId, after: cursor } }
         );
         const colData = await colRes.json();
-        const products = colData.data?.collection?.products;
+        if (colData.errors) {
+          console.error(`CollectionProducts query failed for ${collectionId}:`, JSON.stringify(colData.errors));
+          collectionErrorMessages.push(colData.errors[0]?.message ?? "Unknown error");
+          break;
+        }
+        if (!colData.data?.collection) {
+          console.error(`Collection not found or inaccessible: ${collectionId}`, JSON.stringify(colData));
+          collectionErrorMessages.push("collection not found");
+          break;
+        }
+        const products = colData.data.collection.products;
         for (const p of products?.nodes ?? []) {
           if (!resolvedProductIds.includes(p.id)) resolvedProductIds.push(p.id);
         }
@@ -88,7 +99,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       } while (cursor);
     }
   }
-  if (resolvedProductIds.length === 0) return { error: "No products found in the selected collections." };
+  if (resolvedProductIds.length === 0) {
+    return {
+      error: collectionErrorMessages.length > 0
+        ? `Couldn't read the selected collection(s): ${collectionErrorMessages[0]}. Please try again in a moment.`
+        : "No products found in the selected collections. If you just created or edited this collection, wait a few minutes for Shopify to finish updating it, then try again.",
+    };
+  }
 
   // Fetch blocked product types
   const blockedRows = await db.blockedProductType.findMany({
