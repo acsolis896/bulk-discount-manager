@@ -1,5 +1,5 @@
-import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
-import { useLoaderData, useNavigate } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs, HeadersFunction } from "react-router";
+import { useLoaderData, useNavigate, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
@@ -89,9 +89,138 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { sets, totalCodes, totalUsed, activeSets };
 };
 
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { admin, session } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") || "");
+  const numericId = String(formData.get("numericId") || "");
+  if (!numericId) return { error: "Missing discount id." };
+  const gid = `gid://shopify/DiscountCodeNode/${numericId}`;
+
+  if (intent === "activate" || intent === "deactivate") {
+    const mutationName = intent === "activate" ? "discountCodeActivate" : "discountCodeDeactivate";
+    const res = await admin.graphql(
+      `#graphql
+      mutation ToggleDiscount($id: ID!) {
+        ${mutationName}(id: $id) {
+          userErrors { field message }
+        }
+      }`,
+      { variables: { id: gid } }
+    );
+    const data = await res.json();
+    const errors = data.data?.[mutationName]?.userErrors ?? [];
+    if (errors.length > 0) {
+      return { error: errors.map((e: { message: string }) => e.message).join(", ") };
+    }
+    return { ok: true };
+  }
+
+  if (intent === "delete") {
+    // Try to delete from Shopify (may already be gone)
+    try {
+      await admin.graphql(
+        `#graphql
+        mutation DeleteDiscount($id: ID!) {
+          discountCodeDelete(id: $id) {
+            userErrors { field message }
+          }
+        }`,
+        { variables: { id: gid } }
+      );
+    } catch { /* ignore — already deleted from Shopify */ }
+
+    // Clean up whichever local rows apply — a discount is either a reusable
+    // single code or a bulk set, never both, mirroring the dedicated delete
+    // actions on each type's own detail page.
+    const singleCodeRow = await db.singleCodeDiscount.findFirst({ where: { shop: session.shop, discountId: gid } });
+    if (singleCodeRow) {
+      await db.singleCodeDiscount.deleteMany({ where: { shop: session.shop, discountId: gid } });
+    } else {
+      await db.issuedCode.deleteMany({ where: { shop: session.shop, discountId: gid } });
+      await db.preUsedCode.deleteMany({ where: { shop: session.shop, discountId: gid } });
+      await db.codeRedemption.deleteMany({ where: { shop: session.shop, discountId: gid } });
+    }
+    return { ok: true };
+  }
+
+  return { error: "Unknown intent" };
+};
+
 function formatDate(iso: string | null) {
   if (!iso) return "No expiration";
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function DiscountSetRow({ s, navigate }: { s: DiscountSet; navigate: (path: string) => void }) {
+  const fetcher = useFetcher();
+  const busy = fetcher.state !== "idle";
+  const setUsageRate = s.totalCodes > 0 ? Math.round((s.usedCodes / s.totalCodes) * 100) : 0;
+
+  const submit = (intent: "activate" | "deactivate" | "delete") => {
+    const form = new FormData();
+    form.set("intent", intent);
+    form.set("numericId", s.numericId);
+    fetcher.submit(form, { method: "post" });
+  };
+
+  const actionError = (fetcher.data as { error?: string } | undefined)?.error;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div className="set-row" style={{ display: "flex", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", borderRadius: "6px", gap: "12px" }}>
+      <div style={{ flex: 3, display: "flex", alignItems: "center", gap: "8px" }}>
+        <s-icon type={s.isReusableCode ? "discount-code" : "discount-add"} tone="neutral" size="small" />
+        <span style={{ fontSize: "14px" }}>{s.title}</span>
+      </div>
+      <div style={{ width: "80px" }}>
+        {s.status === "ACTIVE" ? (
+          <s-badge tone="success">Active</s-badge>
+        ) : s.status === "EXPIRED" ? (
+          <s-badge tone="critical">Expired</s-badge>
+        ) : (
+          <s-badge>{s.status.charAt(0) + s.status.slice(1).toLowerCase()}</s-badge>
+        )}
+      </div>
+      <span style={{ flex: 2, fontSize: "14px", color: "#6d7175" }}>
+        {s.isReusableCode ? `${s.usedCodes} uses (Reusable)` : `${s.usedCodes} / ${s.totalCodes} (${setUsageRate}%)`}
+      </span>
+      <span style={{ flex: 2, fontSize: "14px", color: "#6d7175" }}>{formatDate(s.endsAt)}</span>
+      <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+        <s-button
+          disabled={busy}
+          onClick={() => navigate(s.isReusableCode ? `/app/single-codes/${s.numericId}` : `/app/discounts/${s.numericId}`)}
+        >
+          View
+        </s-button>
+        <s-button disabled={busy} commandFor={`actions-menu-${s.numericId}`}>
+          Actions
+        </s-button>
+        <s-menu id={`actions-menu-${s.numericId}`} accessibilityLabel={`Actions for ${s.title}`}>
+          {s.status === "ACTIVE" ? (
+            <s-button disabled={busy} onClick={() => submit("deactivate")}>Deactivate</s-button>
+          ) : (
+            <s-button disabled={busy} onClick={() => submit("activate")}>Activate</s-button>
+          )}
+          <s-button
+            tone="critical"
+            disabled={busy}
+            onClick={() => {
+              if (confirm(`Delete "${s.title}"? This removes the discount and all its codes from Shopify. This cannot be undone.`)) {
+                submit("delete");
+              }
+            }}
+          >
+            Delete
+          </s-button>
+        </s-menu>
+      </div>
+    </div>
+    {actionError && (
+      <s-paragraph style={{ color: "#d72c0d", fontSize: "13px", padding: "0 12px 8px" }}>{actionError}</s-paragraph>
+    )}
+    </div>
+  );
 }
 
 export default function DiscountSets() {
@@ -161,41 +290,11 @@ export default function DiscountSets() {
               <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "80px" }}>Status</span>
               <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 2 }}>Usage</span>
               <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 2 }}>Expires</span>
-              <span style={{ width: "60px" }}></span>
+              <span style={{ width: "230px" }}></span>
             </div>
-            {sets.map((s: DiscountSet) => {
-              const setUsageRate = s.totalCodes > 0 ? Math.round((s.usedCodes / s.totalCodes) * 100) : 0;
-              return (
-                <div key={s.numericId} className="set-row" style={{ display: "flex", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", borderRadius: "6px", gap: "12px" }}>
-                  <div style={{ flex: 3, display: "flex", alignItems: "center", gap: "8px" }}>
-                    <s-icon type={s.isReusableCode ? "discount-code" : "discount-add"} tone="neutral" size="small" />
-                    <span style={{ fontSize: "14px" }}>{s.title}</span>
-                  </div>
-                  <div style={{ width: "80px" }}>
-                    {s.status === "ACTIVE" ? (
-                      <s-badge tone="success">Active</s-badge>
-                    ) : s.status === "EXPIRED" ? (
-                      <s-badge tone="critical">Expired</s-badge>
-                    ) : (
-                      <s-badge>{s.status.charAt(0) + s.status.slice(1).toLowerCase()}</s-badge>
-                    )}
-                  </div>
-                  <span style={{ flex: 2, fontSize: "14px", color: "#6d7175" }}>
-                    {s.isReusableCode ? `${s.usedCodes} uses (Reusable)` : `${s.usedCodes} / ${s.totalCodes} (${setUsageRate}%)`}
-                  </span>
-                  <span style={{ flex: 2, fontSize: "14px", color: "#6d7175" }}>{formatDate(s.endsAt)}</span>
-                  <div style={{ width: "60px" }}>
-                    <s-button
-                      onClick={() =>
-                        navigate(s.isReusableCode ? `/app/single-codes/${s.numericId}` : `/app/discounts/${s.numericId}`)
-                      }
-                    >
-                      View
-                    </s-button>
-                  </div>
-                </div>
-              );
-            })}
+            {sets.map((s: DiscountSet) => (
+              <DiscountSetRow key={s.numericId} s={s} navigate={navigate} />
+            ))}
           </div>
         )}
       </s-section>
