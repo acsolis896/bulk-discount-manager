@@ -358,7 +358,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   if (intent === "updateEndsAt") {
     const endsAtRaw = String(formData.get("endsAt") || "");
-    const endsAt = endsAtRaw ? new Date(`${endsAtRaw}T23:59:59.000Z`).toISOString() : null;
+    const endsAt = endsAtRaw ? new Date(`${endsAtRaw}T23:59:59-08:00`).toISOString() : null;
     const appDiscountId = gid.replace("DiscountCodeNode", "DiscountCodeApp");
 
     const res = await admin.graphql(
@@ -969,7 +969,7 @@ export default function DiscountDetails() {
               )}
               <s-paragraph>
                 {endsAt
-                  ? `Currently expires ${new Date(endsAt).toLocaleDateString("en-US", { timeZone: "UTC" })}.`
+                  ? `Currently expires ${new Date(endsAt).toLocaleDateString("en-US", { timeZone: "America/Los_Angeles" })}.`
                   : "No expiration date set."}
               </s-paragraph>
               <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
