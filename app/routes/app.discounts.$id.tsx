@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo, useRef } from "react";
+import { useCallback, useState, useMemo, useRef, useEffect } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs, HeadersFunction } from "react-router";
 import { useLoaderData, useNavigate, useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
@@ -476,6 +476,26 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return { updated: true };
   }
 
+  if (intent === "delete") {
+    // Try to delete from Shopify (may already be gone)
+    try {
+      await admin.graphql(
+        `#graphql
+        mutation DeleteDiscount($id: ID!) {
+          discountCodeDelete(id: $id) {
+            userErrors { field message }
+          }
+        }`,
+        { variables: { id: gid } }
+      );
+    } catch { /* ignore — already deleted from Shopify */ }
+
+    await db.issuedCode.deleteMany({ where: { shop: session.shop, discountId: gid } });
+    await db.preUsedCode.deleteMany({ where: { shop: session.shop, discountId: gid } });
+    await db.codeRedemption.deleteMany({ where: { shop: session.shop, discountId: gid } });
+    return { deleted: true };
+  }
+
   const code = formData.get("code") as string;
 
   // discountCodeRedeemCodeBulkDelete is async — poll until the job completes
@@ -515,6 +535,23 @@ export default function DiscountDetails() {
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if ((fetcher.data as { deleted?: boolean } | undefined)?.deleted) {
+      shopify.toast.show("Discount set deleted");
+      navigate("/app/additional");
+    }
+  }, [fetcher.data, shopify, navigate]);
+
+  const handleDelete = useCallback(() => {
+    if (!confirm(`Delete "${title}"? This removes the discount and all its codes from Shopify. This cannot be undone.`)) return;
+    setIsDeleting(true);
+    const form = new FormData();
+    form.set("intent", "delete");
+    fetcher.submit(form, { method: "post" });
+  }, [fetcher, title]);
+
   const unusedCount = Math.max(0, totalCount - usedCount - preUsedCodes.length);
   const [confirmCode, setConfirmCode] = useState<string | null>(null);
   const [editingItems, setEditingItems] = useState(false);
@@ -692,6 +729,9 @@ export default function DiscountDetails() {
             Export unused only
           </s-button>
           <s-button onClick={() => navigate("/app/discounts/new")}>Create another discount</s-button>
+          <s-button tone="critical" disabled={isDeleting} onClick={handleDelete}>
+            {isDeleting ? "Deleting…" : "Delete discount set"}
+          </s-button>
         </s-stack>
       </div>
 
