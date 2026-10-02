@@ -25,6 +25,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const percentage = Number(formData.get("percentage") || 0);
   const fixedAmount = Number(formData.get("fixedAmount") || 0);
   const oncePerOrder = formData.get("oncePerOrder") !== "0";
+  const maxItemsRaw = String(formData.get("maxDiscountedItems") || "").trim();
+  const parsedMaxItems = !oncePerOrder && maxItemsRaw ? Number(maxItemsRaw) : null;
+  if (parsedMaxItems !== null && (!Number.isFinite(parsedMaxItems) || parsedMaxItems < 1)) {
+    return { error: "Max items discounted must be a whole number of 1 or more." };
+  }
+  const maxDiscountedItems = parsedMaxItems !== null ? Math.floor(parsedMaxItems) : null;
   const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
   const parsedUsesLimit = usesPerCustomerLimitRaw ? Number(usesPerCustomerLimitRaw) : null;
   if (parsedUsesLimit !== null && (!Number.isFinite(parsedUsesLimit) || parsedUsesLimit < 1)) {
@@ -162,6 +168,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     discountType,
     ...(discountType === "fixedAmount" ? { fixedAmount } : { percentage }),
     oncePerOrder,
+    ...(maxDiscountedItems !== null ? { maxDiscountedItems } : {}),
     blockedProductTypes,
     requiredTag,
     blockedTag,
@@ -285,6 +292,7 @@ export default function NewSingleCodePage() {
   const [percentage, setPercentage] = useState("50");
   const [fixedAmount, setFixedAmount] = useState("10");
   const [oncePerOrder, setOncePerOrder] = useState(true);
+  const [maxDiscountedItems, setMaxDiscountedItems] = useState("");
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState("");
   const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">("all");
   const [requiredTag, setRequiredTag] = useState("");
@@ -350,6 +358,7 @@ export default function NewSingleCodePage() {
     form.set("percentage", percentage);
     form.set("fixedAmount", fixedAmount);
     form.set("oncePerOrder", oncePerOrder ? "1" : "0");
+    form.set("maxDiscountedItems", maxDiscountedItems);
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
     form.set("eligibilityMode", eligibilityMode);
     form.set("requiredTag", requiredTag);
@@ -448,10 +457,26 @@ export default function NewSingleCodePage() {
             details={
               oncePerOrder
                 ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
-                : "The discount will be taken off every eligible item in the cart."
+                : maxDiscountedItems.trim()
+                  ? `The discount will be taken off up to ${maxDiscountedItems.trim()} eligible items in the cart, highest-priced first.`
+                  : "The discount will be taken off every eligible item in the cart."
             }
           />
         </div>
+        {!oncePerOrder && (
+          <div style={{ marginTop: "16px" }}>
+            <s-text-field
+              label="Max items discounted (optional)"
+              type="number"
+              min="1"
+              step="1"
+              value={maxDiscountedItems}
+              placeholder="All eligible items"
+              details="Leave blank to discount every eligible item. Set a number to cap how many items get the discount per order — the highest-priced items are discounted first."
+              onInput={(e: InputEvent) => setMaxDiscountedItems((e.target as HTMLInputElement).value)}
+            />
+          </div>
+        )}
         <div style={{ marginTop: "16px" }}>
           <s-text-field
             label="Limit uses per customer (optional)"

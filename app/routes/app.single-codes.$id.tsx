@@ -122,6 +122,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     percentage: config.percentage ?? null,
     fixedAmount: config.fixedAmount ?? null,
     oncePerOrder: config.oncePerOrder !== false,
+    maxDiscountedItems: Number.isInteger(config.maxDiscountedItems) && (config.maxDiscountedItems as number) > 0 ? (config.maxDiscountedItems as number) : null,
     productIds,
     collectionIds,
     collectionTitles,
@@ -149,6 +150,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const percentage = Number(formData.get("percentage") || 0);
     const fixedAmount = Number(formData.get("fixedAmount") || 0);
     const oncePerOrder = formData.get("oncePerOrder") !== "0";
+    const maxItemsRaw = String(formData.get("maxDiscountedItems") || "").trim();
+    const parsedMaxItems = !oncePerOrder && maxItemsRaw ? Number(maxItemsRaw) : null;
+    if (parsedMaxItems !== null && (!Number.isFinite(parsedMaxItems) || parsedMaxItems < 1)) {
+      return { error: "Max items discounted must be a whole number of 1 or more." };
+    }
+    const maxDiscountedItems = parsedMaxItems !== null ? Math.floor(parsedMaxItems) : null;
     const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
     const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
     const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
@@ -238,6 +245,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       percentage: discountType === "percentage" ? percentage : undefined,
       fixedAmount: discountType === "fixedAmount" ? fixedAmount : undefined,
       oncePerOrder,
+      maxDiscountedItems: maxDiscountedItems ?? undefined,
       requiredTag,
       blockedTag,
       usesPerCustomerLimit,
@@ -278,6 +286,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       percentage: discountType === "percentage" ? percentage : undefined,
       fixedAmount: discountType === "fixedAmount" ? fixedAmount : undefined,
       oncePerOrder,
+      maxDiscountedItems: maxDiscountedItems ?? undefined,
       blockedProductTypes: existing.blockedProductTypes ?? ["GWP"],
       requiredTag,
       blockedTag,
@@ -383,6 +392,7 @@ export default function SingleCodeDetailsPage() {
   const [percentage, setPercentage] = useState(String(loaderData.percentage ?? ""));
   const [fixedAmount, setFixedAmount] = useState(String(loaderData.fixedAmount ?? ""));
   const [oncePerOrder, setOncePerOrder] = useState(loaderData.oncePerOrder);
+  const [maxDiscountedItems, setMaxDiscountedItems] = useState(loaderData.maxDiscountedItems ? String(loaderData.maxDiscountedItems) : "");
   const [productIds, setProductIds] = useState<string[]>(loaderData.productIds);
   const [productTitles, setProductTitles] = useState<string[]>([]);
   const [collectionIds, setCollectionIds] = useState<string[]>(loaderData.collectionIds);
@@ -437,6 +447,7 @@ export default function SingleCodeDetailsPage() {
     form.set("percentage", percentage);
     form.set("fixedAmount", fixedAmount);
     form.set("oncePerOrder", oncePerOrder ? "1" : "0");
+    form.set("maxDiscountedItems", maxDiscountedItems);
     form.set("productIds", JSON.stringify(productIds));
     form.set("collectionIds", JSON.stringify(collectionIds));
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
@@ -626,10 +637,26 @@ export default function SingleCodeDetailsPage() {
                 details={
                   oncePerOrder
                     ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
-                    : "The discount will be taken off every eligible item in the cart."
+                    : maxDiscountedItems.trim()
+                      ? `The discount will be taken off up to ${maxDiscountedItems.trim()} eligible items in the cart, highest-priced first.`
+                      : "The discount will be taken off every eligible item in the cart."
                 }
               />
             </div>
+            {!oncePerOrder && (
+              <div style={{ marginTop: "16px" }}>
+                <s-text-field
+                  label="Max items discounted (optional)"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={maxDiscountedItems}
+                  placeholder="All eligible items"
+                  details="Leave blank to discount every eligible item. Set a number to cap how many items get the discount per order — the highest-priced items are discounted first."
+                  onInput={(e: InputEvent) => setMaxDiscountedItems((e.target as HTMLInputElement).value)}
+                />
+              </div>
+            )}
             <div style={{ marginTop: "16px" }}>
               <s-text-field
                 label="Limit uses per customer (optional)"

@@ -49,6 +49,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const percentage = Number(formData.get("percentage") || 0);
     const fixedAmount = Number(formData.get("fixedAmount") || 0);
     const oncePerOrder = formData.get("oncePerOrder") !== "0";
+    const maxItemsRaw = String(formData.get("maxDiscountedItems") || "").trim();
+    const parsedMaxItems = !oncePerOrder && maxItemsRaw ? Number(maxItemsRaw) : null;
+    if (parsedMaxItems !== null && (!Number.isFinite(parsedMaxItems) || parsedMaxItems < 1)) {
+      return { error: "Max items discounted must be a whole number of 1 or more." };
+    }
+    const maxDiscountedItems = parsedMaxItems !== null ? Math.floor(parsedMaxItems) : null;
     const codeMode = String(formData.get("codeMode") || "generate");
     const endsAtRaw = String(formData.get("endsAt") || "");
     const endsAt = endsAtRaw ? new Date(`${endsAtRaw}T23:59:59-08:00`).toISOString() : null;
@@ -255,6 +261,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 discountType,
                 ...(discountType === "fixedAmount" ? { fixedAmount } : { percentage }),
                 oncePerOrder,
+                ...(maxDiscountedItems !== null ? { maxDiscountedItems } : {}),
                 blockedProductTypes,
               }),
             },
@@ -361,6 +368,7 @@ export default function CreateBulkDiscount() {
   const [percentage, setPercentage] = useState("20");
   const [fixedAmount, setFixedAmount] = useState("10");
   const [oncePerOrder, setOncePerOrder] = useState(true);
+  const [maxDiscountedItems, setMaxDiscountedItems] = useState("");
   const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">("all");
   const [requiredTag, setRequiredTag] = useState("");
   const [blockedTag, setBlockedTag] = useState("");
@@ -447,6 +455,7 @@ export default function CreateBulkDiscount() {
     formData.set("percentage", percentage);
     formData.set("fixedAmount", fixedAmount);
     formData.set("oncePerOrder", oncePerOrder ? "1" : "0");
+    formData.set("maxDiscountedItems", maxDiscountedItems);
     formData.set("codeMode", codeMode);
     formData.set("endsAt", endsAt);
     formData.set("usageLimitOne", usageLimitOne ? "1" : "0");
@@ -473,7 +482,7 @@ export default function CreateBulkDiscount() {
       formData.set("productIds", JSON.stringify([]));
     }
     fetcher.submit(formData, { method: "POST", encType: "multipart/form-data" });
-  }, [fetcher, title, discountType, percentage, fixedAmount, oncePerOrder, eligibilityMode, requiredTag, blockedTag, selectedSegmentId, codeMode, csvFile, prefix, codeCount, codeLength, selectionType, selectedItems]);
+  }, [fetcher, title, discountType, percentage, fixedAmount, oncePerOrder, maxDiscountedItems, eligibilityMode, requiredTag, blockedTag, selectedSegmentId, codeMode, csvFile, prefix, codeCount, codeLength, selectionType, selectedItems]);
 
   const handleReset = useCallback(() => {
     setTitle("Bulk Discount");
@@ -556,10 +565,26 @@ export default function CreateBulkDiscount() {
               details={
                 oncePerOrder
                   ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
-                  : "The discount will be taken off every eligible item in the cart."
+                  : maxDiscountedItems.trim()
+                    ? `The discount will be taken off up to ${maxDiscountedItems.trim()} eligible items in the cart, highest-priced first.`
+                    : "The discount will be taken off every eligible item in the cart."
               }
             />
           </div>
+          {!oncePerOrder && (
+            <div style={{ marginTop: "16px" }}>
+              <s-text-field
+                label="Max items discounted (optional)"
+                type="number"
+                min="1"
+                step="1"
+                value={maxDiscountedItems}
+                placeholder="All eligible items"
+                details="Leave blank to discount every eligible item. Set a number to cap how many items get the discount per order — the highest-priced items are discounted first."
+                onInput={(e: InputEvent) => setMaxDiscountedItems((e.target as HTMLInputElement).value)}
+              />
+            </div>
+          )}
           <div style={{ marginTop: "16px" }}>
             <s-date-field
               label="Expiration date"
@@ -668,7 +693,9 @@ export default function CreateBulkDiscount() {
         <s-paragraph>
           {oncePerOrder
             ? "The discount applies to the highest-priced eligible item in the cart — 1 unit only."
-            : "The discount applies to every eligible item in the cart."}
+            : maxDiscountedItems.trim()
+              ? `The discount applies to up to ${maxDiscountedItems.trim()} eligible items in the cart, highest-priced first.`
+              : "The discount applies to every eligible item in the cart."}
         </s-paragraph>
         <s-stack direction="block" gap="base">
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>

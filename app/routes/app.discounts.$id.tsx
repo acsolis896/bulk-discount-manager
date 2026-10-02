@@ -183,6 +183,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     let fixedAmount: number | null = null;
     let discountType: "percentage" | "fixedAmount" = "percentage";
     let oncePerOrder = true;
+    let maxDiscountedItems: number | null = null;
     try {
       if (rawConfig) {
         const cfg = JSON.parse(rawConfig);
@@ -192,6 +193,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         fixedAmount = cfg.fixedAmount ?? null;
         discountType = cfg.discountType === "fixedAmount" ? "fixedAmount" : "percentage";
         oncePerOrder = cfg.oncePerOrder !== false;
+        maxDiscountedItems = Number.isInteger(cfg.maxDiscountedItems) && cfg.maxDiscountedItems > 0 ? cfg.maxDiscountedItems : null;
       }
     } catch { /* ignore */ }
 
@@ -225,7 +227,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
     }
 
-    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error: null as string | null };
+    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -237,6 +239,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       appliesOncePerCustomer: false,
       combinesWith: { productDiscounts: false, orderDiscounts: false, shippingDiscounts: false },
       oncePerOrder: true,
+      maxDiscountedItems: null as number | null,
       codes: [] as RedeemCode[],
       totalCount: 0,
       usedCount: 0,
@@ -531,7 +534,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function DiscountDetails() {
-  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
+  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -694,7 +697,9 @@ export default function DiscountDetails() {
     discountType === "fixedAmount" ? `$${fixedAmount} off eligible items` : `${percentage}% off eligible items`,
     oncePerOrder
       ? "Applies to the highest-priced eligible item in the cart only"
-      : "Applies to every eligible item in the cart",
+      : maxDiscountedItems
+        ? `Applies to up to ${maxDiscountedItems} eligible item${maxDiscountedItems === 1 ? "" : "s"} in the cart, highest-priced first`
+        : "Applies to every eligible item in the cart",
     eligibleCollections.length > 0
       ? `Applies to ${eligibleCollections.length} collection${eligibleCollections.length === 1 ? "" : "s"}`
       : eligibleProducts.length > 0

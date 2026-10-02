@@ -18,7 +18,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const { productIds, percentage, fixedAmount, discountType, oncePerOrder, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
+  const { productIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
 
   const rejectableCodes = () =>
     (input.enteredDiscountCodes ?? []).filter((c) => c.rejectable).map((c) => ({ code: c.code }));
@@ -111,6 +111,20 @@ export function cartLinesDiscountsGenerateRun(input) {
       return price > bestPrice ? line : best;
     });
     targets = [{ cartLine: { id: bestLine.id, quantity: 1 } }];
+  } else if (Number.isInteger(maxDiscountedItems) && maxDiscountedItems > 0) {
+    // Discount at most maxDiscountedItems units across the eligible lines,
+    // highest-priced first (same preference once-per-order uses).
+    const byPriceDesc = [...eligibleLines].sort(
+      (a, b) => parseFloat(b.cost.amountPerQuantity.amount) - parseFloat(a.cost.amountPerQuantity.amount)
+    );
+    let remaining = maxDiscountedItems;
+    targets = [];
+    for (const line of byPriceDesc) {
+      if (remaining <= 0) break;
+      const take = Math.min(line.quantity, remaining);
+      targets.push({ cartLine: { id: line.id, quantity: take } });
+      remaining -= take;
+    }
   } else {
     targets = eligibleLines.map((line) => ({ cartLine: { id: line.id } }));
   }
