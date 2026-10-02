@@ -5,6 +5,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { MAX_DISCOUNTED_ITEMS_ENABLED } from "../feature-flags";
 import { applyEligibility, listSegments } from "../eligibility.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -643,7 +644,7 @@ export default function SingleCodeDetailsPage() {
                 }
               />
             </div>
-            {!oncePerOrder && (
+            {MAX_DISCOUNTED_ITEMS_ENABLED && !oncePerOrder && (
               <div style={{ marginTop: "16px" }}>
                 <s-text-field
                   label="Max items discounted (optional)"
