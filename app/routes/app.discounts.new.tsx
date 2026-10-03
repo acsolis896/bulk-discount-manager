@@ -573,7 +573,7 @@ export default function CreateBulkDiscount() {
             />
           </div>
           {MAX_DISCOUNTED_ITEMS_ENABLED && !oncePerOrder && (
-            <div style={{ marginTop: "16px" }}>
+            <div style={{ marginTop: "12px", marginLeft: "22px", paddingLeft: "12px", borderLeft: "2px solid #c9cccf" }}>
               <s-text-field
                 label="Max items discounted (optional)"
                 type="number"
