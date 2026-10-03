@@ -238,7 +238,7 @@ export default function DiscountSets() {
       <s-section heading="Overview">
         <s-stack direction="inline" gap="base">
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="inline" gap="tight" style={{ alignItems: "center" }}>
+            <s-stack direction="inline" gap="small" style={{ alignItems: "center" }}>
               <s-icon type="collection-list" tone="info" />
               <s-stack direction="block" gap="none">
                 <s-text emphasis="bold" style={{ fontSize: "24px" }}>{sets.length}</s-text>
@@ -247,7 +247,7 @@ export default function DiscountSets() {
             </s-stack>
           </s-box>
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="inline" gap="tight" style={{ alignItems: "center" }}>
+            <s-stack direction="inline" gap="small" style={{ alignItems: "center" }}>
               <s-icon type="status-active" tone="success" />
               <s-stack direction="block" gap="none">
                 <s-text emphasis="bold" style={{ fontSize: "24px" }}>{activeSets}</s-text>

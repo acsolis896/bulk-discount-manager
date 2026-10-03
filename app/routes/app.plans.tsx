@@ -65,7 +65,7 @@ export default function PlansPage() {
                 borderRadius="base"
                 background="base"
               >
-                <s-stack direction="block" gap="tight">
+                <s-stack direction="block" gap="small">
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                     <s-text emphasis="bold" style={{ fontSize: "16px" }}>{plan.tier}</s-text>
                     {isCurrent && <s-badge tone="success">Current plan</s-badge>}
@@ -78,7 +78,7 @@ export default function PlansPage() {
           })}
           {isCustomPlan && (
             <s-box padding="base" borderWidth="large" borderColor="strong" borderRadius="base" background="base">
-              <s-stack direction="block" gap="tight">
+              <s-stack direction="block" gap="small">
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                   <s-text emphasis="bold" style={{ fontSize: "16px" }}>{planName}</s-text>
                   <s-badge tone="success">Current plan</s-badge>

@@ -595,7 +595,7 @@ export default function CreateBulkDiscount() {
             />
           </div>
           <div style={{ marginTop: "16px" }}>
-          <s-stack direction="block" gap="tight">
+          <s-stack direction="block" gap="small">
             <s-checkbox
               label="Limit number of times each code can be used in total (1)"
               checked={usageLimitOne}
@@ -717,7 +717,7 @@ export default function CreateBulkDiscount() {
           </s-button>
           {selectedItems.length > 0 && (
             <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-              <s-stack direction="block" gap="tight">
+              <s-stack direction="block" gap="small">
                 {selectedItems.map((p) => (
                   <s-text key={p.id}>{p.title}</s-text>
                 ))}
@@ -728,7 +728,7 @@ export default function CreateBulkDiscount() {
       </s-section>
 
       <s-section heading="Customer eligibility">
-        <s-stack direction="block" gap="tight">
+        <s-stack direction="block" gap="small">
           <s-paragraph>Choose which customers can use these discount codes.</s-paragraph>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {(["all", "tags", "segment"] as const).map((mode) => (
@@ -777,7 +777,7 @@ export default function CreateBulkDiscount() {
       </s-section>
 
       <s-section heading="Combinations">
-        <s-stack direction="block" gap="tight">
+        <s-stack direction="block" gap="small">
           <s-paragraph>Choose whether this discount can be combined with other discount types.</s-paragraph>
           <s-checkbox
             label="Product discounts"

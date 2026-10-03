@@ -511,7 +511,7 @@ export default function NewSingleCodePage() {
       </s-section>
 
       <s-section heading="Customer eligibility">
-        <s-stack direction="block" gap="tight">
+        <s-stack direction="block" gap="small">
           <s-paragraph>Choose which customers can use this code.</s-paragraph>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {(["all", "tags", "segment"] as const).map((mode) => (

@@ -134,7 +134,7 @@ export default function Home() {
 
       {showChecklist && (
         <s-section heading="Getting started">
-          <s-stack direction="block" gap="tight">
+          <s-stack direction="block" gap="small">
             {checklist.map((step) => (
               <div
                 key={step.key}
