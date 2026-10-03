@@ -5,6 +5,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED } from "../feature-flags";
 import { checkCodeQuota } from "../billing.server";
 import { applyEligibility, listSegments } from "../eligibility.server";
@@ -427,25 +428,25 @@ export default function NewSingleCodePage() {
               ))}
             </div>
             {discountType === "percentage" ? (
-              <s-text-field
+              <s-number-field
                 label="Discount percentage"
-                type="number"
+                inputMode="decimal"
                 value={percentage}
-                min="1"
-                max="100"
+                min={1}
+                max={100}
                 details="Percentage off the eligible product"
-                onInput={(e: { target: { value: string } }) => setPercentage(e.target.value)}
+                onInput={numericInputHandler("decimal", setPercentage)}
               />
             ) : (
-              <s-text-field
+              <s-number-field
                 label="Amount off"
-                type="number"
+                inputMode="decimal"
                 value={fixedAmount}
-                min="0.01"
-                step="0.01"
+                min={0.01}
+                step={0.01}
                 prefix="$"
                 details="Fixed amount off the eligible product"
-                onInput={(e: { target: { value: string } }) => setFixedAmount(e.target.value)}
+                onInput={numericInputHandler("decimal", setFixedAmount)}
               />
             )}
           </s-stack>
@@ -474,24 +475,19 @@ export default function NewSingleCodePage() {
               value={maxDiscountedItems}
               placeholder="All eligible items"
               details="Leave blank to discount every eligible item. Set a number to cap how many items get the discount per order — the highest-priced items are discounted first."
-              onInput={(e: InputEvent) => {
-                const el = e.target as HTMLInputElement;
-                const digits = el.value.replace(/\D/g, "");
-                if (el.value !== digits) el.value = digits;
-                setMaxDiscountedItems(digits);
-              }}
+              onInput={numericInputHandler("integer", setMaxDiscountedItems)}
             />
           </div>
         )}
         <div style={{ marginTop: "16px" }}>
-          <s-text-field
+          <s-number-field
             label="Limit uses per customer (optional)"
-            type="number"
+            inputMode="numeric"
             value={usesPerCustomerLimit}
-            min="1"
+            min={1}
             placeholder="Unlimited"
             details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code — e.g. 5."
-            onInput={(e: InputEvent) => setUsesPerCustomerLimit((e.target as HTMLInputElement).value)}
+            onInput={numericInputHandler("integer", setUsesPerCustomerLimit)}
           />
         </div>
         <div style={{ marginTop: "16px" }}>

@@ -5,6 +5,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { numericInputHandler } from "../numeric-input";
 import { checkCodeQuota } from "../billing.server";
 
 type RedeemCode = { code: string; usageCount: number };
@@ -1162,13 +1163,13 @@ export default function DiscountDetails() {
                     New codes will reuse this set's existing prefix and format:{" "}
                     <strong>{inferredPrefix}-{"X".repeat(inferredCodeLength ?? 6)}</strong>
                   </s-paragraph>
-                  <s-text-field
+                  <s-number-field
                     label="Number of codes"
-                    type="number"
+                    inputMode="numeric"
                     value={addCodeCount}
-                    min="1"
-                    max="5000"
-                    onInput={(e: InputEvent) => setAddCodeCount((e.target as HTMLInputElement).value)}
+                    min={1}
+                    max={5000}
+                    onInput={numericInputHandler("integer", setAddCodeCount)}
                     details="Maximum 5,000 per batch"
                   />
                 </s-form-layout>
@@ -1185,22 +1186,22 @@ export default function DiscountDetails() {
                     onInput={(e: InputEvent) => setAddPrefix((e.target as HTMLInputElement).value)}
                     details="Letters and numbers only, e.g. BAJIO"
                   />
-                  <s-text-field
+                  <s-number-field
                     label="Number of codes"
-                    type="number"
+                    inputMode="numeric"
                     value={addCodeCount}
-                    min="1"
-                    max="5000"
-                    onInput={(e: InputEvent) => setAddCodeCount((e.target as HTMLInputElement).value)}
+                    min={1}
+                    max={5000}
+                    onInput={numericInputHandler("integer", setAddCodeCount)}
                     details="Maximum 5,000 per batch"
                   />
-                  <s-text-field
+                  <s-number-field
                     label="Code length"
-                    type="number"
+                    inputMode="numeric"
                     value={addCodeLength}
-                    min="4"
-                    max="12"
-                    onInput={(e: InputEvent) => setAddCodeLength((e.target as HTMLInputElement).value)}
+                    min={4}
+                    max={12}
+                    onInput={numericInputHandler("integer", setAddCodeLength)}
                     details="Number of random characters after the prefix (4–12)"
                   />
                 </s-form-layout>

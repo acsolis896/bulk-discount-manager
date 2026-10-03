@@ -9,6 +9,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED } from "../feature-flags";
 import { checkCodeQuota } from "../billing.server";
 import { applyEligibility, listSegments } from "../eligibility.server";
@@ -536,24 +537,24 @@ export default function CreateBulkDiscount() {
                 ))}
               </div>
               {discountType === "percentage" ? (
-                <s-text-field
+                <s-number-field
                   label="Percentage off"
-                  type="number"
+                  inputMode="decimal"
                   value={percentage}
-                  min="1"
-                  max="100"
+                  min={1}
+                  max={100}
                   suffix="%"
-                  onInput={(e: InputEvent) => setPercentage((e.target as HTMLInputElement).value)}
+                  onInput={numericInputHandler("decimal", setPercentage)}
                 />
               ) : (
-                <s-text-field
+                <s-number-field
                   label="Amount off"
-                  type="number"
+                  inputMode="decimal"
                   value={fixedAmount}
-                  min="0.01"
-                  step="0.01"
+                  min={0.01}
+                  step={0.01}
                   prefix="$"
-                  onInput={(e: InputEvent) => setFixedAmount((e.target as HTMLInputElement).value)}
+                  onInput={numericInputHandler("decimal", setFixedAmount)}
                 />
               )}
             </s-stack>
@@ -582,12 +583,7 @@ export default function CreateBulkDiscount() {
                 value={maxDiscountedItems}
                 placeholder="All eligible items"
                 details="Leave blank to discount every eligible item. Set a number to cap how many items get the discount per order — the highest-priced items are discounted first."
-                onInput={(e: InputEvent) => {
-                  const el = e.target as HTMLInputElement;
-                  const digits = el.value.replace(/\D/g, "");
-                  if (el.value !== digits) el.value = digits;
-                  setMaxDiscountedItems(digits);
-                }}
+                onInput={numericInputHandler("integer", setMaxDiscountedItems)}
               />
             </div>
           )}
@@ -639,24 +635,24 @@ export default function CreateBulkDiscount() {
                 details={previewCode ? `Preview: ${previewCode}` : "Letters and numbers only, e.g. WELCOME — a dash and random characters will be added automatically"}
               />
               <div style={{ marginTop: "16px" }}>
-                <s-text-field
+                <s-number-field
                   label="Number of codes"
-                  type="number"
+                  inputMode="numeric"
                   value={codeCount}
-                  min="1"
-                  max="5000"
-                  onInput={(e: InputEvent) => setCodeCount((e.target as HTMLInputElement).value)}
+                  min={1}
+                  max={5000}
+                  onInput={numericInputHandler("integer", setCodeCount)}
                   details="Maximum 5,000 per batch"
                 />
               </div>
               <div style={{ marginTop: "16px" }}>
-                <s-text-field
+                <s-number-field
                   label="Code length"
-                  type="number"
+                  inputMode="numeric"
                   value={codeLength}
-                  min="4"
-                  max="12"
-                  onInput={(e: InputEvent) => setCodeLength((e.target as HTMLInputElement).value)}
+                  min={4}
+                  max={12}
+                  onInput={numericInputHandler("integer", setCodeLength)}
                   details="Number of random characters after the prefix (4–12)"
                 />
               </div>
