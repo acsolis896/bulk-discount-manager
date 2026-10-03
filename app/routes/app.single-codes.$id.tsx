@@ -646,15 +646,20 @@ export default function SingleCodeDetailsPage() {
             </div>
             {MAX_DISCOUNTED_ITEMS_ENABLED && !oncePerOrder && (
               <div style={{ marginTop: "12px", marginLeft: "22px", paddingLeft: "12px", borderLeft: "2px solid #c9cccf" }}>
-                <s-text-field
+                <s-number-field
                   label="Max items discounted (optional)"
-                  type="number"
-                  min="1"
-                  step="1"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
                   value={maxDiscountedItems}
                   placeholder="All eligible items"
                   details="Leave blank to discount every eligible item. Set a number to cap how many items get the discount per order — the highest-priced items are discounted first."
-                  onInput={(e: InputEvent) => setMaxDiscountedItems((e.target as HTMLInputElement).value)}
+                  onInput={(e: InputEvent) => {
+                    const el = e.target as HTMLInputElement;
+                    const digits = el.value.replace(/\D/g, "");
+                    if (el.value !== digits) el.value = digits;
+                    setMaxDiscountedItems(digits);
+                  }}
                 />
               </div>
             )}
