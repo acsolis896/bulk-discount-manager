@@ -593,7 +593,7 @@ export default function SingleCodeDetailsPage() {
               </div>
             )}
             <div style={{ marginTop: "16px" }}>
-              <s-stack direction="block" gap="tight">
+              <s-stack direction="block" gap="small">
                 <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   {(["percentage", "fixedAmount"] as const).map((type) => (
