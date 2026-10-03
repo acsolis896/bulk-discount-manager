@@ -54,22 +54,6 @@ export default function PlansPage() {
 
       <s-section heading="Compare plans">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" }}>
-          {isCustomPlan && (
-            <s-box padding="base" borderWidth="large" borderColor="strong" borderRadius="base" background="base">
-              <s-stack direction="block" gap="tight">
-                <s-stack direction="inline" gap="tight" style={{ alignItems: "center", justifyContent: "space-between" }}>
-                  <s-text emphasis="bold" style={{ fontSize: "16px" }}>{planName}</s-text>
-                  <s-badge tone="success">Current plan</s-badge>
-                </s-stack>
-                <s-text emphasis="bold">Custom plan</s-text>
-                <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
-                  {limit === null
-                    ? "Unlimited active discount codes."
-                    : `Up to ${limit} active discount codes at a time.`}
-                </s-paragraph>
-              </s-stack>
-            </s-box>
-          )}
           {PLANS.map((plan) => {
             const isCurrent = !isCustomPlan && tier === plan.tier;
             return (
@@ -82,16 +66,32 @@ export default function PlansPage() {
                 background="base"
               >
                 <s-stack direction="block" gap="tight">
-                  <s-stack direction="inline" gap="tight" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                     <s-text emphasis="bold" style={{ fontSize: "16px" }}>{plan.tier}</s-text>
                     {isCurrent && <s-badge tone="success">Current plan</s-badge>}
-                  </s-stack>
+                  </div>
                   <s-text emphasis="bold">{plan.price}</s-text>
                   <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>{plan.feature}</s-paragraph>
                 </s-stack>
               </s-box>
             );
           })}
+          {isCustomPlan && (
+            <s-box padding="base" borderWidth="large" borderColor="strong" borderRadius="base" background="base">
+              <s-stack direction="block" gap="tight">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                  <s-text emphasis="bold" style={{ fontSize: "16px" }}>{planName}</s-text>
+                  <s-badge tone="success">Current plan</s-badge>
+                </div>
+                <s-text emphasis="bold">Custom plan</s-text>
+                <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
+                  {limit === null
+                    ? "Unlimited active discount codes."
+                    : `Up to ${limit} active discount codes at a time.`}
+                </s-paragraph>
+              </s-stack>
+            </s-box>
+          )}
         </div>
       </s-section>
     </s-page>
