@@ -35,7 +35,7 @@ export default function PlansPage() {
 
   return (
     <s-page heading="Plans">
-      <s-section heading="Current usage">
+      <s-section heading="View or change plan">
         <s-stack direction="block" gap="base">
           <s-paragraph>
             You're on the <s-text emphasis="bold">{isCustomPlan ? planName : tier}</s-text> plan
@@ -52,8 +52,24 @@ export default function PlansPage() {
         </s-stack>
       </s-section>
 
-      <s-section heading="Choose a plan">
+      <s-section heading="Compare plans">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" }}>
+          {isCustomPlan && (
+            <s-box padding="base" borderWidth="large" borderColor="strong" borderRadius="base" background="base">
+              <s-stack direction="block" gap="tight">
+                <s-stack direction="inline" gap="tight" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                  <s-text emphasis="bold" style={{ fontSize: "16px" }}>{planName}</s-text>
+                  <s-badge tone="success">Current plan</s-badge>
+                </s-stack>
+                <s-text emphasis="bold">Custom plan</s-text>
+                <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
+                  {limit === null
+                    ? "Unlimited active discount codes."
+                    : `Up to ${limit} active discount codes at a time.`}
+                </s-paragraph>
+              </s-stack>
+            </s-box>
+          )}
           {PLANS.map((plan) => {
             const isCurrent = !isCustomPlan && tier === plan.tier;
             return (
