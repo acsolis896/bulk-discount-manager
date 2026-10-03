@@ -19,15 +19,14 @@ export const STARTER_PLAN_LIMIT = 1000;
 
 export type PlanTier = "Free" | "Starter" | "Pro";
 
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
+// Matches "starter"/"pro" as whole words so private plans like "Multi-store
+// Pro" map to the right tier, while names that merely contain the letters
+// (e.g. "Professional") don't.
 export function tierForPlanName(planName: string | null): PlanTier {
   if (!planName) return "Free";
-  const n = normalize(planName);
-  if (n === PLAN_STARTER) return "Starter";
-  if (n === PLAN_PRO) return "Pro";
+  const words = planName.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  if (words.includes(PLAN_PRO)) return "Pro";
+  if (words.includes(PLAN_STARTER)) return "Starter";
   return "Free";
 }
 
