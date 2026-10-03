@@ -1,3 +1,3 @@
-// Flip to true once `shopify app deploy` succeeds with the updated Function
-// (the "Max items discounted" cap is only enforced by the deployed Function).
-export const MAX_DISCOUNTED_ITEMS_ENABLED = false;
+// Set to false to hide the "Max items discounted" field. The cap itself is
+// enforced by the deployed Function, so only enable it once that is live.
+export const MAX_DISCOUNTED_ITEMS_ENABLED = true;
