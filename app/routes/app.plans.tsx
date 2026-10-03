@@ -12,11 +12,14 @@ const APP_HANDLE = "bulk-discount-manager-7";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, billing, session } = await authenticate.admin(request);
-  const { tier, limit } = await getCurrentPlan(billing);
+  const { tier, limit, planName } = await getCurrentPlan(billing);
   const current = await countActiveCodes(admin, limit);
   const storeHandle = session.shop.replace(".myshopify.com", "");
   const pricingUrl = `https://admin.shopify.com/store/${storeHandle}/charges/${APP_HANDLE}/pricing_plans`;
-  return { tier, limit, current, pricingUrl };
+  // A private plan (e.g. "Multi-store Pro") maps to a standard tier for its
+  // limits but has its own price, so don't show it as the public tier.
+  const isCustomPlan = planName !== null && planName.trim().toLowerCase() !== tier.toLowerCase();
+  return { tier, limit, current, pricingUrl, planName, isCustomPlan };
 };
 
 type PlanTier = "Free" | "Starter" | "Pro";
@@ -28,14 +31,15 @@ const PLANS: { tier: PlanTier; price: string; feature: string }[] = [
 ];
 
 export default function PlansPage() {
-  const { tier, limit, current, pricingUrl } = useLoaderData<typeof loader>();
+  const { tier, limit, current, pricingUrl, planName, isCustomPlan } = useLoaderData<typeof loader>();
 
   return (
     <s-page heading="Plans">
       <s-section heading="Current usage">
         <s-stack direction="block" gap="base">
           <s-paragraph>
-            You're on the <s-text emphasis="bold">{tier}</s-text> plan.{" "}
+            You're on the <s-text emphasis="bold">{isCustomPlan ? planName : tier}</s-text> plan
+            {isCustomPlan ? ` (${tier} features)` : ""}.{" "}
             {limit === null
               ? "Unlimited active discount codes."
               : `${current} / ${limit} active discount codes used.`}
@@ -51,7 +55,7 @@ export default function PlansPage() {
       <s-section heading="Choose a plan">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" }}>
           {PLANS.map((plan) => {
-            const isCurrent = tier === plan.tier;
+            const isCurrent = !isCustomPlan && tier === plan.tier;
             return (
               <s-box
                 key={plan.tier}
