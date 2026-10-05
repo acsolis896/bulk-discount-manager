@@ -8,6 +8,7 @@ import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { checkCodeQuota } from "../billing.server";
 import { countryName } from "../countries";
+import { COUNTRY_RESTRICTION_ENABLED } from "../feature-flags";
 
 type RedeemCode = { code: string; usageCount: number };
 type ParsedCode = { code: string; used: boolean };
@@ -705,7 +706,7 @@ export default function DiscountDetails() {
       : maxDiscountedItems
         ? `Applies to up to ${maxDiscountedItems} eligible item${maxDiscountedItems === 1 ? "" : "s"} in the cart, highest-priced first`
         : "Applies to every eligible item in the cart",
-    ...(allowedCountries.length > 0 ? [`Valid for shipping to ${allowedCountries.map(countryName).join(", ")}`] : []),
+    ...(COUNTRY_RESTRICTION_ENABLED && allowedCountries.length > 0 ? [`Valid for shipping to ${allowedCountries.map(countryName).join(", ")}`] : []),
     eligibleCollections.length > 0
       ? `Applies to ${eligibleCollections.length} collection${eligibleCollections.length === 1 ? "" : "s"}`
       : eligibleProducts.length > 0
