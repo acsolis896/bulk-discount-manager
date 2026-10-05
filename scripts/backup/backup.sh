@@ -25,9 +25,14 @@ aws s3 cp "$FILE" "s3://${BACKUP_BUCKET}/db/$(basename "$FILE")" --endpoint-url 
 rm -f "$FILE"
 echo "Uploaded db/backup-${STAMP}.sql.gz.age"
 
-CUTOFF="$(date -u -d "-${RETENTION_DAYS} days" +%Y-%m-%dT%H:%M:%SZ)"
+# Prune by the timestamp in each file name (backup-<stamp>.sql.gz.age). Alpine's busybox
+# date has no "-N days" syntax, so the cutoff is computed from epoch seconds.
+CUTOFF="backup-$(date -u -d "@$(( $(date +%s) - RETENTION_DAYS * 86400 ))" +%Y-%m-%dT%H-%M-%SZ).sql.gz.age"
 aws s3api list-objects-v2 --bucket "$BACKUP_BUCKET" --prefix db/ --endpoint-url "$BACKUP_ENDPOINT" \
-  --query "Contents[?LastModified<='${CUTOFF}'].Key" --output text | tr '\t' '\n' | while read -r KEY; do
-  [ -n "$KEY" ] && [ "$KEY" != "None" ] && aws s3 rm "s3://${BACKUP_BUCKET}/${KEY}" --endpoint-url "$BACKUP_ENDPOINT" && echo "Pruned ${KEY}"
+  --query "Contents[].Key" --output text | tr '\t' '\n' | while read -r KEY; do
+  NAME="${KEY#db/}"
+  if [[ "$NAME" == backup-*.sql.gz.age && "$NAME" < "$CUTOFF" ]]; then
+    aws s3 rm "s3://${BACKUP_BUCKET}/${KEY}" --endpoint-url "$BACKUP_ENDPOINT" && echo "Pruned ${KEY}"
+  fi
 done
 exit 0
