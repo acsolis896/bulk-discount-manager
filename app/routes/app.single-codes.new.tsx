@@ -7,6 +7,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
+import { saveFunctionConfig } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota } from "../billing.server";
@@ -182,29 +183,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     blockedTag,
     ...(usesPerCustomerLimit !== null ? { usesPerCustomerLimit, usageCappedCustomerIds: [] } : {}),
   });
-  const mfRes = await admin.graphql(
-    `#graphql
-    mutation SetDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
-      metafieldsSet(metafields: $metafields) {
-        userErrors { field message }
-      }
-    }`,
-    {
-      variables: {
-        metafields: [{
-          ownerId: nodeDiscountId,
-          namespace: "$app",
-          key: "function-configuration",
-          type: "json",
-          value: metafieldConfig,
-        }],
-      },
-    }
-  );
-  const mfData = await mfRes.json();
-  const mfErrors = mfData.data?.metafieldsSet?.userErrors ?? [];
-  if (mfErrors.length > 0) {
-    return { error: `Discount created but config save failed: ${mfErrors.map((e: { message: string }) => e.message).join(", ")}` };
+  const saved = await saveFunctionConfig(admin, {
+    ownerId: nodeDiscountId,
+    readId: nodeDiscountId,
+    value: metafieldConfig,
+  });
+  if (!saved.ok) {
+    // Don't leave a discount behind that exists but can never apply.
+    try {
+      await admin.graphql(
+        `#graphql
+        mutation DeleteUnconfiguredDiscount($id: ID!) {
+          discountCodeDelete(id: $id) { userErrors { message } }
+        }`,
+        { variables: { id: nodeDiscountId } }
+      );
+    } catch { /* best effort */ }
+    return { error: `Config save failed: ${saved.message}. Nothing was created, please try again.` };
   }
 
   // Scan discountNodes to find the real function node (may differ from construction node)

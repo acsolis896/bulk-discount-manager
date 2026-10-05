@@ -11,6 +11,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
+import { saveFunctionConfig, discountNodeId } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota } from "../billing.server";
@@ -246,41 +247,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       : ["GWP"]; // default fallback
 
     // Step 2: save function configuration metafield
-    const metafieldRes = await admin.graphql(
-      `#graphql
-      mutation SetDiscountMetafield($metafields: [MetafieldsSetInput!]!) {
-        metafieldsSet(metafields: $metafields) {
-          metafields { key namespace value }
-          userErrors { field message }
-        }
-      }`,
-      {
-        variables: {
-          metafields: [
-            {
-              ownerId: discountId,
-              namespace: "$app",
-              key: "function-configuration",
-              type: "json",
-              value: JSON.stringify({
-                productIds: resolvedProductIds,
-                collectionIds,
-                discountType,
-                ...(discountType === "fixedAmount" ? { fixedAmount } : { percentage }),
-                oncePerOrder,
-                ...(maxDiscountedItems !== null ? { maxDiscountedItems } : {}),
-                ...(allowedCountries.length > 0 ? { allowedCountries } : {}),
-                blockedProductTypes,
-              }),
-            },
-          ],
-        },
-      }
-    );
-    const metafieldData = await metafieldRes.json();
-    const metafieldErrors = metafieldData.data?.metafieldsSet?.userErrors ?? [];
-    if (metafieldErrors.length > 0) {
-      return { error: `Saving configuration: ${metafieldErrors.map((e: { message: string }) => e.message).join(", ")}` };
+    const saved = await saveFunctionConfig(admin, {
+      ownerId: discountId,
+      readId: discountNodeId(discountId),
+      value: JSON.stringify({
+        productIds: resolvedProductIds,
+        collectionIds,
+        discountType,
+        ...(discountType === "fixedAmount" ? { fixedAmount } : { percentage }),
+        oncePerOrder,
+        ...(maxDiscountedItems !== null ? { maxDiscountedItems } : {}),
+        ...(allowedCountries.length > 0 ? { allowedCountries } : {}),
+        blockedProductTypes,
+      }),
+    });
+    if (!saved.ok) {
+      // Don't leave a discount behind that exists but can never apply.
+      try {
+        await admin.graphql(
+          `#graphql
+          mutation DeleteUnconfiguredDiscount($id: ID!) {
+            discountCodeDelete(id: $id) { userErrors { message } }
+          }`,
+          { variables: { id: discountNodeId(discountId) } }
+        );
+      } catch { /* best effort */ }
+      return { error: `Saving configuration: ${saved.message}. Nothing was created, please try again.` };
     }
 
     let eligibilityWarning: string | null = null;

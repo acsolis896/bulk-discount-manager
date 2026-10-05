@@ -9,6 +9,7 @@ import { numericInputHandler } from "../numeric-input";
 import { checkCodeQuota } from "../billing.server";
 import { countryName } from "../countries";
 import { useCountryRestrictionEnabled } from "../feature-flags";
+import { saveFunctionConfig } from "../function-config.server";
 
 type RedeemCode = { code: string; usageCount: number };
 type ParsedCode = { code: string; used: boolean };
@@ -180,6 +181,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     );
     const metafieldData = await metafieldRes.json();
     const rawConfig = metafieldData.data?.discountNode?.metafield?.value ?? null;
+    // Only flag it when the node itself was readable, so a failed read never raises a false alarm.
+    const configMissing = Boolean(metafieldData.data?.discountNode) && !rawConfig;
     let eligibleProductIds: string[] = [];
     let eligibleCollectionIds: string[] = [];
     let percentage: number | null = null;
@@ -232,7 +235,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
     }
 
-    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error: null as string | null };
+    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -262,6 +265,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       endsAt: null as string | null,
       percentage: null as number | null,
       fixedAmount: null as number | null,
+      configMissing: false,
       error: err instanceof Error ? err.message : String(err),
     };
   }
@@ -462,25 +466,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         ? { ...existingConfig, productIds: resolvedProductIds, collectionIds }
         : { ...existingConfig, productIds: resolvedProductIds, collectionIds, percentage };
 
-    await admin.graphql(
-      `#graphql
-      mutation UpdateConfig($metafields: [MetafieldsSetInput!]!) {
-        metafieldsSet(metafields: $metafields) {
-          userErrors { field message }
-        }
-      }`,
-      {
-        variables: {
-          metafields: [{
-            ownerId: gid,
-            namespace: "$app",
-            key: "function-configuration",
-            type: "json",
-            value: JSON.stringify(newConfig),
-          }],
-        },
-      }
-    );
+    const saved = await saveFunctionConfig(admin, {
+      ownerId: gid,
+      readId: gid,
+      value: JSON.stringify(newConfig),
+    });
+    if (!saved.ok) {
+      return { error: `Couldn't save the updated settings: ${saved.message}. Please try again.` };
+    }
 
     return { updated: true };
   }
@@ -541,7 +534,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 export default function DiscountDetails() {
   const countryRestrictionEnabled = useCountryRestrictionEnabled();
-  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
+  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -730,6 +723,14 @@ export default function DiscountDetails() {
       {error && (
         <s-banner title="Error" tone="critical">
           <s-paragraph>{error}</s-paragraph>
+        </s-banner>
+      )}
+      {configMissing && (
+        <s-banner title="This discount set has no saved settings" tone="warning">
+          <s-paragraph>
+            Its discount value, eligible items and other settings are missing, so its codes won't apply at checkout
+            (shoppers see "valid but not applicable"). Create the set again to restore them.
+          </s-paragraph>
         </s-banner>
       )}
 
