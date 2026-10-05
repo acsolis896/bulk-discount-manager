@@ -7,7 +7,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
-import { saveFunctionConfig } from "../function-config.server";
+import { saveFunctionConfig, configSizeProblem } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota } from "../billing.server";
@@ -129,6 +129,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const blockedProductTypes = blockedRows.length > 0
     ? blockedRows.map((r: { productType: string }) => r.productType)
     : ["GWP"];
+
+  const sizeProblem = configSizeProblem(resolvedProductIds);
+  if (sizeProblem) return { error: sizeProblem };
 
   // Create discount
   const createRes = await admin.graphql(

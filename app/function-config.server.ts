@@ -18,6 +18,37 @@ const READ_CONFIG = `#graphql
     }
   }`;
 
+// Shopify gives a Function `null` for any metafield value over 10,000 bytes. The value is
+// still stored (and visible in the app), but the discount silently never applies. The
+// product list is what grows, at about 40 bytes per product, so large collections hit it.
+export const FUNCTION_CONFIG_LIMIT_BYTES = 10_000;
+const DEFAULT_OTHER_SETTINGS_BYTES = 1_000; // value, countries, blocked types, tags...
+
+export function configByteLength(value: string): number {
+  return Buffer.byteLength(value, "utf8");
+}
+
+/** True when a stored config is too big for Shopify to hand to the Function. */
+export function configTooLargeForFunction(value: string): boolean {
+  return configByteLength(value) > FUNCTION_CONFIG_LIMIT_BYTES;
+}
+
+/**
+ * Returns a merchant-facing message if this many product IDs won't fit in the config the
+ * Function reads, otherwise null. Pass the real size of the other settings when known.
+ */
+export function configSizeProblem(productIds: string[], otherSettingsBytes = DEFAULT_OTHER_SETTINGS_BYTES): string | null {
+  const listBytes = configByteLength(JSON.stringify(productIds));
+  if (listBytes + otherSettingsBytes <= FUNCTION_CONFIG_LIMIT_BYTES) return null;
+  const perProduct = Math.ceil(listBytes / Math.max(productIds.length, 1));
+  const max = Math.max(0, Math.floor((FUNCTION_CONFIG_LIMIT_BYTES - otherSettingsBytes) / perProduct));
+  return (
+    `This selection covers ${productIds.length} products, but Shopify only lets a discount keep about ${max}, ` +
+    `so its codes would never apply at checkout. Choose a smaller collection, split it across several sets, ` +
+    `or select products individually.`
+  );
+}
+
 export type SaveConfigResult = { ok: true } | { ok: false; message: string };
 
 /** discountCodeAppCreate returns a DiscountCodeApp GID; reads need the DiscountCodeNode GID. */

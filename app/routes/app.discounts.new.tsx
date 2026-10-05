@@ -11,7 +11,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
-import { saveFunctionConfig, discountNodeId } from "../function-config.server";
+import { saveFunctionConfig, discountNodeId, configSizeProblem } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota } from "../billing.server";
@@ -190,6 +190,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           : "No products found in the selected collections. If you just created or edited this collection, wait a few minutes for Shopify to finish updating it, then try again.",
       };
     }
+
+    const sizeProblem = configSizeProblem(resolvedProductIds);
+    if (sizeProblem) return { error: sizeProblem };
 
     // Step 1: create the discount — try each code until one isn't a duplicate
     let discountId: string | null = null;
