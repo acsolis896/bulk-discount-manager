@@ -559,7 +559,7 @@ export default function SingleCodeDetailsPage() {
           </s-section>
 
           {countryRestrictionEnabled && (
-            <s-section heading="Shipping countries">
+            <s-section heading="Countries">
               <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
             </s-section>
           )}

@@ -40,10 +40,12 @@ export default function PrivacyPolicy() {
           code performs.
         </li>
         <li>
-          <strong>Shipping country at checkout:</strong> if you restrict a
-          code to certain countries, the App reads the shipping country during
-          checkout to decide whether the code applies. It is evaluated at
-          checkout time and is not stored by the App.
+          <strong>Country at checkout:</strong> if you restrict a code to
+          certain countries, the App reads the country Shopify assigns to the
+          checkout (which follows the shopper's shipping country) to decide
+          whether the code applies. It is evaluated at checkout time and is
+          not stored by the App. The App does not read the shopper's
+          address.
         </li>
         <li>
           <strong>Access log:</strong> we keep a log of when the App processes

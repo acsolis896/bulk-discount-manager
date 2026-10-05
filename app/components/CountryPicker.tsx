@@ -6,10 +6,10 @@ export function CountryPicker({ value, onChange }: { value: string[]; onChange: 
   return (
     <s-stack direction="block" gap="small">
       <s-select
-        label="Only valid for shipping to these countries (optional)"
+        label="Only valid in these countries (optional)"
         placeholder="Add a country…"
         value=""
-        details="Leave empty to allow any country. The code is checked against the shipping address at checkout, so it works for guests too."
+        details="Leave empty to allow any country. Checked against the country Shopify uses at checkout, which follows the shipping address, so it works for guests too. The code won't apply for shoppers in other countries."
         onChange={(e: { target: unknown }) => {
           const el = e.target as HTMLSelectElement;
           if (el.value) onChange([...value, el.value]);

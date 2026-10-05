@@ -10,8 +10,10 @@
 | Encrypted database backups | Disaster recovery | 35 days offsite (`BACKUP_RETENTION_DAYS`); Railway volume backups per their schedule |
 
 Not stored: customer names, email addresses, phone numbers, or physical addresses.
-The shipping country used by the country restriction is read inside Shopify Functions
-at checkout and is never stored by the app.
+The country used by the country restriction is the checkout country Shopify supplies to
+the Function (`localization.country`, which follows the shipping country). It is read
+inside Shopify Functions at checkout and is never stored by the app. The app does not
+query the shipping address.
 
 Mandatory privacy webhooks: `customers/data_request` (logged; nothing beyond what
 Shopify holds), `customers/redact` and `shop/redact` (delete the rows above).

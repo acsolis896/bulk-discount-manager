@@ -707,7 +707,7 @@ export default function DiscountDetails() {
       : maxDiscountedItems
         ? `Applies to up to ${maxDiscountedItems} eligible item${maxDiscountedItems === 1 ? "" : "s"} in the cart, highest-priced first`
         : "Applies to every eligible item in the cart",
-    ...(countryRestrictionEnabled && allowedCountries.length > 0 ? [`Valid for shipping to ${allowedCountries.map(countryName).join(", ")}`] : []),
+    ...(countryRestrictionEnabled && allowedCountries.length > 0 ? [`Valid when the checkout country is ${allowedCountries.map(countryName).join(", ")}`] : []),
     eligibleCollections.length > 0
       ? `Applies to ${eligibleCollections.length} collection${eligibleCollections.length === 1 ? "" : "s"}`
       : eligibleProducts.length > 0
