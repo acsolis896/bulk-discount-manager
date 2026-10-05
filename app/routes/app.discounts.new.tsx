@@ -10,7 +10,9 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
-import { MAX_DISCOUNTED_ITEMS_ENABLED } from "../feature-flags";
+import { MAX_DISCOUNTED_ITEMS_ENABLED, COUNTRY_RESTRICTION_ENABLED } from "../feature-flags";
+import { CountryPicker } from "../components/CountryPicker";
+import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota } from "../billing.server";
 import { applyEligibility, listSegments } from "../eligibility.server";
 import { shouldRequestReviewAfterCreation } from "../review-prompt";
@@ -57,6 +59,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return { error: "Max items discounted must be a whole number of 1 or more." };
     }
     const maxDiscountedItems = parsedMaxItems !== null ? Math.floor(parsedMaxItems) : null;
+    const countriesResult = parseAllowedCountries(String(formData.get("allowedCountries") || ""));
+    if ("error" in countriesResult) return { error: countriesResult.error };
+    const allowedCountries = countriesResult.countries;
     const codeMode = String(formData.get("codeMode") || "generate");
     const endsAtRaw = String(formData.get("endsAt") || "");
     const endsAt = endsAtRaw ? new Date(`${endsAtRaw}T23:59:59-08:00`).toISOString() : null;
@@ -264,6 +269,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 ...(discountType === "fixedAmount" ? { fixedAmount } : { percentage }),
                 oncePerOrder,
                 ...(maxDiscountedItems !== null ? { maxDiscountedItems } : {}),
+                ...(allowedCountries.length > 0 ? { allowedCountries } : {}),
                 blockedProductTypes,
               }),
             },
@@ -371,6 +377,7 @@ export default function CreateBulkDiscount() {
   const [fixedAmount, setFixedAmount] = useState("10");
   const [oncePerOrder, setOncePerOrder] = useState(true);
   const [maxDiscountedItems, setMaxDiscountedItems] = useState("");
+  const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
   const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">("all");
   const [requiredTag, setRequiredTag] = useState("");
   const [blockedTag, setBlockedTag] = useState("");
@@ -458,6 +465,7 @@ export default function CreateBulkDiscount() {
     formData.set("fixedAmount", fixedAmount);
     formData.set("oncePerOrder", oncePerOrder ? "1" : "0");
     formData.set("maxDiscountedItems", maxDiscountedItems);
+    formData.set("allowedCountries", JSON.stringify(allowedCountries));
     formData.set("codeMode", codeMode);
     formData.set("endsAt", endsAt);
     formData.set("usageLimitOne", usageLimitOne ? "1" : "0");
@@ -484,7 +492,7 @@ export default function CreateBulkDiscount() {
       formData.set("productIds", JSON.stringify([]));
     }
     fetcher.submit(formData, { method: "POST", encType: "multipart/form-data" });
-  }, [fetcher, title, discountType, percentage, fixedAmount, oncePerOrder, maxDiscountedItems, eligibilityMode, requiredTag, blockedTag, selectedSegmentId, codeMode, csvFile, prefix, codeCount, codeLength, selectionType, selectedItems]);
+  }, [fetcher, title, discountType, percentage, fixedAmount, oncePerOrder, maxDiscountedItems, allowedCountries, eligibilityMode, requiredTag, blockedTag, selectedSegmentId, codeMode, csvFile, prefix, codeCount, codeLength, selectionType, selectedItems]);
 
   const handleReset = useCallback(() => {
     setTitle("Bulk Discount");
@@ -727,6 +735,12 @@ export default function CreateBulkDiscount() {
           )}
         </s-stack>
       </s-section>
+
+      {COUNTRY_RESTRICTION_ENABLED && (
+        <s-section heading="Shipping countries">
+          <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+        </s-section>
+      )}
 
       <s-section heading="Customer eligibility">
         <s-stack direction="block" gap="small">

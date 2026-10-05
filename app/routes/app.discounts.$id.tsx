@@ -7,6 +7,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { checkCodeQuota } from "../billing.server";
+import { countryName } from "../countries";
 
 type RedeemCode = { code: string; usageCount: number };
 type ParsedCode = { code: string; used: boolean };
@@ -185,6 +186,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     let discountType: "percentage" | "fixedAmount" = "percentage";
     let oncePerOrder = true;
     let maxDiscountedItems: number | null = null;
+    let allowedCountries: string[] = [];
     try {
       if (rawConfig) {
         const cfg = JSON.parse(rawConfig);
@@ -195,6 +197,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         discountType = cfg.discountType === "fixedAmount" ? "fixedAmount" : "percentage";
         oncePerOrder = cfg.oncePerOrder !== false;
         maxDiscountedItems = Number.isInteger(cfg.maxDiscountedItems) && cfg.maxDiscountedItems > 0 ? cfg.maxDiscountedItems : null;
+        allowedCountries = Array.isArray(cfg.allowedCountries) ? cfg.allowedCountries : [];
       }
     } catch { /* ignore */ }
 
@@ -228,7 +231,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
     }
 
-    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error: null as string | null };
+    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -241,6 +244,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       combinesWith: { productDiscounts: false, orderDiscounts: false, shippingDiscounts: false },
       oncePerOrder: true,
       maxDiscountedItems: null as number | null,
+      allowedCountries: [] as string[],
       codes: [] as RedeemCode[],
       totalCount: 0,
       usedCount: 0,
@@ -535,7 +539,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function DiscountDetails() {
-  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
+  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -701,6 +705,7 @@ export default function DiscountDetails() {
       : maxDiscountedItems
         ? `Applies to up to ${maxDiscountedItems} eligible item${maxDiscountedItems === 1 ? "" : "s"} in the cart, highest-priced first`
         : "Applies to every eligible item in the cart",
+    ...(allowedCountries.length > 0 ? [`Valid for shipping to ${allowedCountries.map(countryName).join(", ")}`] : []),
     eligibleCollections.length > 0
       ? `Applies to ${eligibleCollections.length} collection${eligibleCollections.length === 1 ? "" : "s"}`
       : eligibleProducts.length > 0

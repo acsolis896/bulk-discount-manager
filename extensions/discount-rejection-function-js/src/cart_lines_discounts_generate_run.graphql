@@ -5,6 +5,11 @@ query CartLinesDiscountsGenerateRunInput {
         id
       }
     }
+    deliveryGroups {
+      deliveryAddress {
+        countryCode
+      }
+    }
     lines {
       id
       quantity

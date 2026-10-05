@@ -6,7 +6,9 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
-import { MAX_DISCOUNTED_ITEMS_ENABLED } from "../feature-flags";
+import { MAX_DISCOUNTED_ITEMS_ENABLED, COUNTRY_RESTRICTION_ENABLED } from "../feature-flags";
+import { CountryPicker } from "../components/CountryPicker";
+import { parseAllowedCountries } from "../countries";
 import { applyEligibility, listSegments } from "../eligibility.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -124,6 +126,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     percentage: config.percentage ?? null,
     fixedAmount: config.fixedAmount ?? null,
     oncePerOrder: config.oncePerOrder !== false,
+    allowedCountries: Array.isArray(config.allowedCountries) ? (config.allowedCountries as string[]) : [],
     maxDiscountedItems: Number.isInteger(config.maxDiscountedItems) && (config.maxDiscountedItems as number) > 0 ? (config.maxDiscountedItems as number) : null,
     productIds,
     collectionIds,
@@ -158,6 +161,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return { error: "Max items discounted must be a whole number of 1 or more." };
     }
     const maxDiscountedItems = parsedMaxItems !== null ? Math.floor(parsedMaxItems) : null;
+    const countriesResult = parseAllowedCountries(String(formData.get("allowedCountries") || ""));
+    if ("error" in countriesResult) return { error: countriesResult.error };
+    const allowedCountries = countriesResult.countries;
     const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
     const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
     const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
@@ -248,6 +254,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       fixedAmount: discountType === "fixedAmount" ? fixedAmount : undefined,
       oncePerOrder,
       maxDiscountedItems: maxDiscountedItems ?? undefined,
+      allowedCountries: allowedCountries.length > 0 ? allowedCountries : undefined,
       requiredTag,
       blockedTag,
       usesPerCustomerLimit,
@@ -289,6 +296,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       fixedAmount: discountType === "fixedAmount" ? fixedAmount : undefined,
       oncePerOrder,
       maxDiscountedItems: maxDiscountedItems ?? undefined,
+      allowedCountries: allowedCountries.length > 0 ? allowedCountries : undefined,
       blockedProductTypes: existing.blockedProductTypes ?? ["GWP"],
       requiredTag,
       blockedTag,
@@ -394,6 +402,7 @@ export default function SingleCodeDetailsPage() {
   const [percentage, setPercentage] = useState(String(loaderData.percentage ?? ""));
   const [fixedAmount, setFixedAmount] = useState(String(loaderData.fixedAmount ?? ""));
   const [oncePerOrder, setOncePerOrder] = useState(loaderData.oncePerOrder);
+  const [allowedCountries, setAllowedCountries] = useState<string[]>(loaderData.allowedCountries);
   const [maxDiscountedItems, setMaxDiscountedItems] = useState(loaderData.maxDiscountedItems ? String(loaderData.maxDiscountedItems) : "");
   const [productIds, setProductIds] = useState<string[]>(loaderData.productIds);
   const [productTitles, setProductTitles] = useState<string[]>([]);
@@ -450,6 +459,7 @@ export default function SingleCodeDetailsPage() {
     form.set("fixedAmount", fixedAmount);
     form.set("oncePerOrder", oncePerOrder ? "1" : "0");
     form.set("maxDiscountedItems", maxDiscountedItems);
+    form.set("allowedCountries", JSON.stringify(allowedCountries));
     form.set("productIds", JSON.stringify(productIds));
     form.set("collectionIds", JSON.stringify(collectionIds));
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
@@ -546,6 +556,12 @@ export default function SingleCodeDetailsPage() {
               <s-button onClick={handlePickProducts}>Browse products</s-button>
             </div>
           </s-section>
+
+          {COUNTRY_RESTRICTION_ENABLED && (
+            <s-section heading="Shipping countries">
+              <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+            </s-section>
+          )}
 
           <s-section heading="Edit customer eligibility">
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>

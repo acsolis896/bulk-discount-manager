@@ -6,7 +6,9 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
-import { MAX_DISCOUNTED_ITEMS_ENABLED } from "../feature-flags";
+import { MAX_DISCOUNTED_ITEMS_ENABLED, COUNTRY_RESTRICTION_ENABLED } from "../feature-flags";
+import { CountryPicker } from "../components/CountryPicker";
+import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota } from "../billing.server";
 import { applyEligibility, listSegments } from "../eligibility.server";
 import { shouldRequestReviewAfterCreation } from "../review-prompt";
@@ -33,6 +35,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: "Max items discounted must be a whole number of 1 or more." };
   }
   const maxDiscountedItems = parsedMaxItems !== null ? Math.floor(parsedMaxItems) : null;
+  const countriesResult = parseAllowedCountries(String(formData.get("allowedCountries") || ""));
+  if ("error" in countriesResult) return { error: countriesResult.error };
+  const allowedCountries = countriesResult.countries;
   const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
   const parsedUsesLimit = usesPerCustomerLimitRaw ? Number(usesPerCustomerLimitRaw) : null;
   if (parsedUsesLimit !== null && (!Number.isFinite(parsedUsesLimit) || parsedUsesLimit < 1)) {
@@ -171,6 +176,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     ...(discountType === "fixedAmount" ? { fixedAmount } : { percentage }),
     oncePerOrder,
     ...(maxDiscountedItems !== null ? { maxDiscountedItems } : {}),
+    ...(allowedCountries.length > 0 ? { allowedCountries } : {}),
     blockedProductTypes,
     requiredTag,
     blockedTag,
@@ -295,6 +301,7 @@ export default function NewSingleCodePage() {
   const [fixedAmount, setFixedAmount] = useState("10");
   const [oncePerOrder, setOncePerOrder] = useState(true);
   const [maxDiscountedItems, setMaxDiscountedItems] = useState("");
+  const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState("");
   const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">("all");
   const [requiredTag, setRequiredTag] = useState("");
@@ -361,6 +368,7 @@ export default function NewSingleCodePage() {
     form.set("fixedAmount", fixedAmount);
     form.set("oncePerOrder", oncePerOrder ? "1" : "0");
     form.set("maxDiscountedItems", maxDiscountedItems);
+    form.set("allowedCountries", JSON.stringify(allowedCountries));
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
     form.set("eligibilityMode", eligibilityMode);
     form.set("requiredTag", requiredTag);
@@ -510,6 +518,12 @@ export default function NewSingleCodePage() {
           <s-paragraph>No items selected yet.</s-paragraph>
         )}
       </s-section>
+
+      {COUNTRY_RESTRICTION_ENABLED && (
+        <s-section heading="Shipping countries">
+          <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+        </s-section>
+      )}
 
       <s-section heading="Customer eligibility">
         <s-stack direction="block" gap="small">

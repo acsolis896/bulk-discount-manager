@@ -18,7 +18,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const { productIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
+  const { productIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, allowedCountries, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
 
   const rejectableCodes = () =>
     (input.enteredDiscountCodes ?? []).filter((c) => c.rejectable).map((c) => ({ code: c.code }));
@@ -41,6 +41,33 @@ export function cartLinesDiscountsGenerateRun(input) {
                 message: isUsageCapped
                   ? "This discount code has reached its usage limit for your account."
                   : "This discount code isn't available for your account.",
+              },
+            },
+          ],
+        };
+      }
+      return { operations: [] };
+    }
+  }
+
+  // Optional shipping-country restriction. Works for guests too, since it
+  // reads the address typed at checkout. With no address yet (cart page,
+  // pickup, digital orders) the code is allowed; checkout re-runs this once
+  // an address exists.
+  if (Array.isArray(allowedCountries) && allowedCountries.length > 0) {
+    const shipToCountries = (input.cart.deliveryGroups ?? [])
+      .map((group) => group.deliveryAddress?.countryCode)
+      .filter(Boolean);
+    const outsideAllowed = shipToCountries.some((country) => !allowedCountries.includes(country));
+    if (outsideAllowed) {
+      const codes = rejectableCodes();
+      if (codes.length > 0) {
+        return {
+          operations: [
+            {
+              enteredDiscountCodesReject: {
+                codes,
+                message: `This discount code is only valid for orders shipping to ${allowedCountries.join(", ")}.`,
               },
             },
           ],
