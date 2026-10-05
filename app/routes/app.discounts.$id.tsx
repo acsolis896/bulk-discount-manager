@@ -8,7 +8,7 @@ import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { checkCodeQuota } from "../billing.server";
 import { countryName } from "../countries";
-import { COUNTRY_RESTRICTION_ENABLED } from "../feature-flags";
+import { useCountryRestrictionEnabled } from "../feature-flags";
 
 type RedeemCode = { code: string; usageCount: number };
 type ParsedCode = { code: string; used: boolean };
@@ -540,6 +540,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function DiscountDetails() {
+  const countryRestrictionEnabled = useCountryRestrictionEnabled();
   const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
@@ -706,7 +707,7 @@ export default function DiscountDetails() {
       : maxDiscountedItems
         ? `Applies to up to ${maxDiscountedItems} eligible item${maxDiscountedItems === 1 ? "" : "s"} in the cart, highest-priced first`
         : "Applies to every eligible item in the cart",
-    ...(COUNTRY_RESTRICTION_ENABLED && allowedCountries.length > 0 ? [`Valid for shipping to ${allowedCountries.map(countryName).join(", ")}`] : []),
+    ...(countryRestrictionEnabled && allowedCountries.length > 0 ? [`Valid for shipping to ${allowedCountries.map(countryName).join(", ")}`] : []),
     eligibleCollections.length > 0
       ? `Applies to ${eligibleCollections.length} collection${eligibleCollections.length === 1 ? "" : "s"}`
       : eligibleProducts.length > 0

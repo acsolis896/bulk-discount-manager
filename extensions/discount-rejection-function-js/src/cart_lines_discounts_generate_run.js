@@ -50,15 +50,15 @@ export function cartLinesDiscountsGenerateRun(input) {
     }
   }
 
-  // Optional shipping-country restriction. Works for guests too, since it
-  // reads the address typed at checkout. With no address yet (cart page,
-  // pickup, digital orders) the code is allowed; checkout re-runs this once
-  // an address exists.
+  // Optional country restriction. cart.deliveryGroups is always empty in this
+  // target (Shopify only fills it for delivery targets, which never see entered
+  // codes), so the shipping address can't be read. The checkout's country
+  // (localization) is used instead: Shopify updates it to the shipping country
+  // when the buyer enters an address, which is also why prices switch currency.
+  // Works for guests. If Shopify supplies no country, the code is allowed.
   if (Array.isArray(allowedCountries) && allowedCountries.length > 0) {
-    const shipToCountries = (input.cart.deliveryGroups ?? [])
-      .map((group) => group.deliveryAddress?.countryCode)
-      .filter(Boolean);
-    const outsideAllowed = shipToCountries.some((country) => !allowedCountries.includes(country));
+    const checkoutCountry = input.localization?.country?.isoCode;
+    const outsideAllowed = Boolean(checkoutCountry) && !allowedCountries.includes(checkoutCountry);
     if (outsideAllowed) {
       const codes = rejectableCodes();
       if (codes.length > 0) {

@@ -6,7 +6,7 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
-import { MAX_DISCOUNTED_ITEMS_ENABLED, COUNTRY_RESTRICTION_ENABLED } from "../feature-flags";
+import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
 import { CountryPicker } from "../components/CountryPicker";
 import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota } from "../billing.server";
@@ -289,6 +289,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function NewSingleCodePage() {
+  const countryRestrictionEnabled = useCountryRestrictionEnabled();
   const { segments } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const navigate = useNavigate();
@@ -519,7 +520,7 @@ export default function NewSingleCodePage() {
         )}
       </s-section>
 
-      {COUNTRY_RESTRICTION_ENABLED && (
+      {countryRestrictionEnabled && (
         <s-section heading="Shipping countries">
           <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
         </s-section>

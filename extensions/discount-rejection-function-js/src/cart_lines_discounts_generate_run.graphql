@@ -5,11 +5,6 @@ query CartLinesDiscountsGenerateRunInput {
         id
       }
     }
-    deliveryGroups {
-      deliveryAddress {
-        countryCode
-      }
-    }
     lines {
       id
       quantity
@@ -26,6 +21,11 @@ query CartLinesDiscountsGenerateRunInput {
           }
         }
       }
+    }
+  }
+  localization {
+    country {
+      isoCode
     }
   }
   enteredDiscountCodes {

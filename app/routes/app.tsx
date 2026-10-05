@@ -15,7 +15,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
   // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  return {
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    // Read by useCountryRestrictionEnabled() in app/feature-flags.ts.
+    countryRestriction: process.env.COUNTRY_RESTRICTION_ENABLED === "true",
+  };
 };
 
 export default function App() {
