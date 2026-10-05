@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { logPersonalDataAccess } from "../access-log.server";
 
 type OrderPayload = {
   id?: number;
@@ -23,6 +24,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const customerId = order.customer?.id;
   const customerGid = customerId ? `gid://shopify/Customer/${customerId}` : null;
+
+  await logPersonalDataAccess({ shop: session.shop, action: "orders/create processed", resourceType: "order", customerId: customerGid });
 
   // Record a redemption row for every code on this order, regardless of
   // whether it's attributable to a customer — this feeds the "Code

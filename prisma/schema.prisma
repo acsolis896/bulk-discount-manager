@@ -102,6 +102,21 @@ model CodeRedemption {
   @@index([shop, code])
 }
 
+// Access log for protected customer data (Shopify level 2 requirement). Records
+// when the app handles customer data, never the data itself: no names, emails
+// or addresses. Purged by scripts/retention.mjs.
+model PersonalDataAccessLog {
+  id           String   @id @default(cuid())
+  shop         String
+  action       String
+  resourceType String
+  customerId   String?
+  createdAt    DateTime @default(now())
+
+  @@index([shop, createdAt])
+  @@index([createdAt])
+}
+
 model Session {
   id            String    @id
   shop          String

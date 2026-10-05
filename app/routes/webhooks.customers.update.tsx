@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { logPersonalDataAccess } from "../access-log.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, payload, session } = await authenticate.webhook(request);
@@ -9,6 +10,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const customer = payload as { id: number };
   const customerId = `gid://shopify/Customer/${customer.id}`;
+
+  await logPersonalDataAccess({ shop: session.shop, action: "customers/update processed", resourceType: "customer", customerId });
+  await logPersonalDataAccess({ shop: session.shop, action: "read customer tags via Admin API", resourceType: "customer", customerId });
 
   // Tags are not included in the 2026-04 webhook payload — fetch them via Admin API
   const customerRes = await admin.graphql(

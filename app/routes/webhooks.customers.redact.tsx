@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { logPersonalDataAccess } from "../access-log.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, topic, payload, admin } = await authenticate.webhook(request);
@@ -10,6 +11,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const customerId = (payload as { customer?: { id?: number } })?.customer?.id;
   if (!customerId) return new Response();
   const customerGid = `gid://shopify/Customer/${customerId}`;
+
+  await logPersonalDataAccess({ shop, action: "customers/redact processed", resourceType: "customer", customerId: customerGid });
+
+  // Per-customer usage counts are deleted. Redemption rows keep the order
+  // reference and totals (needed for code performance reporting) but lose the
+  // link to the customer. Access-log entries lose the customer id too.
+  await db.codeUsageCount.deleteMany({ where: { shop, customerId: customerGid } });
+  await db.codeRedemption.updateMany({ where: { shop, customerId: customerGid }, data: { customerId: null } });
+  await db.personalDataAccessLog.updateMany({ where: { shop, customerId: customerGid }, data: { customerId: null } });
 
   const codes = await db.singleCodeDiscount.findMany({
     where: { shop },

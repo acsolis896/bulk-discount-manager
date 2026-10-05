@@ -4,7 +4,7 @@ export default function PrivacyPolicy() {
   return (
     <div className={styles.wrapper}>
       <h1>Privacy Policy</h1>
-      <p className={styles.updated}>Effective date: July 13, 2026</p>
+      <p className={styles.updated}>Effective date: October 5, 2026</p>
 
       <p>
         Discount Codes &amp; Rules ("the App") is a Shopify app that helps merchants
@@ -26,11 +26,30 @@ export default function PrivacyPolicy() {
           types you configure through the App.
         </li>
         <li>
-          <strong>Customer identifiers only:</strong> when you use the
-          reusable-code eligibility feature, the App stores Shopify customer
-          ID references (e.g. <code>gid://shopify/Customer/123</code>) to
-          build discount eligibility segments. We do not store customer
-          names, email addresses, phone numbers, or physical addresses.
+          <strong>Customer identifiers:</strong> the App stores Shopify
+          customer ID references (e.g. <code>gid://shopify/Customer/123</code>)
+          to build discount eligibility lists and to count how many times a
+          customer has used a reusable code. We do not store customer names,
+          email addresses, phone numbers, or physical addresses.
+        </li>
+        <li>
+          <strong>Order references for code reporting:</strong> when an order
+          uses a discount code created with the App, we record the order ID
+          and number, the code used, the order total and currency, and the
+          customer ID (if the customer was logged in), so you can see how each
+          code performs.
+        </li>
+        <li>
+          <strong>Shipping country at checkout:</strong> if you restrict a
+          code to certain countries, the App reads the shipping country during
+          checkout to decide whether the code applies. It is evaluated at
+          checkout time and is not stored by the App.
+        </li>
+        <li>
+          <strong>Access log:</strong> we keep a log of when the App processes
+          customer-related events (such as an order or customer update). The
+          log records the event, the shop and a customer ID, never names,
+          emails, or addresses.
         </li>
         <li>
           <strong>Staff account information:</strong> if you access the App's
@@ -67,20 +86,25 @@ export default function PrivacyPolicy() {
       <h2>Data retention and deletion</h2>
       <p>
         We retain shop data for as long as the App is installed on your
-        store. When you uninstall the App, we automatically delete stored
-        shop data, including session tokens, discount configuration records,
-        and reusable code eligibility data. We also honor Shopify's mandatory
-        privacy webhooks:
+        store. Order references for code reporting are kept for up to 24
+        months, and the access log for up to 12 months. When you uninstall
+        the App, we automatically delete stored shop data, including session
+        tokens, discount configuration records, code usage and redemption
+        records, and reusable code eligibility data. We also honor Shopify's
+        mandatory privacy webhooks:
       </p>
       <ul>
         <li>
-          <strong>Customer data requests</strong> — we do not store customer
-          PII, so no additional data beyond what Shopify itself provides
-          exists to disclose.
+          <strong>Customer data requests</strong> — we store only customer ID
+          references and order references (no names, emails, phone numbers
+          or addresses), so there is no additional personal information
+          beyond what Shopify itself holds to disclose.
         </li>
         <li>
           <strong>Customer redaction</strong> — we remove the requested
-          customer's ID from any discount eligibility lists we maintain.
+          customer's ID from discount eligibility lists, delete their code
+          usage counts, and remove the customer link from redemption and
+          access-log records.
         </li>
         <li>
           <strong>Shop redaction</strong> — we permanently delete all

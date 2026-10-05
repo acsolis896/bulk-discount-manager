@@ -12,6 +12,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   await db.preUsedCode.deleteMany({ where: { shop } });
   await db.blockedProductType.deleteMany({ where: { shop } });
   await db.singleCodeDiscount.deleteMany({ where: { shop } });
+  await db.issuedCode.deleteMany({ where: { shop } });
+  await db.codeUsageCount.deleteMany({ where: { shop } });
+  await db.codeRedemption.deleteMany({ where: { shop } });
+  await db.personalDataAccessLog.deleteMany({ where: { shop } });
 
   return new Response();
 };
