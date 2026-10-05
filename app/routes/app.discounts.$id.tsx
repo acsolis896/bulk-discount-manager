@@ -701,11 +701,12 @@ export default function DiscountDetails() {
         </s-banner>
       )}
       {configTooLarge && (
-        <s-banner title="This set covers too many products to apply" tone="warning">
+        <s-banner title="This set's saved product list is too large to apply" tone="warning">
           <s-paragraph>
-            Shopify only lets a discount keep about 230 products, and this set's selection is larger, so its codes
-            won't apply at checkout (shoppers see "valid but not applicable"). Create the set again with a smaller
-            collection, split it across several sets, or select products individually.
+            Shopify can't read a product list this long, so its codes won't apply at checkout (shoppers see "valid but
+            not applicable"). To fix it, use "Edit by collection" under Eligible items, pick the collection again and
+            save. Collections are matched live, with no size limit. If the set was built from individually selected
+            products, choose a collection or split them across several sets.
           </s-paragraph>
         </s-banner>
       )}

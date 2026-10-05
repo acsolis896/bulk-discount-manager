@@ -34,8 +34,8 @@ export function configTooLargeForFunction(value: string): boolean {
 }
 
 /**
- * Returns a merchant-facing message if this many product IDs won't fit in the config the
- * Function reads, otherwise null. Pass the real size of the other settings when known.
+ * Returns a merchant-facing message if this many individually selected product IDs won't fit in the
+ * config the Function reads, otherwise null. Collections are matched live and are not counted. Pass the real size of the other settings when known.
  */
 export function configSizeProblem(productIds: string[], otherSettingsBytes = DEFAULT_OTHER_SETTINGS_BYTES): string | null {
   const listBytes = configByteLength(JSON.stringify(productIds));
@@ -43,9 +43,9 @@ export function configSizeProblem(productIds: string[], otherSettingsBytes = DEF
   const perProduct = Math.ceil(listBytes / Math.max(productIds.length, 1));
   const max = Math.max(0, Math.floor((FUNCTION_CONFIG_LIMIT_BYTES - otherSettingsBytes) / perProduct));
   return (
-    `This selection covers ${productIds.length} products, but Shopify only lets a discount keep about ${max}, ` +
-    `so its codes would never apply at checkout. Choose a smaller collection, split it across several sets, ` +
-    `or select products individually.`
+    `You selected ${productIds.length} products one by one, but Shopify only lets a discount keep about ${max} ` +
+    `of those, so its codes would never apply at checkout. Choose a collection instead (collections can be any ` +
+    `size), or split the products across several sets.`
   );
 }
 
