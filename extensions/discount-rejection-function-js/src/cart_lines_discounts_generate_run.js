@@ -18,7 +18,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const { productIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, allowedCountries, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
+  const { productIds, collectionIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, allowedCountries, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
 
   const rejectableCodes = () =>
     (input.enteredDiscountCodes ?? []).filter((c) => c.rejectable).map((c) => ({ code: c.code }));
@@ -111,16 +111,25 @@ export function cartLinesDiscountsGenerateRun(input) {
   const isFixedAmount = discountType === "fixedAmount";
   const hasValue = isFixedAmount ? Boolean(fixedAmount) : Boolean(percentage);
 
-  if (!Array.isArray(productIds) || productIds.length === 0 || !hasValue) {
+  // Eligibility comes from a stored product list when there is one (everything created
+  // before this, including collection-based sets, which stored every product in the
+  // collection), and otherwise from live collection membership. A long product list
+  // can't be used for big collections: Shopify gives a Function null for a metafield
+  // over 10,000 bytes, so new collection-based sets store only collectionIds.
+  const hasProductList = Array.isArray(productIds) && productIds.length > 0;
+  const hasCollections = Array.isArray(collectionIds) && collectionIds.length > 0;
+
+  if ((!hasProductList && !hasCollections) || !hasValue) {
     return { operations: [] };
   }
 
-  const numericIds = productIds.map((id) => id.split("/").pop());
+  const numericIds = hasProductList ? productIds.map((id) => id.split("/").pop()) : [];
 
   const eligibleLines = input.cart.lines.filter((line) => {
-    const productId = line.merchandise?.product?.id;
-    if (!productId) return false;
-    return numericIds.includes(productId.split("/").pop());
+    const product = line.merchandise?.product;
+    if (!product?.id) return false;
+    if (hasProductList) return numericIds.includes(product.id.split("/").pop());
+    return product.inAnyCollection === true;
   });
 
   if (eligibleLines.length === 0) return { operations: [] };

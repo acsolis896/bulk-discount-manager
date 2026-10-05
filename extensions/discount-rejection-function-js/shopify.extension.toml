@@ -12,6 +12,11 @@ description = "t:description"
   input_query = "src/cart_lines_discounts_generate_run.graphql"
   export = "cart-lines-discounts-generate-run"
 
+  # Feeds the query variable $collectionIds from this metafield's top-level key of the same name.
+  [extensions.input.variables]
+  namespace = "$app"
+  key = "function-configuration"
+
   [extensions.ui.paths]
   create = "/app/discounts/new"
   details = "/app/discounts/:id"

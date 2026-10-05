@@ -1,4 +1,7 @@
-query CartLinesDiscountsGenerateRunInput {
+# $collectionIds comes from the discount's function-configuration metafield (see
+# [extensions.input.variables] in shopify.extension.toml). It is null for discounts
+# that have no collectionIds, and inAnyCollection then falls back to its default [].
+query CartLinesDiscountsGenerateRunInput($collectionIds: [ID!]) {
   cart {
     buyerIdentity {
       customer {
@@ -18,6 +21,7 @@ query CartLinesDiscountsGenerateRunInput {
           product {
             id
             productType
+            inAnyCollection(ids: $collectionIds)
           }
         }
       }

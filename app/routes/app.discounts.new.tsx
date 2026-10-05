@@ -144,51 +144,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       };
     }
 
-    // Expand collection IDs → product IDs
-    let resolvedProductIds = [...productIds];
-    const collectionErrorMessages: string[] = [];
-    if (collectionIds.length > 0) {
-      for (const collectionId of collectionIds) {
-        let cursor: string | null = null;
-        do {
-          const colRes = await admin.graphql(
-            `#graphql
-            query CollectionProducts($id: ID!, $after: String) {
-              collection(id: $id) {
-                products(first: 250, after: $after) {
-                  nodes { id }
-                  pageInfo { hasNextPage endCursor }
-                }
-              }
-            }`,
-            { variables: { id: collectionId, after: cursor } }
-          );
-          const colData = await colRes.json();
-          if (colData.errors) {
-            console.error(`CollectionProducts query failed for ${collectionId}:`, JSON.stringify(colData.errors));
-            collectionErrorMessages.push(colData.errors[0]?.message ?? "Unknown error");
-            break;
-          }
-          if (!colData.data?.collection) {
-            console.error(`Collection not found or inaccessible: ${collectionId}`, JSON.stringify(colData));
-            collectionErrorMessages.push("collection not found");
-            break;
-          }
-          const products = colData.data.collection.products;
-          for (const p of products?.nodes ?? []) {
-            if (!resolvedProductIds.includes(p.id)) resolvedProductIds.push(p.id);
-          }
-          cursor = products?.pageInfo?.hasNextPage ? products.pageInfo.endCursor : null;
-        } while (cursor);
-      }
-    }
-
-    if (resolvedProductIds.length === 0) {
-      return {
-        error: collectionErrorMessages.length > 0
-          ? `Couldn't read the selected collection(s): ${collectionErrorMessages[0]}. Please try again in a moment.`
-          : "No products found in the selected collections. If you just created or edited this collection, wait a few minutes for Shopify to finish updating it, then try again.",
-      };
+    // Collections are not expanded into product IDs. The Function checks membership live, because a long
+    // product list can pass the 10,000-byte limit Shopify applies to what a Function can read.
+    const resolvedProductIds = [...productIds];
+    if (productIds.length === 0 && collectionIds.length === 0) {
+      return { error: "Select at least one eligible product or collection." };
     }
 
     const sizeProblem = configSizeProblem(resolvedProductIds);
