@@ -29,3 +29,11 @@
       the staging database
 - [ ] Private key stored offline and recovery tested
 - [ ] Restore test repeated yearly
+
+## Restore drill log
+- 2026-10-05: downloaded `db/backup-2026-10-05T16-36-14Z.sql.gz.age`, confirmed it is
+  unreadable without the key (starts with the age header, no plaintext), decrypted it
+  with the private key and restored it into a scratch local Postgres 18 database. All 9
+  tables were present and row counts looked right. The scratch database and the
+  downloaded file were deleted afterwards. Repeat into the staging database once it
+  exists, then tick the staging item above.

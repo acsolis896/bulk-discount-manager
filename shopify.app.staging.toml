@@ -1,0 +1,42 @@
+# Staging copy of the app. Separate Shopify app, separate Railway environment and database,
+# installed only on development stores. Deploy with: npm run deploy:staging
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "bcccae485f3bd2d1d1a98c427e14a4bd"
+name = "Staging Discount Codes & Rules"
+application_url = "https://just-abundance-staging.up.railway.app"
+embedded = true
+
+[build]
+
+[webhooks]
+api_version = "2026-04"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "/webhooks/orders/create"
+
+  [webhooks.privacy_compliance]
+  customer_deletion_url = "/webhooks/customers/redact"
+  customer_data_request_url = "/webhooks/customers/data_request"
+  shop_deletion_url = "/webhooks/shop/redact"
+
+[access_scopes]
+scopes = "write_discounts,read_products,read_customers,write_customers,read_orders"
+
+[discount.metafields.app.function-configuration]
+type = "json"
+name = "Function configuration"
+access.admin = "merchant_read_write"
+access.storefront = "none"
+
+[auth]
+redirect_urls = [ "https://just-abundance-staging.up.railway.app/auth/callback" ]
