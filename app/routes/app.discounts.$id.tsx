@@ -607,6 +607,17 @@ export default function DiscountDetails() {
     fetcher.submit(form, { method: "post" });
   };
 
+  // Re-saves the set's current collections through the same action as "Edit by collection", which
+  // writes the up-to-date format. Not a useCallback, so it always sees the current values.
+  const handleRepairSet = () => {
+    const form = new FormData();
+    form.append("intent", "updateItems");
+    form.append("productIds", JSON.stringify([]));
+    form.append("collectionIds", JSON.stringify(eligibleCollectionIds));
+    form.append("percentage", String(percentage ?? 0));
+    fetcher.submit(form, { method: "post" });
+  };
+
   const handleUpdateEndsAt = useCallback(() => {
     const form = new FormData();
     form.append("intent", "updateEndsAt");
@@ -772,29 +783,38 @@ export default function DiscountDetails() {
         </s-banner>
       )}
       {configNeedsResave && (
-        <s-banner title="This set needs to be saved again" tone="warning">
-          <s-paragraph>
-            It was saved in an earlier format, so its codes won't apply at checkout (shoppers see "valid but not
-            applicable"). To fix it, use "Edit by collection" under Eligible items, pick the collection(s) again and save.
-          </s-paragraph>
+        <s-banner heading="Codes in this set aren't applying yet" tone="warning">
+          <s-stack direction="block" gap="small">
+            <s-paragraph>This set was saved before a recent update. Fix it to make its codes work again.</s-paragraph>
+            <div>
+              <s-button variant="primary" onClick={handleRepairSet} disabled={fetcher.state !== "idle"}>
+                {fetcher.state !== "idle" ? "Fixing…" : "Fix now"}
+              </s-button>
+            </div>
+          </s-stack>
         </s-banner>
       )}
       {configTooLarge && (
-        <s-banner title="This set's saved product list is too large to apply" tone="warning">
-          <s-paragraph>
-            Shopify can't read a product list this long, so its codes won't apply at checkout (shoppers see "valid but
-            not applicable"). To fix it, use "Edit by collection" under Eligible items, pick the collection again and
-            save. Collections are matched live, with no size limit. If the set was built from individually selected
-            products, choose a collection or split them across several sets.
-          </s-paragraph>
+        <s-banner heading="Codes in this set aren't applying" tone="warning">
+          {eligibleCollectionIds.length > 0 ? (
+            <s-stack direction="block" gap="small">
+              <s-paragraph>This set's product list is too long for Shopify to read. Fix it to match by collection instead.</s-paragraph>
+              <div>
+                <s-button variant="primary" onClick={handleRepairSet} disabled={fetcher.state !== "idle"}>
+                  {fetcher.state !== "idle" ? "Fixing…" : "Fix now"}
+                </s-button>
+              </div>
+            </s-stack>
+          ) : (
+            <s-paragraph>
+              This set's product list is too long for Shopify to read. Choose a collection instead, or split the products across several sets.
+            </s-paragraph>
+          )}
         </s-banner>
       )}
       {configMissing && (
-        <s-banner title="This discount set has no saved settings" tone="warning">
-          <s-paragraph>
-            Its discount value, eligible items and other settings are missing, so its codes won't apply at checkout
-            (shoppers see "valid but not applicable"). Create the set again to restore them.
-          </s-paragraph>
+        <s-banner heading="This set has no saved settings" tone="warning">
+          <s-paragraph>Its codes won't apply at checkout. Create the set again to restore them.</s-paragraph>
         </s-banner>
       )}
 
