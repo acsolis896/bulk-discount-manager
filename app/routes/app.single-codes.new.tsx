@@ -85,6 +85,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const sizeProblem = configSizeProblem(resolvedProductIds);
   if (sizeProblem) return { error: sizeProblem };
 
+  // Fetch blocked product types
+  const blockedRows = await db.blockedProductType.findMany({
+    where: { shop: session.shop },
+    select: { productType: true },
+  });
+  const blockedProductTypes = blockedRows.length > 0
+    ? blockedRows.map((r: { productType: string }) => r.productType)
+    : ["GWP"];
+
   // Create discount
   const createRes = await admin.graphql(
     `#graphql
