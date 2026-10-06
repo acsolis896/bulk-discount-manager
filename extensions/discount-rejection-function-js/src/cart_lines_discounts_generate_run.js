@@ -18,7 +18,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const { productIds, collectionIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, allowedCountries, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
+  const { productIds, collectionIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, maxCartItems, allowedCountries, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
 
   const rejectableCodes = () =>
     (input.enteredDiscountCodes ?? []).filter((c) => c.rejectable).map((c) => ({ code: c.code }));
@@ -68,6 +68,31 @@ export function cartLinesDiscountsGenerateRun(input) {
               enteredDiscountCodesReject: {
                 codes,
                 message: `This discount code is only valid for orders shipping to ${allowedCountries.join(", ")}.`,
+              },
+            },
+          ],
+        };
+      }
+      return { operations: [] };
+    }
+  }
+
+  // Optional cap on the cart's total units (1 = single-item orders only). It counts every
+  // line in the cart, not just the items this code applies to.
+  if (Number.isInteger(maxCartItems) && maxCartItems > 0) {
+    const cartUnits = input.cart.lines.reduce((sum, line) => sum + line.quantity, 0);
+    if (cartUnits > maxCartItems) {
+      const codes = rejectableCodes();
+      if (codes.length > 0) {
+        return {
+          operations: [
+            {
+              enteredDiscountCodesReject: {
+                codes,
+                message:
+                  maxCartItems === 1
+                    ? "This discount code is only valid for single-item orders."
+                    : `This discount code is only valid for orders with ${maxCartItems} items or fewer.`,
               },
             },
           ],
