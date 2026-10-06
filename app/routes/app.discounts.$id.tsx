@@ -600,7 +600,7 @@ export default function DiscountDetails() {
     } finally {
       setEditingItems(false);
     }
-  }, [shopify, eligibleProductIds, percentage, fetcher]);
+  }, [shopify, eligibleProductIds, eligibleCollectionIds, percentage, fetcher]);
 
   const PAGE_SIZE = 50;
   const [search, setSearch] = useState("");

@@ -448,7 +448,7 @@ export default function CreateBulkDiscount() {
       formData.set("productIds", JSON.stringify([]));
     }
     fetcher.submit(formData, { method: "POST", encType: "multipart/form-data" });
-  }, [fetcher, title, discountType, percentage, fixedAmount, oncePerOrder, maxDiscountedItems, allowedCountries, eligibilityMode, requiredTag, blockedTag, selectedSegmentId, codeMode, csvFile, prefix, codeCount, codeLength, selectionType, selectedItems]);
+  }, [fetcher, title, discountType, percentage, fixedAmount, oncePerOrder, maxDiscountedItems, allowedCountries, endsAt, usageLimitOne, oncePerCustomer, combinesWithProduct, combinesWithOrder, combinesWithShipping, eligibilityMode, requiredTag, blockedTag, selectedSegmentId, codeMode, csvFile, prefix, codeCount, codeLength, selectionType, selectedItems]);
 
   const handleReset = useCallback(() => {
     setTitle("Bulk Discount");
