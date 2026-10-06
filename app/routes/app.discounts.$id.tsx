@@ -783,7 +783,7 @@ export default function DiscountDetails() {
         </s-banner>
       )}
       {configNeedsResave && (
-        <s-banner heading="This discount set needs to be updated and saved again." tone="warning">
+        <s-banner heading="This discount set needs to be saved again." tone="warning">
           <s-stack direction="block" gap="small">
             <s-paragraph>This set was saved before a recent update. Fix it to make its codes work again.</s-paragraph>
             <div>
