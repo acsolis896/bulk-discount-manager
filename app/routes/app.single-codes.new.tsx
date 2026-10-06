@@ -45,6 +45,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: "Uses per customer must be a whole number of 1 or more." };
   }
   const usesPerCustomerLimit = parsedUsesLimit !== null ? Math.floor(parsedUsesLimit) : null;
+
+  const maxCartItemsRaw = String(formData.get("maxCartItems") || "").trim();
+  const parsedMaxCartItems = maxCartItemsRaw ? Number(maxCartItemsRaw) : null;
+  if (parsedMaxCartItems !== null && (!Number.isFinite(parsedMaxCartItems) || parsedMaxCartItems < 1)) {
+    return { error: "Maximum items in the cart must be a whole number of 1 or more." };
+  }
+  const maxCartItems = parsedMaxCartItems !== null ? Math.floor(parsedMaxCartItems) : null;
   const eligibilityMode = (["all", "tags", "segment"] as const).includes(String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
     ? (String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
     : "all";
@@ -141,6 +148,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     ...(discountType === "fixedAmount" ? { fixedAmount } : { percentage }),
     oncePerOrder,
     ...(maxDiscountedItems !== null ? { maxDiscountedItems } : {}),
+    ...(maxCartItems !== null ? { maxCartItems } : {}),
     ...(allowedCountries.length > 0 ? { allowedCountries } : {}),
     blockedProductTypes,
     requiredTag,
@@ -263,6 +271,7 @@ export default function NewSingleCodePage() {
   const [maxDiscountedItems, setMaxDiscountedItems] = useState("");
   const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState("");
+  const [maxCartItems, setMaxCartItems] = useState("");
   const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">("all");
   const [requiredTag, setRequiredTag] = useState("");
   const [blockedTag, setBlockedTag] = useState("");
@@ -330,6 +339,7 @@ export default function NewSingleCodePage() {
     form.set("maxDiscountedItems", maxDiscountedItems);
     form.set("allowedCountries", JSON.stringify(allowedCountries));
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
+    form.set("maxCartItems", maxCartItems);
     form.set("eligibilityMode", eligibilityMode);
     form.set("requiredTag", requiredTag);
     form.set("blockedTag", blockedTag);
@@ -456,6 +466,17 @@ export default function NewSingleCodePage() {
             placeholder="Unlimited"
             details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code — e.g. 5."
             onInput={numericInputHandler("integer", setUsesPerCustomerLimit)}
+          />
+        </div>
+        <div style={{ marginTop: "16px" }}>
+          <s-number-field
+            label="Maximum items in the cart (optional)"
+            inputMode="numeric"
+            value={maxCartItems}
+            min={1}
+            placeholder="No limit"
+            details="Leave blank for no limit. Set a number to stop this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
+            onInput={numericInputHandler("integer", setMaxCartItems)}
           />
         </div>
         <div style={{ marginTop: "16px" }}>

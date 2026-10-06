@@ -395,6 +395,39 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return { endsAtUpdated: true };
   }
 
+  if (intent === "updateCombinations") {
+    const appDiscountId = gid.replace("DiscountCodeNode", "DiscountCodeApp");
+    const combinesWith = {
+      productDiscounts: formData.get("combinesWithProduct") === "1",
+      orderDiscounts: formData.get("combinesWithOrder") === "1",
+      shippingDiscounts: formData.get("combinesWithShipping") === "1",
+    };
+
+    const res = await admin.graphql(
+      `#graphql
+      mutation UpdateDiscountCombinations($id: ID!, $input: DiscountCodeAppInput!) {
+        discountCodeAppUpdate(id: $id, codeAppDiscount: $input) {
+          userErrors { field message }
+        }
+      }`,
+      { variables: { id: appDiscountId, input: { combinesWith } } }
+    );
+    const data = (await res.json()) as {
+      data?: { discountCodeAppUpdate?: { userErrors?: { message: string }[] } | null };
+      errors?: { message?: string }[];
+    };
+    const result = data.data?.discountCodeAppUpdate;
+    const errors = result?.userErrors ?? [];
+    if (errors.length > 0) {
+      return { combinationsError: `Updating combinations: ${errors.map((e) => e.message).join(", ")}` };
+    }
+    if (!result) {
+      return { combinationsError: `Updating combinations: ${data.errors?.[0]?.message ?? "Shopify did not confirm the change"}.` };
+    }
+
+    return { combinationsUpdated: true };
+  }
+
   if (intent === "updateItems") {
     const productIds: string[] = JSON.parse(formData.get("productIds") as string ?? "[]");
     const collectionIds: string[] = JSON.parse(formData.get("collectionIds") as string ?? "[]");
@@ -535,6 +568,23 @@ export default function DiscountDetails() {
   const [editingItems, setEditingItems] = useState(false);
 
   const [endsAtInput, setEndsAtInput] = useState(endsAt ? new Date(endsAt).toISOString().split("T")[0] : "");
+
+  const [comboChoices, setComboChoices] = useState({
+    product: combinesWith.productDiscounts,
+    order: combinesWith.orderDiscounts,
+    shipping: combinesWith.shippingDiscounts,
+  });
+
+  // Deliberately not a useCallback: a stale dependency list here is what made the create
+  // form submit old checkbox values.
+  const handleUpdateCombinations = () => {
+    const form = new FormData();
+    form.append("intent", "updateCombinations");
+    form.append("combinesWithProduct", comboChoices.product ? "1" : "0");
+    form.append("combinesWithOrder", comboChoices.order ? "1" : "0");
+    form.append("combinesWithShipping", comboChoices.shipping ? "1" : "0");
+    fetcher.submit(form, { method: "post" });
+  };
 
   const handleUpdateEndsAt = useCallback(() => {
     const form = new FormData();
@@ -1044,6 +1094,42 @@ export default function DiscountDetails() {
               <div>
                 <s-button variant="primary" onClick={handleUpdateEndsAt} disabled={fetcher.state !== "idle"}>
                   {fetcher.state !== "idle" ? "Saving…" : "Update expiration"}
+                </s-button>
+              </div>
+            </s-stack>
+          </s-section>
+
+          <s-section heading="Combinations">
+            <s-stack direction="block" gap="small">
+              {(fetcher.data as { combinationsUpdated?: boolean })?.combinationsUpdated && (
+                <s-banner tone="success">
+                  <s-paragraph>Combinations updated.</s-paragraph>
+                </s-banner>
+              )}
+              {(fetcher.data as { combinationsError?: string })?.combinationsError && (
+                <s-banner tone="critical">
+                  <s-paragraph>{(fetcher.data as { combinationsError: string }).combinationsError}</s-paragraph>
+                </s-banner>
+              )}
+              <s-paragraph>Choose whether this discount can be combined with other discount types.</s-paragraph>
+              <s-checkbox
+                label="Product discounts"
+                checked={comboChoices.product}
+                onChange={(e: { target: { checked: boolean } }) => setComboChoices((c) => ({ ...c, product: e.target.checked }))}
+              />
+              <s-checkbox
+                label="Order discounts"
+                checked={comboChoices.order}
+                onChange={(e: { target: { checked: boolean } }) => setComboChoices((c) => ({ ...c, order: e.target.checked }))}
+              />
+              <s-checkbox
+                label="Shipping discounts"
+                checked={comboChoices.shipping}
+                onChange={(e: { target: { checked: boolean } }) => setComboChoices((c) => ({ ...c, shipping: e.target.checked }))}
+              />
+              <div>
+                <s-button variant="primary" onClick={handleUpdateCombinations} disabled={fetcher.state !== "idle"}>
+                  {fetcher.state !== "idle" ? "Saving…" : "Update combinations"}
                 </s-button>
               </div>
             </s-stack>

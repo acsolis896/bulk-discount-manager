@@ -129,6 +129,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     oncePerOrder: config.oncePerOrder !== false,
     allowedCountries: Array.isArray(config.allowedCountries) ? (config.allowedCountries as string[]) : [],
     maxDiscountedItems: Number.isInteger(config.maxDiscountedItems) && (config.maxDiscountedItems as number) > 0 ? (config.maxDiscountedItems as number) : null,
+    maxCartItems: Number.isInteger(config.maxCartItems) && (config.maxCartItems as number) > 0 ? (config.maxCartItems as number) : null,
     productIds,
     collectionIds,
     collectionTitles,
@@ -173,6 +174,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return { error: "Uses per customer must be a whole number of 1 or more." };
     }
     const usesPerCustomerLimit = parsedUsesLimit !== null ? Math.floor(parsedUsesLimit) : null;
+    const maxCartItemsRaw = String(formData.get("maxCartItems") || "").trim();
+    const parsedMaxCartItems = maxCartItemsRaw ? Number(maxCartItemsRaw) : null;
+    if (parsedMaxCartItems !== null && (!Number.isFinite(parsedMaxCartItems) || parsedMaxCartItems < 1)) {
+      return { error: "Maximum items in the cart must be a whole number of 1 or more." };
+    }
+    const maxCartItems = parsedMaxCartItems !== null ? Math.floor(parsedMaxCartItems) : null;
 
     if (discountType === "percentage") {
       if (!percentage || percentage < 1 || percentage > 100) return { error: "Percentage must be between 1 and 100." };
@@ -219,6 +226,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       fixedAmount: discountType === "fixedAmount" ? fixedAmount : undefined,
       oncePerOrder,
       maxDiscountedItems: maxDiscountedItems ?? undefined,
+      maxCartItems: maxCartItems ?? undefined,
       allowedCountries: allowedCountries.length > 0 ? allowedCountries : undefined,
       requiredTag,
       blockedTag,
@@ -261,6 +269,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       fixedAmount: discountType === "fixedAmount" ? fixedAmount : undefined,
       oncePerOrder,
       maxDiscountedItems: maxDiscountedItems ?? undefined,
+      maxCartItems: maxCartItems ?? undefined,
       allowedCountries: allowedCountries.length > 0 ? allowedCountries : undefined,
       blockedProductTypes: existing.blockedProductTypes ?? ["GWP"],
       requiredTag,
@@ -375,6 +384,7 @@ export default function SingleCodeDetailsPage() {
   const [collectionIds, setCollectionIds] = useState<string[]>(loaderData.collectionIds);
   const [collectionTitles, setCollectionTitles] = useState<string[]>(loaderData.collectionTitles);
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState(String(loaderData.usesPerCustomerLimit ?? ""));
+  const [maxCartItems, setMaxCartItems] = useState(loaderData.maxCartItems ? String(loaderData.maxCartItems) : "");
 
   const isSaving = fetcher.state !== "idle";
   const result = fetcher.data as { error?: string; success?: boolean; deleted?: boolean; eligibilityWarning?: string | null; usageReset?: boolean } | undefined;
@@ -429,6 +439,7 @@ export default function SingleCodeDetailsPage() {
     form.set("productIds", JSON.stringify(productIds));
     form.set("collectionIds", JSON.stringify(collectionIds));
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
+    form.set("maxCartItems", maxCartItems);
     fetcher.submit(form, { method: "post" });
   };
 
@@ -641,6 +652,17 @@ export default function SingleCodeDetailsPage() {
                 />
               </div>
             )}
+            <div style={{ marginTop: "16px" }}>
+              <s-number-field
+                label="Maximum items in the cart (optional)"
+                inputMode="numeric"
+                value={maxCartItems}
+                min={1}
+                placeholder="No limit"
+                details="Leave blank for no limit. Set a number to stop this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
+                onInput={numericInputHandler("integer", setMaxCartItems)}
+              />
+            </div>
             <div style={{ marginTop: "16px" }}>
               <s-number-field
                 label="Limit uses per customer (optional)"
