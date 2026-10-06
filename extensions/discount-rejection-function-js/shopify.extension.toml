@@ -12,7 +12,9 @@ description = "t:description"
   input_query = "src/cart_lines_discounts_generate_run.graphql"
   export = "cart-lines-discounts-generate-run"
 
-  # Feeds the query variable $collectionIds from this metafield's top-level key of the same name.
+  # Feeds the query variable $liveCollectionIds from this metafield's top-level key of the same name.
+  # (Not collectionIds: old configs can hold over 100 collections, and Shopify refuses to run the
+  # Function for any list variable over 100 entries.)
   [extensions.input.variables]
   namespace = "$app"
   key = "function-configuration"

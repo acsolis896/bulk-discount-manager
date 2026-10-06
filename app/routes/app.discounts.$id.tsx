@@ -9,7 +9,7 @@ import { numericInputHandler } from "../numeric-input";
 import { checkCodeQuota } from "../billing.server";
 import { countryName } from "../countries";
 import { useCountryRestrictionEnabled } from "../feature-flags";
-import { saveFunctionConfig, configSizeProblem, configByteLength, configTooLargeForFunction } from "../function-config.server";
+import { saveFunctionConfig, configSizeProblem, configByteLength, configTooLargeForFunction, splitCollections, expandCollectionProducts } from "../function-config.server";
 
 type RedeemCode = { code: string; usageCount: number };
 type ParsedCode = { code: string; used: boolean };
@@ -193,6 +193,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     let oncePerOrder = true;
     let maxDiscountedItems: number | null = null;
     let allowedCountries: string[] = [];
+    let hasLiveCollections = false;
     try {
       if (rawConfig) {
         const cfg = JSON.parse(rawConfig);
@@ -204,8 +205,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         oncePerOrder = cfg.oncePerOrder !== false;
         maxDiscountedItems = Number.isInteger(cfg.maxDiscountedItems) && cfg.maxDiscountedItems > 0 ? cfg.maxDiscountedItems : null;
         allowedCountries = Array.isArray(cfg.allowedCountries) ? cfg.allowedCountries : [];
+        hasLiveCollections = Array.isArray(cfg.liveCollectionIds) && cfg.liveCollectionIds.length > 0;
       }
     } catch { /* ignore */ }
+
+    // Saved by an earlier release as collections only (no product list, no live list): the
+    // Function can't match anything until the set is saved again.
+    const configNeedsResave = eligibleProductIds.length === 0 && eligibleCollectionIds.length > 0 && !hasLiveCollections;
 
     // Prefer showing collections if they were used; fall back to products
     let eligibleProducts: { id: string; title: string }[] = [];
@@ -237,7 +243,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
     }
 
-    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, error: null as string | null };
+    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -269,6 +275,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       fixedAmount: null as number | null,
       configMissing: false,
       configTooLarge: false,
+      configNeedsResave: false,
       error: err instanceof Error ? err.message : String(err),
     };
   }
@@ -433,12 +440,26 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const collectionIds: string[] = JSON.parse(formData.get("collectionIds") as string ?? "[]");
     const percentage = Number(formData.get("percentage") ?? 0);
 
-    // Collections are not expanded into product IDs. The Function checks membership live, because a long
-    // product list can pass the 10,000-byte limit Shopify applies to what a Function can read.
-    const resolvedProductIds = [...productIds];
-    if (productIds.length === 0 && collectionIds.length === 0) {
-      return { error: "Select at least one product or collection." };
+    // Up to 100 collections are matched live at checkout, so the config stores only their IDs (a
+    // long product list can pass the 10,000-byte limit Shopify applies to what a Function can read).
+    // Over 100, Shopify can't take them as a list variable, so list the products in them instead.
+    const { liveCollectionIds, expandCollectionIds } = splitCollections(collectionIds);
+    let resolvedProductIds = [...productIds];
+    if (expandCollectionIds.length > 0) {
+      const expanded = await expandCollectionProducts(admin, expandCollectionIds);
+      if (expanded.error) return { error: expanded.error };
+      resolvedProductIds = [...new Set([...resolvedProductIds, ...expanded.productIds])];
     }
+    if (resolvedProductIds.length === 0 && liveCollectionIds.length === 0) {
+      return {
+        error: expandCollectionIds.length > 0
+          ? "No products found in the selected collections. If you just created or edited them, wait a few minutes for Shopify to finish updating, then try again."
+          : "Select at least one product or collection.",
+      };
+    }
+
+    const itemsSizeProblem = configSizeProblem(resolvedProductIds);
+    if (itemsSizeProblem) return { error: itemsSizeProblem };
 
     // Read existing metafield to preserve other config (blockedProductTypes etc.)
     const existing = await admin.graphql(
@@ -461,8 +482,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     // discount has no percentage field in its form, so don't stomp its config.
     const newConfig =
       existingConfig.discountType === "fixedAmount"
-        ? { ...existingConfig, productIds: resolvedProductIds, collectionIds }
-        : { ...existingConfig, productIds: resolvedProductIds, collectionIds, percentage };
+        ? { ...existingConfig, productIds: resolvedProductIds, collectionIds, liveCollectionIds: liveCollectionIds.length > 0 ? liveCollectionIds : undefined }
+        : { ...existingConfig, productIds: resolvedProductIds, collectionIds, liveCollectionIds: liveCollectionIds.length > 0 ? liveCollectionIds : undefined, percentage };
 
     // Refuse before writing, so a collection that has grown too big can't replace a
     // working config with one the Function would never receive.
@@ -542,7 +563,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 export default function DiscountDetails() {
   const countryRestrictionEnabled = useCountryRestrictionEnabled();
-  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, error } = useLoaderData<typeof loader>();
+  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -748,6 +769,14 @@ export default function DiscountDetails() {
       {error && (
         <s-banner title="Error" tone="critical">
           <s-paragraph>{error}</s-paragraph>
+        </s-banner>
+      )}
+      {configNeedsResave && (
+        <s-banner title="This set needs to be saved again" tone="warning">
+          <s-paragraph>
+            It was saved in an earlier format, so its codes won't apply at checkout (shoppers see "valid but not
+            applicable"). To fix it, use "Edit by collection" under Eligible items, pick the collection(s) again and save.
+          </s-paragraph>
         </s-banner>
       )}
       {configTooLarge && (

@@ -7,7 +7,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
-import { saveFunctionConfig, configSizeProblem } from "../function-config.server";
+import { saveFunctionConfig, configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota } from "../billing.server";
@@ -82,11 +82,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     };
   }
 
-  // Collections are not expanded into product IDs. The Function checks membership live, because a long
-  // product list can pass the 10,000-byte limit Shopify applies to what a Function can read.
-  const resolvedProductIds = [...productIds];
-  if (productIds.length === 0 && collectionIds.length === 0) {
-    return { error: "Select at least one eligible product or collection." };
+  // Up to 100 collections are matched live at checkout, so the config stores only their IDs (a
+  // long product list can pass the 10,000-byte limit Shopify applies to what a Function can read).
+  // Over 100, Shopify can't take them as a list variable, so list the products in them instead.
+  const { liveCollectionIds, expandCollectionIds } = splitCollections(collectionIds);
+  let resolvedProductIds = [...productIds];
+  if (expandCollectionIds.length > 0) {
+    const expanded = await expandCollectionProducts(admin, expandCollectionIds);
+    if (expanded.error) return { error: expanded.error };
+    resolvedProductIds = [...new Set([...resolvedProductIds, ...expanded.productIds])];
+  }
+  if (resolvedProductIds.length === 0 && liveCollectionIds.length === 0) {
+    return {
+      error: expandCollectionIds.length > 0
+        ? "No products found in the selected collections. If you just created or edited them, wait a few minutes for Shopify to finish updating, then try again."
+        : "Select at least one eligible product or collection.",
+    };
   }
 
   const sizeProblem = configSizeProblem(resolvedProductIds);
@@ -144,6 +155,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const metafieldConfig = JSON.stringify({
     productIds: resolvedProductIds,
     collectionIds,
+    ...(liveCollectionIds.length > 0 ? { liveCollectionIds } : {}),
     discountType,
     ...(discountType === "fixedAmount" ? { fixedAmount } : { percentage }),
     oncePerOrder,

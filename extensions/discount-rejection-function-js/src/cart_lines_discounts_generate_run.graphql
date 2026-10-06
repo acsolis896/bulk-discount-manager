@@ -1,7 +1,10 @@
-# $collectionIds comes from the discount's function-configuration metafield (see
-# [extensions.input.variables] in shopify.extension.toml). It is null for discounts
-# that have no collectionIds, and inAnyCollection then falls back to its default [].
-query CartLinesDiscountsGenerateRunInput($collectionIds: [ID!]) {
+# $liveCollectionIds comes from the `liveCollectionIds` key of the discount's
+# function-configuration metafield (see [extensions.input.variables] in
+# shopify.extension.toml). Shopify refuses to run a Function when a list variable has
+# more than 100 entries, so only sets that are matched by collection carry this key and
+# the app caps it at 100. It is null for every other discount, and inAnyCollection then
+# falls back to its default [].
+query CartLinesDiscountsGenerateRunInput($liveCollectionIds: [ID!]) {
   cart {
     buyerIdentity {
       customer {
@@ -21,7 +24,7 @@ query CartLinesDiscountsGenerateRunInput($collectionIds: [ID!]) {
           product {
             id
             productType
-            inAnyCollection(ids: $collectionIds)
+            inAnyCollection(ids: $liveCollectionIds)
           }
         }
       }

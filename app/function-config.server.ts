@@ -24,6 +24,61 @@ const READ_CONFIG = `#graphql
 export const FUNCTION_CONFIG_LIMIT_BYTES = 10_000;
 const DEFAULT_OTHER_SETTINGS_BYTES = 1_000; // value, countries, blocked types, tags...
 
+// Shopify refuses to run a Function whose input query has a list variable over 100 entries.
+// Collections matched live are passed that way, so at most this many can be matched live.
+// Selecting more falls back to listing every product in them (and the size limit above).
+export const MAX_LIVE_COLLECTIONS = 100;
+
+export type CollectionSplit = {
+  /** Collections matched live at checkout (stored as liveCollectionIds). */
+  liveCollectionIds: string[];
+  /** Collections to expand into product IDs instead (too many to match live). */
+  expandCollectionIds: string[];
+};
+
+export function splitCollections(collectionIds: string[]): CollectionSplit {
+  return collectionIds.length <= MAX_LIVE_COLLECTIONS
+    ? { liveCollectionIds: collectionIds, expandCollectionIds: [] }
+    : { liveCollectionIds: [], expandCollectionIds: collectionIds };
+}
+
+/** Lists the product IDs in the given collections (used only when over MAX_LIVE_COLLECTIONS). */
+export async function expandCollectionProducts(
+  admin: AdminApiContext,
+  collectionIds: string[]
+): Promise<{ productIds: string[]; error?: string }> {
+  const seen = new Set<string>();
+  for (const collectionId of collectionIds) {
+    let cursor: string | null = null;
+    do {
+      const res = await admin.graphql(
+        `#graphql
+        query CollectionProducts($id: ID!, $after: String) {
+          collection(id: $id) {
+            products(first: 250, after: $after) {
+              nodes { id }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }`,
+        { variables: { id: collectionId, after: cursor } }
+      );
+      const data = (await res.json()) as {
+        data?: { collection?: { products?: { nodes?: { id: string }[]; pageInfo?: { hasNextPage?: boolean; endCursor?: string } } } | null };
+        errors?: { message?: string }[];
+      };
+      if (data.errors || !data.data?.collection) {
+        console.error(`CollectionProducts failed for ${collectionId}:`, JSON.stringify(data.errors ?? "collection not found"));
+        return { productIds: [], error: "Couldn't read the selected collections. Please try again in a moment." };
+      }
+      const products = data.data.collection.products;
+      for (const p of products?.nodes ?? []) seen.add(p.id);
+      cursor = products?.pageInfo?.hasNextPage ? (products.pageInfo.endCursor ?? null) : null;
+    } while (cursor);
+  }
+  return { productIds: [...seen] };
+}
+
 export function configByteLength(value: string): number {
   return Buffer.byteLength(value, "utf8");
 }
@@ -43,9 +98,9 @@ export function configSizeProblem(productIds: string[], otherSettingsBytes = DEF
   const perProduct = Math.ceil(listBytes / Math.max(productIds.length, 1));
   const max = Math.max(0, Math.floor((FUNCTION_CONFIG_LIMIT_BYTES - otherSettingsBytes) / perProduct));
   return (
-    `You selected ${productIds.length} products one by one, but Shopify only lets a discount keep about ${max} ` +
-    `of those, so its codes would never apply at checkout. Choose a collection instead (collections can be any ` +
-    `size), or split the products across several sets.`
+    `This selection comes to ${productIds.length} individually listed products, but Shopify only lets a discount ` +
+    `keep about ${max}, so its codes would never apply at checkout. Pick up to ${MAX_LIVE_COLLECTIONS} collections ` +
+    `instead (they are matched live and can be any size), or split the selection across several sets.`
   );
 }
 

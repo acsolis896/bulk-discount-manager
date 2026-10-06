@@ -18,7 +18,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const { productIds, collectionIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, maxCartItems, allowedCountries, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
+  const { productIds, liveCollectionIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, maxCartItems, allowedCountries, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
 
   const rejectableCodes = () =>
     (input.enteredDiscountCodes ?? []).filter((c) => c.rejectable).map((c) => ({ code: c.code }));
@@ -138,11 +138,11 @@ export function cartLinesDiscountsGenerateRun(input) {
 
   // Eligibility comes from a stored product list when there is one (everything created
   // before this, including collection-based sets, which stored every product in the
-  // collection), and otherwise from live collection membership. A long product list
-  // can't be used for big collections: Shopify gives a Function null for a metafield
-  // over 10,000 bytes, so new collection-based sets store only collectionIds.
+  // collection), and otherwise from live collection membership (liveCollectionIds, at most
+  // 100). A long product list can't be used for big collections: Shopify gives a Function
+  // null for a metafield over 10,000 bytes, so new collection-based sets store no list.
   const hasProductList = Array.isArray(productIds) && productIds.length > 0;
-  const hasCollections = Array.isArray(collectionIds) && collectionIds.length > 0;
+  const hasCollections = Array.isArray(liveCollectionIds) && liveCollectionIds.length > 0;
 
   if ((!hasProductList && !hasCollections) || !hasValue) {
     return { operations: [] };
