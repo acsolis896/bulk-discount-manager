@@ -35,7 +35,7 @@ describe("limits per plan", () => {
 
   test("reusable codes", () => {
     expect(reusableLimitFor("Free", NEW_SHOP)).toBe(2);
-    expect(reusableLimitFor("Starter", NEW_SHOP)).toBe(25);
+    expect(reusableLimitFor("Starter", NEW_SHOP)).toBe(10);
     expect(reusableLimitFor("Pro", NEW_SHOP)).toBeNull();
   });
 
@@ -69,7 +69,7 @@ describe("grandfathering (existing merchants keep what they had)", () => {
   });
 
   test("the allowance never lowers a paid plan's limit", () => {
-    expect(reusableLimitFor("Starter", MAISON)).toBe(25);
+    expect(reusableLimitFor("Starter", MAISON)).toBe(10);
     expect(reusableLimitFor("Pro", MAISON)).toBeNull();
   });
 

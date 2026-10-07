@@ -76,10 +76,10 @@ describe("reusable code limit", () => {
     expect(rows).toHaveLength(2);
   });
 
-  test("Starter allows up to 25", async () => {
-    seed(SHOP, 24);
+  test("Starter allows up to 10", async () => {
+    seed(SHOP, 9);
     expect((await checkReusableQuota(fakeAdmin({ existing: rows.map((x) => x.discountId) }), billingFor("Starter"), SHOP)).allowed).toBe(true);
-    seed(SHOP, 25);
+    seed(SHOP, 10);
     expect((await checkReusableQuota(fakeAdmin({ existing: rows.map((x) => x.discountId) }), billingFor("Starter"), SHOP)).allowed).toBe(false);
   });
 
