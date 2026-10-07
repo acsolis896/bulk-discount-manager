@@ -456,7 +456,7 @@ export default function NewSingleCodePage() {
                   details="Percentage off the eligible product"
                   onInput={numericInputHandler("decimal", setPercentage)}
                 />
-                {features.discountCap ? (
+                {features.discountCap && (
                 <s-number-field
                   label={`Maximum discount per order${currencyCode ? ` (${currencyCode})` : ""} (optional)`}
                   inputMode="decimal"
@@ -467,8 +467,6 @@ export default function NewSingleCodePage() {
                   details="Leave blank for no cap. If the percentage comes to more than this amount on an order, the discount is limited to this amount. Enter it in your store's currency."
                   onInput={numericInputHandler("decimal", setMaxDiscountAmount)}
                 />
-                ) : (
-                  <UpgradeNote feature="discountCap" />
                 )}
               </>
             ) : (
@@ -511,6 +509,11 @@ export default function NewSingleCodePage() {
               details="Leave blank to discount every eligible item. Set a number to cap how many items get the discount per order — the highest-priced items are discounted first."
               onInput={numericInputHandler("integer", setMaxDiscountedItems)}
             />
+          </div>
+        )}
+        {discountType === "percentage" && !features.discountCap && (
+          <div style={{ marginTop: "16px" }}>
+            <UpgradeNote feature="discountCap" />
           </div>
         )}
         <div style={{ marginTop: "16px" }}>
