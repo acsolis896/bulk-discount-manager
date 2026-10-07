@@ -7,6 +7,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
+import { getShopCurrencyCode } from "../shop.server";
 import { configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { parseAllowedCountries } from "../countries";
@@ -130,6 +131,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     allowedCountries: Array.isArray(config.allowedCountries) ? (config.allowedCountries as string[]) : [],
     maxDiscountedItems: Number.isInteger(config.maxDiscountedItems) && (config.maxDiscountedItems as number) > 0 ? (config.maxDiscountedItems as number) : null,
     maxCartItems: Number.isInteger(config.maxCartItems) && (config.maxCartItems as number) > 0 ? (config.maxCartItems as number) : null,
+    maxDiscountAmount: typeof config.maxDiscountAmount === "number" && config.maxDiscountAmount > 0 ? (config.maxDiscountAmount as number) : null,
+    currencyCode: await getShopCurrencyCode(admin),
     productIds,
     collectionIds,
     collectionTitles,
@@ -180,6 +183,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return { error: "Maximum items in the cart must be a whole number of 1 or more." };
     }
     const maxCartItems = parsedMaxCartItems !== null ? Math.floor(parsedMaxCartItems) : null;
+
+    const maxDiscountAmountRaw = String(formData.get("maxDiscountAmount") || "").trim();
+    const parsedMaxDiscountAmount = discountType === "percentage" && maxDiscountAmountRaw ? Number(maxDiscountAmountRaw) : null;
+    if (parsedMaxDiscountAmount !== null && (!Number.isFinite(parsedMaxDiscountAmount) || parsedMaxDiscountAmount <= 0)) {
+      return { error: "Maximum discount amount must be greater than 0." };
+    }
+    const maxDiscountAmount = parsedMaxDiscountAmount !== null ? Math.round(parsedMaxDiscountAmount * 100) / 100 : null;
 
     if (discountType === "percentage") {
       if (!percentage || percentage < 1 || percentage > 100) return { error: "Percentage must be between 1 and 100." };
@@ -239,6 +249,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       oncePerOrder,
       maxDiscountedItems: maxDiscountedItems ?? undefined,
       maxCartItems: maxCartItems ?? undefined,
+      maxDiscountAmount: maxDiscountAmount ?? undefined,
       allowedCountries: allowedCountries.length > 0 ? allowedCountries : undefined,
       requiredTag,
       blockedTag,
@@ -283,6 +294,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       oncePerOrder,
       maxDiscountedItems: maxDiscountedItems ?? undefined,
       maxCartItems: maxCartItems ?? undefined,
+      maxDiscountAmount: maxDiscountAmount ?? undefined,
       allowedCountries: allowedCountries.length > 0 ? allowedCountries : undefined,
       blockedProductTypes: existing.blockedProductTypes ?? ["GWP"],
       requiredTag,
@@ -398,6 +410,7 @@ export default function SingleCodeDetailsPage() {
   const [collectionTitles, setCollectionTitles] = useState<string[]>(loaderData.collectionTitles);
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState(String(loaderData.usesPerCustomerLimit ?? ""));
   const [maxCartItems, setMaxCartItems] = useState(loaderData.maxCartItems ? String(loaderData.maxCartItems) : "");
+  const [maxDiscountAmount, setMaxDiscountAmount] = useState(loaderData.maxDiscountAmount ? String(loaderData.maxDiscountAmount) : "");
 
   const isSaving = fetcher.state !== "idle";
   const result = fetcher.data as { error?: string; success?: boolean; deleted?: boolean; eligibilityWarning?: string | null; usageReset?: boolean } | undefined;
@@ -453,6 +466,7 @@ export default function SingleCodeDetailsPage() {
     form.set("collectionIds", JSON.stringify(collectionIds));
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
     form.set("maxCartItems", maxCartItems);
+    form.set("maxDiscountAmount", maxDiscountAmount);
     fetcher.submit(form, { method: "post" });
   };
 
@@ -614,15 +628,27 @@ export default function SingleCodeDetailsPage() {
                   ))}
                 </div>
                 {discountType === "percentage" ? (
-                  <s-number-field
-                    label="Discount percentage"
-                    inputMode="decimal"
-                    value={percentage}
-                    min={1}
-                    max={100}
-                    details="Percentage off the eligible product"
-                    onInput={numericInputHandler("decimal", setPercentage)}
-                  />
+                  <>
+                    <s-number-field
+                      label="Discount percentage"
+                      inputMode="decimal"
+                      value={percentage}
+                      min={1}
+                      max={100}
+                      details="Percentage off the eligible product"
+                      onInput={numericInputHandler("decimal", setPercentage)}
+                    />
+                    <s-number-field
+                      label={`Maximum discount per order${loaderData.currencyCode ? ` (${loaderData.currencyCode})` : ""} (optional)`}
+                      inputMode="decimal"
+                      value={maxDiscountAmount}
+                      min={0.01}
+                      step={0.01}
+                      placeholder="No cap"
+                      details="Leave blank for no cap. If the percentage comes to more than this amount on an order, the discount is limited to this amount. Enter it in your store's currency."
+                      onInput={numericInputHandler("decimal", setMaxDiscountAmount)}
+                    />
+                  </>
                 ) : (
                   <s-number-field
                     label="Amount off"

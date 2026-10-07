@@ -7,6 +7,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
+import { getShopCurrencyCode } from "../shop.server";
 import { saveFunctionConfig, configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { parseAllowedCountries } from "../countries";
@@ -17,7 +18,8 @@ import { shouldRequestReviewAfterCreation } from "../review-prompt";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
   const segments = await listSegments(admin);
-  return { segments };
+  const currencyCode = await getShopCurrencyCode(admin);
+  return { segments, currencyCode };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -52,6 +54,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: "Maximum items in the cart must be a whole number of 1 or more." };
   }
   const maxCartItems = parsedMaxCartItems !== null ? Math.floor(parsedMaxCartItems) : null;
+
+  const maxDiscountAmountRaw = String(formData.get("maxDiscountAmount") || "").trim();
+  const parsedMaxDiscountAmount = discountType === "percentage" && maxDiscountAmountRaw ? Number(maxDiscountAmountRaw) : null;
+  if (parsedMaxDiscountAmount !== null && (!Number.isFinite(parsedMaxDiscountAmount) || parsedMaxDiscountAmount <= 0)) {
+    return { error: "Maximum discount amount must be greater than 0." };
+  }
+  const maxDiscountAmount = parsedMaxDiscountAmount !== null ? Math.round(parsedMaxDiscountAmount * 100) / 100 : null;
   const eligibilityMode = (["all", "tags", "segment"] as const).includes(String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
     ? (String(formData.get("eligibilityMode")) as "all" | "tags" | "segment")
     : "all";
@@ -160,6 +169,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     ...(discountType === "fixedAmount" ? { fixedAmount } : { percentage }),
     oncePerOrder,
     ...(maxDiscountedItems !== null ? { maxDiscountedItems } : {}),
+    ...(maxDiscountAmount !== null ? { maxDiscountAmount } : {}),
     ...(maxCartItems !== null ? { maxCartItems } : {}),
     ...(allowedCountries.length > 0 ? { allowedCountries } : {}),
     blockedProductTypes,
@@ -269,7 +279,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function NewSingleCodePage() {
   const countryRestrictionEnabled = useCountryRestrictionEnabled();
-  const { segments } = useLoaderData<typeof loader>();
+  const { segments, currencyCode } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const navigate = useNavigate();
   const shopify = useAppBridge();
@@ -284,6 +294,7 @@ export default function NewSingleCodePage() {
   const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState("");
   const [maxCartItems, setMaxCartItems] = useState("");
+  const [maxDiscountAmount, setMaxDiscountAmount] = useState("");
   const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">("all");
   const [requiredTag, setRequiredTag] = useState("");
   const [blockedTag, setBlockedTag] = useState("");
@@ -352,6 +363,7 @@ export default function NewSingleCodePage() {
     form.set("allowedCountries", JSON.stringify(allowedCountries));
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
     form.set("maxCartItems", maxCartItems);
+    form.set("maxDiscountAmount", maxDiscountAmount);
     form.set("eligibilityMode", eligibilityMode);
     form.set("requiredTag", requiredTag);
     form.set("blockedTag", blockedTag);
@@ -418,15 +430,27 @@ export default function NewSingleCodePage() {
               ))}
             </div>
             {discountType === "percentage" ? (
-              <s-number-field
-                label="Discount percentage"
-                inputMode="decimal"
-                value={percentage}
-                min={1}
-                max={100}
-                details="Percentage off the eligible product"
-                onInput={numericInputHandler("decimal", setPercentage)}
-              />
+              <>
+                <s-number-field
+                  label="Discount percentage"
+                  inputMode="decimal"
+                  value={percentage}
+                  min={1}
+                  max={100}
+                  details="Percentage off the eligible product"
+                  onInput={numericInputHandler("decimal", setPercentage)}
+                />
+                <s-number-field
+                  label={`Maximum discount per order${currencyCode ? ` (${currencyCode})` : ""} (optional)`}
+                  inputMode="decimal"
+                  value={maxDiscountAmount}
+                  min={0.01}
+                  step={0.01}
+                  placeholder="No cap"
+                  details="Leave blank for no cap. If the percentage comes to more than this amount on an order, the discount is limited to this amount. Enter it in your store's currency."
+                  onInput={numericInputHandler("decimal", setMaxDiscountAmount)}
+                />
+              </>
             ) : (
               <s-number-field
                 label="Amount off"

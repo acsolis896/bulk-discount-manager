@@ -30,6 +30,7 @@ query CartLinesDiscountsGenerateRunInput($liveCollectionIds: [ID!]) {
       }
     }
   }
+  presentmentCurrencyRate
   localization {
     country {
       isoCode

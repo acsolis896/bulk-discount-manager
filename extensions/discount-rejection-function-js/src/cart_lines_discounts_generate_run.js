@@ -18,7 +18,7 @@ export function cartLinesDiscountsGenerateRun(input) {
     return { operations: [] };
   }
 
-  const { productIds, liveCollectionIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, maxCartItems, allowedCountries, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
+  const { productIds, liveCollectionIds, percentage, fixedAmount, discountType, oncePerOrder, maxDiscountedItems, maxDiscountAmount, maxCartItems, allowedCountries, blockedProductTypes, blockedCustomerIds, usageCappedCustomerIds } = config;
 
   const rejectableCodes = () =>
     (input.enteredDiscountCodes ?? []).filter((c) => c.rejectable).map((c) => ({ code: c.code }));
@@ -190,13 +190,37 @@ export function cartLinesDiscountsGenerateRun(input) {
     targets = eligibleLines.map((line) => ({ cartLine: { id: line.id } }));
   }
 
-  const value = isFixedAmount
+  let value = isFixedAmount
     ? { fixedAmount: { amount: Number(fixedAmount), appliesToEachItem: !applyOncePerOrder } }
     : { percentage: { value: Number(percentage) } };
 
-  const message = isFixedAmount
+  let message = isFixedAmount
     ? "$" + Number(fixedAmount) + " off"
     : Number(percentage) + "% off";
+
+  // Optional per-order cap on a percentage discount, set in the shop's currency. When the
+  // percentage would come to more than the cap, a flat amount equal to the cap is applied
+  // across the targeted items instead. Fixed amounts are in the cart's currency, so the cap
+  // is converted with presentmentCurrencyRate (shop currency -> checkout currency).
+  if (
+    !isFixedAmount &&
+    typeof maxDiscountAmount === "number" &&
+    Number.isFinite(maxDiscountAmount) &&
+    maxDiscountAmount > 0
+  ) {
+    const lineById = new Map(input.cart.lines.map((line) => [line.id, line]));
+    const targetedTotal = targets.reduce((sum, target) => {
+      const line = lineById.get(target.cartLine.id);
+      const units = target.cartLine.quantity ?? line.quantity;
+      return sum + parseFloat(line.cost.amountPerQuantity.amount) * units;
+    }, 0);
+    const rate = Number(input.presentmentCurrencyRate);
+    const capInCartCurrency = maxDiscountAmount * (Number.isFinite(rate) && rate > 0 ? rate : 1);
+    if (targetedTotal * (Number(percentage) / 100) > capInCartCurrency) {
+      value = { fixedAmount: { amount: Math.round(capInCartCurrency * 100) / 100, appliesToEachItem: false } };
+      message = Number(percentage) + "% off (up to " + maxDiscountAmount + ")";
+    }
+  }
 
   return {
     operations: [
