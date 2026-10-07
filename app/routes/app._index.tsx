@@ -1,14 +1,8 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useEffect, useState } from "react";
 import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
-
-// One-time notice about the 2026-10 rename. Hidden once dismissed (remembered in this browser) and
-// retired on its own after the date below.
-const RENAME_BANNER_KEY = "bdm-rename-banner-dismissed";
-const RENAME_BANNER_UNTIL = Date.parse("2026-12-07T00:00:00Z");
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
@@ -97,25 +91,6 @@ const CONTACT_CARD: Card = {
 
 export default function Home() {
   const { isFirstVisit, checklist, showChecklist } = useLoaderData<typeof loader>();
-
-  // Decided after mount so the server and first client render match (storage is client-only).
-  const [showRenameBanner, setShowRenameBanner] = useState(false);
-  useEffect(() => {
-    if (Date.now() > RENAME_BANNER_UNTIL) return;
-    try {
-      if (localStorage.getItem(RENAME_BANNER_KEY) !== "1") setShowRenameBanner(true);
-    } catch {
-      setShowRenameBanner(true);
-    }
-  }, []);
-  const dismissRenameBanner = () => {
-    setShowRenameBanner(false);
-    try {
-      localStorage.setItem(RENAME_BANNER_KEY, "1");
-    } catch {
-      /* storage unavailable: the banner just comes back next visit */
-    }
-  };
   const navigate = useNavigate();
 
   const renderCard = (card: Card) => (
@@ -145,15 +120,6 @@ export default function Home() {
         {`.home-card { transition: box-shadow 0.15s, border-color 0.15s; }
           .home-card:hover { box-shadow: 0 1px 6px rgba(0,0,0,0.08); border-color: #8a8a8a; }`}
       </style>
-
-      {showRenameBanner && (
-        <s-banner heading="We've got a new name" tone="info" dismissible onDismiss={dismissRenameBanner}>
-          <s-paragraph>
-            Discount Codes &amp; Rules is now Airtight Discount Code Rules. It&apos;s the same app: your
-            codes, rules and plan are unchanged, and there&apos;s nothing you need to do.
-          </s-paragraph>
-        </s-banner>
-      )}
 
       {isFirstVisit && (
         <s-banner tone="info" title="Welcome!">
