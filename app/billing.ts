@@ -10,6 +10,11 @@
 // normalizes and compares against the handle, which will also match the
 // display name here since both were set to the same word.
 
+// Paid-only features (PLAN_LIMITS.*.features) are built and tested but switched off: while this is
+// false every plan can use every feature, and the upgrade notes, save-time checks and Plans page
+// feature lines stay hidden. Set it to true to start restricting them to Starter and above.
+export const FEATURE_LOCKS_ENABLED = false;
+
 export const PLAN_STARTER = "starter";
 export const PLAN_PRO = "pro";
 
@@ -96,7 +101,13 @@ export function reusableLimitFor(tier: PlanTier, shop: string): number | null {
   return Math.max(base, GRANDFATHERED.reusableCodes[shop] ?? 0);
 }
 
-export function canUseFeature(tier: PlanTier, shop: string, feature: PlanFeature): boolean {
+export function canUseFeature(
+  tier: PlanTier,
+  shop: string,
+  feature: PlanFeature,
+  locksEnabled: boolean = FEATURE_LOCKS_ENABLED
+): boolean {
+  if (!locksEnabled) return true;
   if (PLAN_LIMITS[tier].features[feature]) return true;
   return GRANDFATHERED.features[feature]?.includes(shop) ?? false;
 }
@@ -125,9 +136,10 @@ export function isFeatureBlocked(
   tier: PlanTier,
   shop: string,
   feature: PlanFeature,
-  { isSet, wasSet }: { isSet: boolean; wasSet: boolean }
+  { isSet, wasSet }: { isSet: boolean; wasSet: boolean },
+  locksEnabled: boolean = FEATURE_LOCKS_ENABLED
 ): boolean {
-  return isSet && !wasSet && !canUseFeature(tier, shop, feature);
+  return isSet && !wasSet && !canUseFeature(tier, shop, feature, locksEnabled);
 }
 
 export function featureBlockedMessage(feature: PlanFeature, tier: PlanTier): string {

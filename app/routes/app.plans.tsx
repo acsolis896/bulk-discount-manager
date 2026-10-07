@@ -2,7 +2,7 @@ import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { PLAN_LIMITS, type PlanTier } from "../billing";
+import { FEATURE_LOCKS_ENABLED, PLAN_LIMITS, type PlanTier } from "../billing";
 import { getPlanUsage } from "../billing.server";
 
 // Matches the app handle Shopify shows in admin.shopify.com URLs for this
@@ -36,12 +36,16 @@ function featuresFor(tier: PlanTier): string[] {
     l.blockedProductTypes === null
       ? "Unlimited blocked product types"
       : `${l.blockedProductTypes} blocked product type${l.blockedProductTypes === 1 ? "" : "s"}`,
-    "Customer tag and segment targeting, collections and CSV import",
+    FEATURE_LOCKS_ENABLED
+      ? "Customer tag and segment targeting, collections and CSV import"
+      : "Country restrictions, discount caps, per-customer limits, customer targeting, collections and CSV import",
   ];
-  if (l.features.countryRestriction) list.push("Country restrictions");
-  if (l.features.discountCap) list.push("Maximum discount per order");
-  if (l.features.usesPerCustomer) list.push("Limit uses per customer");
-  if (l.features.maxCartItems) list.push("Maximum items in the cart");
+  if (FEATURE_LOCKS_ENABLED) {
+    if (l.features.countryRestriction) list.push("Country restrictions");
+    if (l.features.discountCap) list.push("Maximum discount per order");
+    if (l.features.usesPerCustomer) list.push("Limit uses per customer");
+    if (l.features.maxCartItems) list.push("Maximum items in the cart");
+  }
   if (l.prioritySupport) list.push("Priority support");
   return list;
 }

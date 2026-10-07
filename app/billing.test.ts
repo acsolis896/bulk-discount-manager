@@ -8,6 +8,7 @@ import {
   blockedTypeLimitFor,
   isFeatureBlocked,
   featureBlockedMessage,
+  FEATURE_LOCKS_ENABLED,
   parseTierOverride,
 } from "./billing";
 
@@ -52,12 +53,22 @@ describe("limits per plan", () => {
   });
 });
 
-describe("features", () => {
+describe("feature locks are switched off for now", () => {
+  test("every plan can use every feature while FEATURE_LOCKS_ENABLED is false", () => {
+    expect(FEATURE_LOCKS_ENABLED).toBe(false);
+    for (const f of ["countryRestriction", "discountCap", "usesPerCustomer", "maxCartItems"] as const) {
+      expect(canUseFeature("Free", NEW_SHOP, f)).toBe(true);
+      expect(isFeatureBlocked("Free", NEW_SHOP, f, { isSet: true, wasSet: false })).toBe(false);
+    }
+  });
+});
+
+describe("features (when locks are on)", () => {
   test("Free has none of the gated features; Starter and Pro have all of them", () => {
     for (const f of ["countryRestriction", "discountCap", "usesPerCustomer", "maxCartItems"] as const) {
-      expect(canUseFeature("Free", NEW_SHOP, f)).toBe(false);
-      expect(canUseFeature("Starter", NEW_SHOP, f)).toBe(true);
-      expect(canUseFeature("Pro", NEW_SHOP, f)).toBe(true);
+      expect(canUseFeature("Free", NEW_SHOP, f, true)).toBe(false);
+      expect(canUseFeature("Starter", NEW_SHOP, f, true)).toBe(true);
+      expect(canUseFeature("Pro", NEW_SHOP, f, true)).toBe(true);
     }
   });
 });
@@ -75,26 +86,26 @@ describe("grandfathering (existing merchants keep what they had)", () => {
 
   test("no shop is currently allowed a gated feature on Free", () => {
     for (const f of ["countryRestriction", "discountCap", "usesPerCustomer", "maxCartItems"] as const) {
-      expect(canUseFeature("Free", LOLITA, f)).toBe(false);
+      expect(canUseFeature("Free", LOLITA, f, true)).toBe(false);
     }
   });
 });
 
 describe("saving a locked feature", () => {
   test("turning it on for the first time on Free is blocked", () => {
-    expect(isFeatureBlocked("Free", NEW_SHOP, "countryRestriction", { isSet: true, wasSet: false })).toBe(true);
+    expect(isFeatureBlocked("Free", NEW_SHOP, "countryRestriction", { isSet: true, wasSet: false }, true)).toBe(true);
   });
 
   test("a feature that was already set can still be saved (nobody loses what they have)", () => {
-    expect(isFeatureBlocked("Free", NEW_SHOP, "countryRestriction", { isSet: true, wasSet: true })).toBe(false);
+    expect(isFeatureBlocked("Free", NEW_SHOP, "countryRestriction", { isSet: true, wasSet: true }, true)).toBe(false);
   });
 
   test("not using the feature is never blocked", () => {
-    expect(isFeatureBlocked("Free", NEW_SHOP, "discountCap", { isSet: false, wasSet: false })).toBe(false);
+    expect(isFeatureBlocked("Free", NEW_SHOP, "discountCap", { isSet: false, wasSet: false }, true)).toBe(false);
   });
 
   test("paid plans are never blocked", () => {
-    expect(isFeatureBlocked("Starter", NEW_SHOP, "usesPerCustomer", { isSet: true, wasSet: false })).toBe(false);
+    expect(isFeatureBlocked("Starter", NEW_SHOP, "usesPerCustomer", { isSet: true, wasSet: false }, true)).toBe(false);
   });
 
   test("the message names the feature and the plan", () => {
