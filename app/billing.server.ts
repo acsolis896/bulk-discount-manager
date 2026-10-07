@@ -189,5 +189,10 @@ export async function getPlanFeatures(
 ): Promise<Record<PlanFeature, boolean>> {
   const { tier } = await getCurrentPlan(billing);
   const can = (feature: PlanFeature) => canUseFeature(tier, shop, feature) || Boolean(alreadyUsing[feature]);
-  return { countryRestriction: can("countryRestriction"), discountCap: can("discountCap"), tagTargeting: can("tagTargeting") };
+  return {
+    countryRestriction: can("countryRestriction"),
+    discountCap: can("discountCap"),
+    usesPerCustomer: can("usesPerCustomer"),
+    maxCartItems: can("maxCartItems"),
+  };
 }

@@ -54,7 +54,7 @@ describe("limits per plan", () => {
 
 describe("features", () => {
   test("Free has none of the gated features; Starter and Pro have all of them", () => {
-    for (const f of ["countryRestriction", "discountCap", "tagTargeting"] as const) {
+    for (const f of ["countryRestriction", "discountCap", "usesPerCustomer", "maxCartItems"] as const) {
       expect(canUseFeature("Free", NEW_SHOP, f)).toBe(false);
       expect(canUseFeature("Starter", NEW_SHOP, f)).toBe(true);
       expect(canUseFeature("Pro", NEW_SHOP, f)).toBe(true);
@@ -73,14 +73,10 @@ describe("grandfathering (existing merchants keep what they had)", () => {
     expect(reusableLimitFor("Pro", MAISON)).toBeNull();
   });
 
-  test("tag targeting stays available to the two shops that already used it", () => {
-    expect(canUseFeature("Free", LOLITA, "tagTargeting")).toBe(true);
-    expect(canUseFeature("Free", NEW_SHOP, "tagTargeting")).toBe(false);
-  });
-
-  test("grandfathering applies to tag targeting only, not country or the cap", () => {
-    expect(canUseFeature("Free", LOLITA, "countryRestriction")).toBe(false);
-    expect(canUseFeature("Free", LOLITA, "discountCap")).toBe(false);
+  test("no shop is currently allowed a gated feature on Free", () => {
+    for (const f of ["countryRestriction", "discountCap", "usesPerCustomer", "maxCartItems"] as const) {
+      expect(canUseFeature("Free", LOLITA, f)).toBe(false);
+    }
   });
 });
 
@@ -98,17 +94,14 @@ describe("saving a locked feature", () => {
   });
 
   test("paid plans are never blocked", () => {
-    expect(isFeatureBlocked("Starter", NEW_SHOP, "tagTargeting", { isSet: true, wasSet: false })).toBe(false);
-  });
-
-  test("a grandfathered shop is not blocked on tag targeting", () => {
-    expect(isFeatureBlocked("Free", LOLITA, "tagTargeting", { isSet: true, wasSet: false })).toBe(false);
+    expect(isFeatureBlocked("Starter", NEW_SHOP, "usesPerCustomer", { isSet: true, wasSet: false })).toBe(false);
   });
 
   test("the message names the feature and the plan", () => {
     expect(featureBlockedMessage("countryRestriction", "Free")).toContain("Country restrictions");
     expect(featureBlockedMessage("countryRestriction", "Free")).toContain("Starter");
-    expect(featureBlockedMessage("tagTargeting", "Free")).toContain("is available");
+    expect(featureBlockedMessage("usesPerCustomer", "Free")).toContain("is available");
+    expect(featureBlockedMessage("maxCartItems", "Free")).toContain("maximum number of items");
     expect(featureBlockedMessage("discountCap", "Free")).toContain("per order is available");
     expect(featureBlockedMessage("countryRestriction", "Free")).toContain("are available");
   });

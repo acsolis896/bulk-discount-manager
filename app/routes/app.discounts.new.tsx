@@ -150,7 +150,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Features that need a paid plan (existing codes are never affected; this only applies when creating).
     const lockedFeatures: [PlanFeature, boolean][] = [
       ["countryRestriction", allowedCountries.length > 0],
-      ["tagTargeting", eligibilityMode !== "all"],
     ];
     for (const [feature, isSet] of lockedFeatures) {
       if (isFeatureBlocked(quota.tier, session.shop, feature, { isSet, wasSet: false })) {
@@ -733,7 +732,6 @@ export default function CreateBulkDiscount() {
           <s-paragraph>Choose which customers can use these discount codes.</s-paragraph>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {(["all", "tags", "segment"] as const)
-            .filter((mode) => mode === "all" || features.tagTargeting || eligibilityMode === mode)
             .map((mode) => (
               <s-button
                 key={mode}
@@ -744,7 +742,6 @@ export default function CreateBulkDiscount() {
               </s-button>
             ))}
           </div>
-          {!features.tagTargeting && <UpgradeNote feature="tagTargeting" />}
 
           {eligibilityMode === "tags" && (
             <s-form-layout>

@@ -36,11 +36,12 @@ function featuresFor(tier: PlanTier): string[] {
     l.blockedProductTypes === null
       ? "Unlimited blocked product types"
       : `${l.blockedProductTypes} blocked product type${l.blockedProductTypes === 1 ? "" : "s"}`,
-    "Per-customer limits, item caps and CSV import",
+    "Customer tag and segment targeting, collections and CSV import",
   ];
   if (l.features.countryRestriction) list.push("Country restrictions");
   if (l.features.discountCap) list.push("Maximum discount per order");
-  if (l.features.tagTargeting) list.push("Customer tag and segment targeting");
+  if (l.features.usesPerCustomer) list.push("Limit uses per customer");
+  if (l.features.maxCartItems) list.push("Maximum items in the cart");
   if (l.prioritySupport) list.push("Priority support");
   return list;
 }

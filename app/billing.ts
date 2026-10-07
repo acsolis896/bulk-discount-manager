@@ -15,9 +15,9 @@ export const PLAN_PRO = "pro";
 
 export type PlanTier = "Free" | "Starter" | "Pro";
 
-// Features that need a paid plan. Per-customer limits, items per order, max items in the cart,
+// Features that need a paid plan. Customer tag and segment targeting, items per order,
 // collections, CSV import and bulk generation are on every plan.
-export type PlanFeature = "countryRestriction" | "discountCap" | "tagTargeting";
+export type PlanFeature = "countryRestriction" | "discountCap" | "usesPerCustomer" | "maxCartItems";
 
 export interface PlanLimits {
   /** Reusable codes that can exist at once (null = unlimited). */
@@ -35,21 +35,21 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     reusableCodes: 2,
     bulkCodes: 50,
     blockedProductTypes: 1,
-    features: { countryRestriction: false, discountCap: false, tagTargeting: false },
+    features: { countryRestriction: false, discountCap: false, usesPerCustomer: false, maxCartItems: false },
     prioritySupport: false,
   },
   Starter: {
     reusableCodes: 25,
     bulkCodes: 5000,
     blockedProductTypes: null,
-    features: { countryRestriction: true, discountCap: true, tagTargeting: true },
+    features: { countryRestriction: true, discountCap: true, usesPerCustomer: true, maxCartItems: true },
     prioritySupport: false,
   },
   Pro: {
     reusableCodes: null,
     bulkCodes: null,
     blockedProductTypes: null,
-    features: { countryRestriction: true, discountCap: true, tagTargeting: true },
+    features: { countryRestriction: true, discountCap: true, usesPerCustomer: true, maxCartItems: true },
     prioritySupport: true,
   },
 };
@@ -60,10 +60,11 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
 const GRANDFATHERED: {
   /** Shop -> reusable codes it may keep (never less than the plan allows). */
   reusableCodes: Record<string, number>;
-  tagTargeting: string[];
+  /** Gated feature -> shops that already used it and may keep using it. */
+  features: Partial<Record<PlanFeature, string[]>>;
 } = {
   reusableCodes: { "81xhhk-h2.myshopify.com": 3 },
-  tagTargeting: ["htmybm-hw.myshopify.com", "806bad-23.myshopify.com"],
+  features: {},
 };
 
 // Matches "starter"/"pro" as whole words so private plans like "Multi-store
@@ -97,7 +98,7 @@ export function reusableLimitFor(tier: PlanTier, shop: string): number | null {
 
 export function canUseFeature(tier: PlanTier, shop: string, feature: PlanFeature): boolean {
   if (PLAN_LIMITS[tier].features[feature]) return true;
-  return feature === "tagTargeting" && GRANDFATHERED.tagTargeting.includes(shop);
+  return GRANDFATHERED.features[feature]?.includes(shop) ?? false;
 }
 
 /** Blocked product types this shop may have (null = unlimited). */
@@ -108,7 +109,8 @@ export function blockedTypeLimitFor(tier: PlanTier): number | null {
 const FEATURE_NAMES: Record<PlanFeature, string> = {
   countryRestriction: "Country restrictions",
   discountCap: "A maximum discount per order",
-  tagTargeting: "Customer tag and segment targeting",
+  usesPerCustomer: "A limit on uses per customer",
+  maxCartItems: "A maximum number of items in the cart",
 };
 
 export function featureName(feature: PlanFeature): string {

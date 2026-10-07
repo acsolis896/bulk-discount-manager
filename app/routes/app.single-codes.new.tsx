@@ -98,7 +98,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const lockedFeatures: [PlanFeature, boolean][] = [
     ["countryRestriction", allowedCountries.length > 0],
     ["discountCap", maxDiscountAmount !== null],
-  ["tagTargeting", eligibilityMode !== "all"],
+    ["usesPerCustomer", usesPerCustomerLimit !== null],
+    ["maxCartItems", maxCartItems !== null],
   ];
   for (const [feature, isSet] of lockedFeatures) {
     if (isFeatureBlocked(quota.tier, session.shop, feature, { isSet, wasSet: false })) {
@@ -513,26 +514,34 @@ export default function NewSingleCodePage() {
           </div>
         )}
         <div style={{ marginTop: "16px" }}>
-          <s-number-field
-            label="Limit uses per customer (optional)"
-            inputMode="numeric"
-            value={usesPerCustomerLimit}
-            min={1}
-            placeholder="Unlimited"
-            details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code — e.g. 5."
-            onInput={numericInputHandler("integer", setUsesPerCustomerLimit)}
-          />
+          {features.usesPerCustomer ? (
+            <s-number-field
+              label="Limit uses per customer (optional)"
+              inputMode="numeric"
+              value={usesPerCustomerLimit}
+              min={1}
+              placeholder="Unlimited"
+              details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code — e.g. 5."
+              onInput={numericInputHandler("integer", setUsesPerCustomerLimit)}
+            />
+          ) : (
+            <UpgradeNote feature="usesPerCustomer" />
+          )}
         </div>
         <div style={{ marginTop: "16px" }}>
-          <s-number-field
-            label="Maximum items in the cart (optional)"
-            inputMode="numeric"
-            value={maxCartItems}
-            min={1}
-            placeholder="No limit"
-            details="Leave blank for no limit. Set a number to stop this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
-            onInput={numericInputHandler("integer", setMaxCartItems)}
-          />
+          {features.maxCartItems ? (
+            <s-number-field
+              label="Maximum items in the cart (optional)"
+              inputMode="numeric"
+              value={maxCartItems}
+              min={1}
+              placeholder="No limit"
+              details="Leave blank for no limit. Set a number to stop this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
+              onInput={numericInputHandler("integer", setMaxCartItems)}
+            />
+          ) : (
+            <UpgradeNote feature="maxCartItems" />
+          )}
         </div>
         <div style={{ marginTop: "16px" }}>
           <s-date-field
@@ -570,7 +579,6 @@ export default function NewSingleCodePage() {
           <s-paragraph>Choose which customers can use this code.</s-paragraph>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {(["all", "tags", "segment"] as const)
-            .filter((mode) => mode === "all" || features.tagTargeting || eligibilityMode === mode)
             .map((mode) => (
               <s-button
                 key={mode}
@@ -581,7 +589,6 @@ export default function NewSingleCodePage() {
               </s-button>
             ))}
           </div>
-          {!features.tagTargeting && <UpgradeNote feature="tagTargeting" />}
 
           {eligibilityMode === "tags" && (
             <>

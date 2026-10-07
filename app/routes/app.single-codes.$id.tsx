@@ -139,7 +139,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     features: await getPlanFeatures(billing, session.shop, {
       countryRestriction: Array.isArray(config.allowedCountries) && config.allowedCountries.length > 0,
       discountCap: typeof config.maxDiscountAmount === "number",
-      tagTargeting: row.eligibilityMode === "tags" || row.eligibilityMode === "segment",
+      usesPerCustomer: row.usesPerCustomerLimit != null,
+      maxCartItems: Number.isInteger(config.maxCartItems) && (config.maxCartItems as number) > 0,
     }),
     productIds,
     collectionIds,
@@ -228,7 +229,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (sizeProblem) return { error: sizeProblem };
 
     // Look up functionNodeId from DB
-    const dbRow = await db.singleCodeDiscount.findFirst({ where: { shop: session.shop, discountId }, select: { functionNodeId: true, code: true, eligibilityMode: true } });
+    const dbRow = await db.singleCodeDiscount.findFirst({ where: { shop: session.shop, discountId }, select: { functionNodeId: true, code: true, eligibilityMode: true, usesPerCustomerLimit: true } });
     const fnNodeId = dbRow?.functionNodeId ?? null;
     const readFromId = fnNodeId ?? discountId;
 
@@ -252,7 +253,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const lockedFeatures: [PlanFeature, boolean, boolean][] = [
       ["countryRestriction", allowedCountries.length > 0, Array.isArray(existing.allowedCountries) && existing.allowedCountries.length > 0],
       ["discountCap", maxDiscountAmount !== null, typeof existing.maxDiscountAmount === "number"],
-      ["tagTargeting", eligibilityMode !== "all", dbRow?.eligibilityMode === "tags" || dbRow?.eligibilityMode === "segment"],
+      ["usesPerCustomer", usesPerCustomerLimit !== null, dbRow?.usesPerCustomerLimit != null],
+      ["maxCartItems", maxCartItems !== null, Number.isInteger(existing.maxCartItems) && (existing.maxCartItems as number) > 0],
     ];
     for (const [feature, isSet, wasSet] of lockedFeatures) {
       if (isFeatureBlocked(tier, session.shop, feature, { isSet, wasSet })) {
@@ -597,7 +599,6 @@ export default function SingleCodeDetailsPage() {
           <s-section heading="Edit customer eligibility">
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {(["all", "tags", "segment"] as const)
-              .filter((mode) => mode === "all" || features.tagTargeting || eligibilityMode === mode)
               .map((mode) => (
                 <s-button
                   key={mode}
@@ -608,7 +609,6 @@ export default function SingleCodeDetailsPage() {
                 </s-button>
               ))}
             </div>
-            {!features.tagTargeting && <UpgradeNote feature="tagTargeting" />}
 
             {eligibilityMode === "tags" && (
               <div style={{ marginTop: "16px" }}>
@@ -726,26 +726,34 @@ export default function SingleCodeDetailsPage() {
               </div>
             )}
             <div style={{ marginTop: "16px" }}>
-              <s-number-field
-                label="Maximum items in the cart (optional)"
-                inputMode="numeric"
-                value={maxCartItems}
-                min={1}
-                placeholder="No limit"
-                details="Leave blank for no limit. Set a number to stop this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
-                onInput={numericInputHandler("integer", setMaxCartItems)}
-              />
+              {features.maxCartItems ? (
+                <s-number-field
+                  label="Maximum items in the cart (optional)"
+                  inputMode="numeric"
+                  value={maxCartItems}
+                  min={1}
+                  placeholder="No limit"
+                  details="Leave blank for no limit. Set a number to stop this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
+                  onInput={numericInputHandler("integer", setMaxCartItems)}
+                />
+              ) : (
+                <UpgradeNote feature="maxCartItems" />
+              )}
             </div>
             <div style={{ marginTop: "16px" }}>
-              <s-number-field
-                label="Limit uses per customer (optional)"
-                inputMode="numeric"
-                value={usesPerCustomerLimit}
-                min={1}
-                placeholder="Unlimited"
-                details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code."
-                onInput={numericInputHandler("integer", setUsesPerCustomerLimit)}
-              />
+              {features.usesPerCustomer ? (
+                <s-number-field
+                  label="Limit uses per customer (optional)"
+                  inputMode="numeric"
+                  value={usesPerCustomerLimit}
+                  min={1}
+                  placeholder="Unlimited"
+                  details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code."
+                  onInput={numericInputHandler("integer", setUsesPerCustomerLimit)}
+                />
+              ) : (
+                <UpgradeNote feature="usesPerCustomer" />
+              )}
             </div>
             {loaderData.usesPerCustomerLimit != null && (
               <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
