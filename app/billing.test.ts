@@ -41,7 +41,7 @@ describe("limits per plan", () => {
 
   test("blocked product types", () => {
     expect(blockedTypeLimitFor("Free")).toBe(1);
-    expect(blockedTypeLimitFor("Starter")).toBeNull();
+    expect(blockedTypeLimitFor("Starter")).toBe(5);
     expect(blockedTypeLimitFor("Pro")).toBeNull();
   });
 

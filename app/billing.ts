@@ -41,7 +41,7 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
   Starter: {
     reusableCodes: 10,
     bulkCodes: 5000,
-    blockedProductTypes: null,
+    blockedProductTypes: 5,
     features: { countryRestriction: true, discountCap: true, usesPerCustomer: true, maxCartItems: true },
     prioritySupport: false,
   },
