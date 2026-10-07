@@ -1,7 +1,7 @@
 # Security incident response policy
 
 Owner: Andrea Solis (sole operator), acsolis896@gmail.com
-Scope: Discount Codes & Rules and the Bajio Discounts app, including the Railway
+Scope: Airtight Discount Code Rules and the Bajio Discounts app, including the Railway
 hosting, databases, Shopify Partner accounts and GitHub repositories.
 
 ## What counts as an incident

@@ -54,7 +54,7 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>Discount Codes & Rules</h1>
+        <h1 className={styles.heading}>Airtight Discount Code Rules</h1>
         <p className={styles.text}>
           Create bulk and single-use discount codes, and control which items and
           combinations are allowed at checkout.

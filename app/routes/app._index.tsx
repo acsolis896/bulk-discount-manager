@@ -115,7 +115,7 @@ export default function Home() {
   );
 
   return (
-    <s-page heading="Discount Codes & Rules">
+    <s-page heading="Airtight Discount Code Rules">
       <style>
         {`.home-card { transition: box-shadow 0.15s, border-color 0.15s; }
           .home-card:hover { box-shadow: 0 1px 6px rgba(0,0,0,0.08); border-color: #8a8a8a; }`}

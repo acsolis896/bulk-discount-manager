@@ -7,7 +7,7 @@ export default function PrivacyPolicy() {
       <p className={styles.updated}>Effective date: October 5, 2026</p>
 
       <p>
-        Discount Codes &amp; Rules ("the App") is a Shopify app that helps merchants
+        Airtight Discount Code Rules ("the App") is a Shopify app that helps merchants
         create bulk and reusable discount codes and control which items and
         combinations are allowed at checkout. This policy explains what data the
         App collects, how it's used, and how it's handled.
