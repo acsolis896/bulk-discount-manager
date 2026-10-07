@@ -23,4 +23,7 @@ Access to personal data is therefore limited to the owner.
 - [ ] 2FA enabled on Shopify Partners, Railway and GitHub
 - [ ] Password manager in use for all of the above
 - [ ] Railway project member list shows only the owner
-- [ ] Production `DATABASE_URL` rotated after it was shared outside the system
+- [x] Production database password rotated after it was shared outside the system
+      (2026-10-07; the app and the backup service were confirmed working on the new password)
+- [x] Public TCP proxy on the production database removed (2026-10-07; the app, backup and
+      retention services use the private `postgres.railway.internal` address)
