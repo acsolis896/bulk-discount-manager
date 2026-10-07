@@ -10,16 +10,19 @@ import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../f
 import { getShopCurrencyCode } from "../shop.server";
 import { saveFunctionConfig, configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
+import { UpgradeNote } from "../components/UpgradeNote";
 import { parseAllowedCountries } from "../countries";
-import { checkCodeQuota } from "../billing.server";
+import { checkReusableQuota, getPlanFeatures } from "../billing.server";
+import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
 import { applyEligibility, listSegments } from "../eligibility.server";
 import { shouldRequestReviewAfterCreation } from "../review-prompt";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session, billing } = await authenticate.admin(request);
   const segments = await listSegments(admin);
   const currencyCode = await getShopCurrencyCode(admin);
-  return { segments, currencyCode };
+  const features = await getPlanFeatures(billing, session.shop);
+  return { segments, currencyCode, features };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -84,11 +87,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   if (productIds.length === 0 && collectionIds.length === 0) return { error: "Select at least one eligible product or collection." };
 
-  const quota = await checkCodeQuota(admin, billing, 1);
+  const quota = await checkReusableQuota(admin, billing, session.shop);
   if (!quota.allowed) {
     return {
-      error: `Your ${quota.tier} plan allows up to ${quota.limit} active discount codes (currently using ${quota.current}). Upgrade on the Plans page to create more.`,
+      error: `Your ${quota.tier} plan allows up to ${quota.limit} reusable code${quota.limit === 1 ? "" : "s"} (you have ${quota.current}). Upgrade on the Plans page to create more.`,
     };
+  }
+
+  // Features that need a paid plan (existing codes are never affected; this only applies when creating).
+  const lockedFeatures: [PlanFeature, boolean][] = [
+    ["countryRestriction", allowedCountries.length > 0],
+    ["discountCap", maxDiscountAmount !== null],
+  ["tagTargeting", eligibilityMode !== "all"],
+  ];
+  for (const [feature, isSet] of lockedFeatures) {
+    if (isFeatureBlocked(quota.tier, session.shop, feature, { isSet, wasSet: false })) {
+      return { error: featureBlockedMessage(feature, quota.tier) };
+    }
   }
 
   // Up to 100 collections are matched live at checkout, so the config stores only their IDs (a
@@ -279,7 +294,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function NewSingleCodePage() {
   const countryRestrictionEnabled = useCountryRestrictionEnabled();
-  const { segments, currencyCode } = useLoaderData<typeof loader>();
+  const { segments, currencyCode, features } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const navigate = useNavigate();
   const shopify = useAppBridge();
@@ -440,6 +455,7 @@ export default function NewSingleCodePage() {
                   details="Percentage off the eligible product"
                   onInput={numericInputHandler("decimal", setPercentage)}
                 />
+                {features.discountCap ? (
                 <s-number-field
                   label={`Maximum discount per order${currencyCode ? ` (${currencyCode})` : ""} (optional)`}
                   inputMode="decimal"
@@ -450,6 +466,9 @@ export default function NewSingleCodePage() {
                   details="Leave blank for no cap. If the percentage comes to more than this amount on an order, the discount is limited to this amount. Enter it in your store's currency."
                   onInput={numericInputHandler("decimal", setMaxDiscountAmount)}
                 />
+                ) : (
+                  <UpgradeNote feature="discountCap" />
+                )}
               </>
             ) : (
               <s-number-field
@@ -538,7 +557,11 @@ export default function NewSingleCodePage() {
 
       {countryRestrictionEnabled && (
         <s-section heading="Countries">
-          <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+          {features.countryRestriction ? (
+            <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+          ) : (
+            <UpgradeNote feature="countryRestriction" />
+          )}
         </s-section>
       )}
 
@@ -546,7 +569,9 @@ export default function NewSingleCodePage() {
         <s-stack direction="block" gap="small">
           <s-paragraph>Choose which customers can use this code.</s-paragraph>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {(["all", "tags", "segment"] as const).map((mode) => (
+            {(["all", "tags", "segment"] as const)
+            .filter((mode) => mode === "all" || features.tagTargeting || eligibilityMode === mode)
+            .map((mode) => (
               <s-button
                 key={mode}
                 variant={eligibilityMode === mode ? "primary" : "secondary"}
@@ -556,6 +581,7 @@ export default function NewSingleCodePage() {
               </s-button>
             ))}
           </div>
+          {!features.tagTargeting && <UpgradeNote feature="tagTargeting" />}
 
           {eligibilityMode === "tags" && (
             <>

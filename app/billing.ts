@@ -13,11 +13,58 @@
 export const PLAN_STARTER = "starter";
 export const PLAN_PRO = "pro";
 
-export const FREE_PLAN_LIMIT = 10;
-export const STARTER_PLAN_LIMIT = 1000;
-// Pro = unlimited (limit is null)
-
 export type PlanTier = "Free" | "Starter" | "Pro";
+
+// Features that need a paid plan. Per-customer limits, items per order, max items in the cart,
+// collections, CSV import and bulk generation are on every plan.
+export type PlanFeature = "countryRestriction" | "discountCap" | "tagTargeting";
+
+export interface PlanLimits {
+  /** Reusable codes that can exist at once (null = unlimited). */
+  reusableCodes: number | null;
+  /** Active (never used) bulk codes at once (null = unlimited). */
+  bulkCodes: number | null;
+  /** Blocked product types on the Rules page (null = unlimited). */
+  blockedProductTypes: number | null;
+  features: Record<PlanFeature, boolean>;
+  prioritySupport: boolean;
+}
+
+export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
+  Free: {
+    reusableCodes: 2,
+    bulkCodes: 50,
+    blockedProductTypes: 1,
+    features: { countryRestriction: false, discountCap: false, tagTargeting: false },
+    prioritySupport: false,
+  },
+  Starter: {
+    reusableCodes: 25,
+    bulkCodes: 5000,
+    blockedProductTypes: null,
+    features: { countryRestriction: true, discountCap: true, tagTargeting: true },
+    prioritySupport: false,
+  },
+  Pro: {
+    reusableCodes: null,
+    bulkCodes: null,
+    blockedProductTypes: null,
+    features: { countryRestriction: true, discountCap: true, tagTargeting: true },
+    prioritySupport: true,
+  },
+};
+
+// Shops that already had more than the plan allows, or already used a gated feature, when these
+// limits were introduced (2026-10-07). They keep what they had; nothing new beyond it. Existing
+// codes are never switched off by plan changes (limits and locks apply only when creating or editing).
+const GRANDFATHERED: {
+  /** Shop -> reusable codes it may keep (never less than the plan allows). */
+  reusableCodes: Record<string, number>;
+  tagTargeting: string[];
+} = {
+  reusableCodes: { "81xhhk-h2.myshopify.com": 3 },
+  tagTargeting: ["htmybm-hw.myshopify.com", "806bad-23.myshopify.com"],
+};
 
 // Matches "starter"/"pro" as whole words so private plans like "Multi-store
 // Pro" map to the right tier, while names that merely contain the letters
@@ -30,8 +77,58 @@ export function tierForPlanName(planName: string | null): PlanTier {
   return "Free";
 }
 
+// Staging only: lets a test environment behave as a given plan, because the staging app has no
+// Shopify App Pricing plans. Anything other than an exact tier name is ignored.
+export function parseTierOverride(value: string | undefined): PlanTier | null {
+  return value === "Free" || value === "Starter" || value === "Pro" ? value : null;
+}
+
+/** Active bulk codes allowed (null = unlimited). */
 export function limitForTier(tier: PlanTier): number | null {
-  if (tier === "Starter") return STARTER_PLAN_LIMIT;
-  if (tier === "Pro") return null; // unlimited
-  return FREE_PLAN_LIMIT;
+  return PLAN_LIMITS[tier].bulkCodes;
+}
+
+/** Reusable codes this shop may have at once, including any grandfathered allowance. */
+export function reusableLimitFor(tier: PlanTier, shop: string): number | null {
+  const base = PLAN_LIMITS[tier].reusableCodes;
+  if (base === null) return null;
+  return Math.max(base, GRANDFATHERED.reusableCodes[shop] ?? 0);
+}
+
+export function canUseFeature(tier: PlanTier, shop: string, feature: PlanFeature): boolean {
+  if (PLAN_LIMITS[tier].features[feature]) return true;
+  return feature === "tagTargeting" && GRANDFATHERED.tagTargeting.includes(shop);
+}
+
+/** Blocked product types this shop may have (null = unlimited). */
+export function blockedTypeLimitFor(tier: PlanTier): number | null {
+  return PLAN_LIMITS[tier].blockedProductTypes;
+}
+
+const FEATURE_NAMES: Record<PlanFeature, string> = {
+  countryRestriction: "Country restrictions",
+  discountCap: "A maximum discount per order",
+  tagTargeting: "Customer tag and segment targeting",
+};
+
+export function featureName(feature: PlanFeature): string {
+  return FEATURE_NAMES[feature];
+}
+
+/**
+ * Whether saving should be refused because the shop is turning on a locked feature.
+ * A feature that was already set stays editable, so nobody loses what they have.
+ */
+export function isFeatureBlocked(
+  tier: PlanTier,
+  shop: string,
+  feature: PlanFeature,
+  { isSet, wasSet }: { isSet: boolean; wasSet: boolean }
+): boolean {
+  return isSet && !wasSet && !canUseFeature(tier, shop, feature);
+}
+
+export function featureBlockedMessage(feature: PlanFeature, tier: PlanTier): string {
+  const plural = feature === "countryRestriction";
+  return `${featureName(feature)} ${plural ? "are" : "is"} available on the Starter plan and above (you're on ${tier}). Upgrade on the Plans page to use ${plural ? "them" : "it"}.`;
 }

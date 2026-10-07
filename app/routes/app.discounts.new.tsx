@@ -13,15 +13,18 @@ import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
 import { saveFunctionConfig, discountNodeId, configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
+import { UpgradeNote } from "../components/UpgradeNote";
 import { parseAllowedCountries } from "../countries";
-import { checkCodeQuota } from "../billing.server";
+import { checkCodeQuota, getPlanFeatures } from "../billing.server";
+import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
 import { applyEligibility, listSegments } from "../eligibility.server";
 import { shouldRequestReviewAfterCreation } from "../review-prompt";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session, billing } = await authenticate.admin(request);
   const segments = await listSegments(admin);
-  return { segments };
+  const features = await getPlanFeatures(billing, session.shop);
+  return { segments, features };
 };
 
 type ParsedCode = { code: string; used: boolean };
@@ -137,11 +140,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       finalCodes = Array.from(codeSet);
     }
 
-    const quota = await checkCodeQuota(admin, billing, finalCodes.length);
+    const quota = await checkCodeQuota(admin, billing, session.shop, finalCodes.length);
     if (!quota.allowed) {
       return {
-        error: `Your ${quota.tier} plan allows up to ${quota.limit} active discount codes (currently using ${quota.current}). Upgrade on the Plans page to create more.`,
+        error: `Your ${quota.tier} plan allows up to ${quota.limit} active bulk codes (currently using ${quota.current}). Upgrade on the Plans page to create more.`,
       };
+    }
+
+    // Features that need a paid plan (existing codes are never affected; this only applies when creating).
+    const lockedFeatures: [PlanFeature, boolean][] = [
+      ["countryRestriction", allowedCountries.length > 0],
+      ["tagTargeting", eligibilityMode !== "all"],
+    ];
+    for (const [feature, isSet] of lockedFeatures) {
+      if (isFeatureBlocked(quota.tier, session.shop, feature, { isSet, wasSet: false })) {
+        return { error: featureBlockedMessage(feature, quota.tier) };
+      }
     }
 
     // Up to 100 collections are matched live at checkout, so the config stores only their IDs (a
@@ -334,7 +348,7 @@ type SelectedItem = { id: string; title: string };
 
 export default function CreateBulkDiscount() {
   const countryRestrictionEnabled = useCountryRestrictionEnabled();
-  const { segments } = useLoaderData<typeof loader>();
+  const { segments, features } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -706,7 +720,11 @@ export default function CreateBulkDiscount() {
 
       {countryRestrictionEnabled && (
         <s-section heading="Countries">
-          <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+          {features.countryRestriction ? (
+            <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+          ) : (
+            <UpgradeNote feature="countryRestriction" />
+          )}
         </s-section>
       )}
 
@@ -714,7 +732,9 @@ export default function CreateBulkDiscount() {
         <s-stack direction="block" gap="small">
           <s-paragraph>Choose which customers can use these discount codes.</s-paragraph>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {(["all", "tags", "segment"] as const).map((mode) => (
+            {(["all", "tags", "segment"] as const)
+            .filter((mode) => mode === "all" || features.tagTargeting || eligibilityMode === mode)
+            .map((mode) => (
               <s-button
                 key={mode}
                 variant={eligibilityMode === mode ? "primary" : "secondary"}
@@ -724,6 +744,7 @@ export default function CreateBulkDiscount() {
               </s-button>
             ))}
           </div>
+          {!features.tagTargeting && <UpgradeNote feature="tagTargeting" />}
 
           {eligibilityMode === "tags" && (
             <s-form-layout>

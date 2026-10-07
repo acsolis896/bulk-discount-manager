@@ -4,6 +4,8 @@ import { useLoaderData, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { getCurrentPlan } from "../billing.server";
+import { blockedTypeLimitFor } from "../billing";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -152,7 +154,7 @@ async function syncBlockedProductTypesToDiscounts(
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { admin, session, billing } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 
@@ -170,6 +172,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       (r: { productType: string }) => r.productType.toLowerCase() === productType.toLowerCase()
     );
     if (!alreadyBlocked) {
+      const { tier } = await getCurrentPlan(billing);
+      const typeLimit = blockedTypeLimitFor(tier);
+      if (typeLimit !== null && existing.length >= typeLimit) {
+        return {
+          error: `Your ${tier} plan allows ${typeLimit} blocked product type${typeLimit === 1 ? "" : "s"}. Remove one, or upgrade on the Plans page to add more.`,
+        };
+      }
       await db.blockedProductType.create({
         data: { shop: session.shop, productType },
       });

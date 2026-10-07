@@ -2,8 +2,8 @@ import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { FREE_PLAN_LIMIT, STARTER_PLAN_LIMIT } from "../billing";
-import { getCurrentPlan, countActiveCodes } from "../billing.server";
+import { PLAN_LIMITS, type PlanTier } from "../billing";
+import { getPlanUsage } from "../billing.server";
 
 // Matches the app handle Shopify shows in admin.shopify.com URLs for this
 // app (e.g. .../apps/bulk-discount-manager-7) — used to deep-link merchants
@@ -12,26 +12,47 @@ const APP_HANDLE = "bulk-discount-manager-7";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, billing, session } = await authenticate.admin(request);
-  const { tier, limit, planName } = await getCurrentPlan(billing);
-  const current = await countActiveCodes(admin, limit);
+  const usage = await getPlanUsage(admin, billing, session.shop);
   const storeHandle = session.shop.replace(".myshopify.com", "");
   const pricingUrl = `https://admin.shopify.com/store/${storeHandle}/charges/${APP_HANDLE}/pricing_plans`;
   // A private plan (e.g. "Multi-store Pro") maps to a standard tier for its
   // limits but has its own price, so don't show it as the public tier.
-  const isCustomPlan = planName !== null && planName.trim().toLowerCase() !== tier.toLowerCase();
-  return { tier, limit, current, pricingUrl, planName, isCustomPlan };
+  const isCustomPlan = usage.planName !== null && usage.planName.trim().toLowerCase() !== usage.tier.toLowerCase();
+  return { ...usage, pricingUrl, isCustomPlan };
 };
 
-type PlanTier = "Free" | "Starter" | "Pro";
+const PRICES: Record<PlanTier, string> = {
+  Free: "$0/month",
+  Starter: "$19.99/month or $199.90/year",
+  Pro: "$49.99/month or $499.90/year",
+};
 
-const PLANS: { tier: PlanTier; price: string; feature: string }[] = [
-  { tier: "Free", price: "$0/month", feature: `Up to ${FREE_PLAN_LIMIT} active discount codes at a time.` },
-  { tier: "Starter", price: "$19.99/month or $199.90/year", feature: `Up to ${STARTER_PLAN_LIMIT} active discount codes at a time.` },
-  { tier: "Pro", price: "$49.99/month or $499.90/year", feature: "Unlimited active discount codes." },
-];
+// Built from the same rules the app enforces, so this page can't drift from them.
+function featuresFor(tier: PlanTier): string[] {
+  const l = PLAN_LIMITS[tier];
+  const list: string[] = [
+    l.reusableCodes === null ? "Unlimited reusable codes" : `Up to ${l.reusableCodes} reusable codes`,
+    l.bulkCodes === null ? "Unlimited active bulk codes" : `Up to ${l.bulkCodes.toLocaleString("en-US")} active bulk codes`,
+    l.blockedProductTypes === null
+      ? "Unlimited blocked product types"
+      : `${l.blockedProductTypes} blocked product type${l.blockedProductTypes === 1 ? "" : "s"}`,
+    "Per-customer limits, item caps and CSV import",
+  ];
+  if (l.features.countryRestriction) list.push("Country restrictions");
+  if (l.features.discountCap) list.push("Maximum discount per order");
+  if (l.features.tagTargeting) list.push("Customer tag and segment targeting");
+  if (l.prioritySupport) list.push("Priority support");
+  return list;
+}
+
+const PLANS: PlanTier[] = ["Free", "Starter", "Pro"];
+
+const usageText = (used: number, limit: number | null, noun: string) =>
+  limit === null ? `Unlimited ${noun}` : `${used} / ${limit} ${noun} used`;
 
 export default function PlansPage() {
-  const { tier, limit, current, pricingUrl, planName, isCustomPlan } = useLoaderData<typeof loader>();
+  const { tier, bulkLimit, bulkUsed, reusableLimit, reusableUsed, pricingUrl, planName, isCustomPlan } =
+    useLoaderData<typeof loader>();
 
   return (
     <s-page heading="Plans">
@@ -40,9 +61,7 @@ export default function PlansPage() {
           <s-paragraph>
             You're on the <s-text emphasis="bold">{isCustomPlan ? planName : tier}</s-text> plan
             {isCustomPlan ? ` (${tier} features)` : ""}.{" "}
-            {limit === null
-              ? "Unlimited active discount codes."
-              : `${current} / ${limit} active discount codes used.`}
+            {usageText(reusableUsed, reusableLimit, "reusable codes")}. {usageText(bulkUsed, bulkLimit, "active bulk codes")}.
           </s-paragraph>
           <div>
             <s-button href={pricingUrl} target="_top" variant="primary">
@@ -54,11 +73,11 @@ export default function PlansPage() {
 
       <s-section heading="Compare plans">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" }}>
-          {PLANS.map((plan) => {
-            const isCurrent = !isCustomPlan && tier === plan.tier;
+          {PLANS.map((planTier) => {
+            const isCurrent = !isCustomPlan && tier === planTier;
             return (
               <s-box
-                key={plan.tier}
+                key={planTier}
                 padding="base"
                 borderWidth={isCurrent ? "large" : "base"}
                 borderColor={isCurrent ? "strong" : "subdued"}
@@ -67,11 +86,13 @@ export default function PlansPage() {
               >
                 <s-stack direction="block" gap="small">
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-                    <s-text emphasis="bold" style={{ fontSize: "16px" }}>{plan.tier}</s-text>
+                    <s-text emphasis="bold" style={{ fontSize: "16px" }}>{planTier}</s-text>
                     {isCurrent && <s-badge tone="success">Current plan</s-badge>}
                   </div>
-                  <s-text emphasis="bold">{plan.price}</s-text>
-                  <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>{plan.feature}</s-paragraph>
+                  <s-text emphasis="bold">{PRICES[planTier]}</s-text>
+                  {featuresFor(planTier).map((line) => (
+                    <s-paragraph key={line} style={{ fontSize: "13px", color: "#6d7175" }}>✓ {line}</s-paragraph>
+                  ))}
                 </s-stack>
               </s-box>
             );
@@ -85,9 +106,7 @@ export default function PlansPage() {
                 </div>
                 <s-text emphasis="bold">Custom plan</s-text>
                 <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
-                  {limit === null
-                    ? "Unlimited active discount codes."
-                    : `Up to ${limit} active discount codes at a time.`}
+                  {featuresFor(tier).join(" · ")}
                 </s-paragraph>
               </s-stack>
             </s-box>

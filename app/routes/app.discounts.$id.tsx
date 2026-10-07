@@ -331,10 +331,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (finalCodes.length > 0) {
-      const quota = await checkCodeQuota(admin, billing, finalCodes.length);
+      const quota = await checkCodeQuota(admin, billing, session.shop, finalCodes.length);
       if (!quota.allowed) {
         return {
-          error: `Your ${quota.tier} plan allows up to ${quota.limit} active discount codes (currently using ${quota.current}). Upgrade on the Plans page to create more.`,
+          error: `Your ${quota.tier} plan allows up to ${quota.limit} active bulk codes (currently using ${quota.current}). Upgrade on the Plans page to create more.`,
         };
       }
     }

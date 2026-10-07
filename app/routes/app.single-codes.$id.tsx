@@ -8,13 +8,16 @@ import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
 import { getShopCurrencyCode } from "../shop.server";
+import { getCurrentPlan, getPlanFeatures } from "../billing.server";
+import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
 import { configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
+import { UpgradeNote } from "../components/UpgradeNote";
 import { parseAllowedCountries } from "../countries";
 import { applyEligibility, listSegments } from "../eligibility.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { admin, session, billing } = await authenticate.admin(request);
   const numericId = params.id!;
   const discountId = `gid://shopify/DiscountCodeNode/${numericId}`;
 
@@ -133,6 +136,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     maxCartItems: Number.isInteger(config.maxCartItems) && (config.maxCartItems as number) > 0 ? (config.maxCartItems as number) : null,
     maxDiscountAmount: typeof config.maxDiscountAmount === "number" && config.maxDiscountAmount > 0 ? (config.maxDiscountAmount as number) : null,
     currencyCode: await getShopCurrencyCode(admin),
+    features: await getPlanFeatures(billing, session.shop, {
+      countryRestriction: Array.isArray(config.allowedCountries) && config.allowedCountries.length > 0,
+      discountCap: typeof config.maxDiscountAmount === "number",
+      tagTargeting: row.eligibilityMode === "tags" || row.eligibilityMode === "segment",
+    }),
     productIds,
     collectionIds,
     collectionTitles,
@@ -143,7 +151,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { admin, session, billing } = await authenticate.admin(request);
   const numericId = params.id!;
   const discountId = `gid://shopify/DiscountCodeNode/${numericId}`;
   const formData = await request.formData();
@@ -220,7 +228,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (sizeProblem) return { error: sizeProblem };
 
     // Look up functionNodeId from DB
-    const dbRow = await db.singleCodeDiscount.findFirst({ where: { shop: session.shop, discountId }, select: { functionNodeId: true, code: true } });
+    const dbRow = await db.singleCodeDiscount.findFirst({ where: { shop: session.shop, discountId }, select: { functionNodeId: true, code: true, eligibilityMode: true } });
     const fnNodeId = dbRow?.functionNodeId ?? null;
     const readFromId = fnNodeId ?? discountId;
 
@@ -237,6 +245,20 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const mfData = await mfRes.json();
     let existing: Record<string, unknown> = {};
     try { existing = JSON.parse(mfData.data?.discountNode?.metafield?.value); } catch {}
+
+    // Features that need a paid plan can't be newly turned on from a lower plan; ones this code
+    // already has stay editable, so nobody loses what they have.
+    const { tier } = await getCurrentPlan(billing);
+    const lockedFeatures: [PlanFeature, boolean, boolean][] = [
+      ["countryRestriction", allowedCountries.length > 0, Array.isArray(existing.allowedCountries) && existing.allowedCountries.length > 0],
+      ["discountCap", maxDiscountAmount !== null, typeof existing.maxDiscountAmount === "number"],
+      ["tagTargeting", eligibilityMode !== "all", dbRow?.eligibilityMode === "tags" || dbRow?.eligibilityMode === "segment"],
+    ];
+    for (const [feature, isSet, wasSet] of lockedFeatures) {
+      if (isFeatureBlocked(tier, session.shop, feature, { isSet, wasSet })) {
+        return { error: featureBlockedMessage(feature, tier) };
+      }
+    }
 
     const newConfig = {
       ...existing,
@@ -390,6 +412,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 export default function SingleCodeDetailsPage() {
   const countryRestrictionEnabled = useCountryRestrictionEnabled();
   const loaderData = useLoaderData<typeof loader>();
+  const features = loaderData.features;
   const navigate = useNavigate();
   const shopify = useAppBridge();
   const fetcher = useFetcher<typeof action>();
@@ -563,13 +586,19 @@ export default function SingleCodeDetailsPage() {
 
           {countryRestrictionEnabled && (
             <s-section heading="Countries">
-              <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+              {features.countryRestriction ? (
+                <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+              ) : (
+                <UpgradeNote feature="countryRestriction" />
+              )}
             </s-section>
           )}
 
           <s-section heading="Edit customer eligibility">
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {(["all", "tags", "segment"] as const).map((mode) => (
+              {(["all", "tags", "segment"] as const)
+              .filter((mode) => mode === "all" || features.tagTargeting || eligibilityMode === mode)
+              .map((mode) => (
                 <s-button
                   key={mode}
                   variant={eligibilityMode === mode ? "primary" : "secondary"}
@@ -579,6 +608,7 @@ export default function SingleCodeDetailsPage() {
                 </s-button>
               ))}
             </div>
+            {!features.tagTargeting && <UpgradeNote feature="tagTargeting" />}
 
             {eligibilityMode === "tags" && (
               <div style={{ marginTop: "16px" }}>
@@ -638,6 +668,7 @@ export default function SingleCodeDetailsPage() {
                       details="Percentage off the eligible product"
                       onInput={numericInputHandler("decimal", setPercentage)}
                     />
+                    {features.discountCap ? (
                     <s-number-field
                       label={`Maximum discount per order${loaderData.currencyCode ? ` (${loaderData.currencyCode})` : ""} (optional)`}
                       inputMode="decimal"
@@ -648,6 +679,9 @@ export default function SingleCodeDetailsPage() {
                       details="Leave blank for no cap. If the percentage comes to more than this amount on an order, the discount is limited to this amount. Enter it in your store's currency."
                       onInput={numericInputHandler("decimal", setMaxDiscountAmount)}
                     />
+                    ) : (
+                      <UpgradeNote feature="discountCap" />
+                    )}
                   </>
                 ) : (
                   <s-number-field
