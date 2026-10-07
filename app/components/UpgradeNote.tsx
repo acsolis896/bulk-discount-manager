@@ -4,8 +4,8 @@ import { featureName, type PlanFeature } from "../billing";
 export function UpgradeNote({ feature }: { feature: PlanFeature }) {
   const plural = feature === "countryRestriction";
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
-      <span style={{ flexShrink: 0, display: "inline-flex", paddingTop: "1px" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <span style={{ flexShrink: 0, display: "inline-flex" }}>
         <s-icon type="info" />
       </span>
       <s-paragraph>
