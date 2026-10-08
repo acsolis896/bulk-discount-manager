@@ -44,6 +44,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const countriesResult = parseAllowedCountries(String(formData.get("allowedCountries") || ""));
   if ("error" in countriesResult) return { error: countriesResult.error };
   const allowedCountries = countriesResult.countries;
+  const usageLimitRaw = Number(formData.get("usageLimit") || 0);
+  const usageLimit = usageLimitRaw > 0 ? Math.floor(usageLimitRaw) : null;
   const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
   const parsedUsesLimit = usesPerCustomerLimitRaw ? Number(usesPerCustomerLimitRaw) : null;
   if (parsedUsesLimit !== null && (!Number.isFinite(parsedUsesLimit) || parsedUsesLimit < 1)) {
@@ -154,6 +156,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           startsAt: new Date().toISOString(),
           ...(endsAt ? { endsAt } : {}),
           code,
+          ...(usageLimit !== null ? { usageLimit } : {}),
           discountClasses: ["PRODUCT"],
           combinesWith: {
             productDiscounts: combinesWithProduct,
@@ -308,6 +311,7 @@ export default function NewSingleCodePage() {
   const [oncePerOrder, setOncePerOrder] = useState(true);
   const [maxDiscountedItems, setMaxDiscountedItems] = useState("");
   const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
+  const [usageLimit, setUsageLimit] = useState("");
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState("");
   const [maxCartItems, setMaxCartItems] = useState("");
   const [maxDiscountAmount, setMaxDiscountAmount] = useState("");
@@ -377,6 +381,7 @@ export default function NewSingleCodePage() {
     form.set("oncePerOrder", oncePerOrder ? "1" : "0");
     form.set("maxDiscountedItems", maxDiscountedItems);
     form.set("allowedCountries", JSON.stringify(allowedCountries));
+    form.set("usageLimit", usageLimit);
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
     form.set("maxCartItems", maxCartItems);
     form.set("maxDiscountAmount", maxDiscountAmount);
@@ -517,6 +522,17 @@ export default function NewSingleCodePage() {
             )}
           </div>
         )}
+        <div style={{ marginTop: "16px" }}>
+          <s-number-field
+            label="Maximum total uses (optional)"
+            inputMode="numeric"
+            value={usageLimit}
+            min={1}
+            placeholder="Unlimited"
+            details="Leave blank for unlimited. Set a number to cap total redemptions across all customers — e.g. 100."
+            onInput={(e: InputEvent) => setUsageLimit((e.target as HTMLInputElement).value)}
+          />
+        </div>
         <div style={{ marginTop: "16px" }}>
           {features.usesPerCustomer ? (
             <s-number-field

@@ -45,6 +45,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             title
             status
             asyncUsageCount
+            usageLimit
             startsAt
             endsAt
             combinesWith { productDiscounts orderDiscounts shippingDiscounts }
@@ -122,6 +123,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     title: discount?.title ?? row.code,
     status: discount?.status ?? "UNKNOWN",
     usageCount: discount?.asyncUsageCount ?? 0,
+    usageLimit: discount?.usageLimit ?? null,
     revenue,
     lastUsed,
     startsAt: discount?.startsAt ?? null,
@@ -180,6 +182,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const allowedCountries = countriesResult.countries;
     const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
     const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
+    const usageLimitRaw = Number(formData.get("usageLimit") || 0);
+    const usageLimit = usageLimitRaw > 0 ? Math.floor(usageLimitRaw) : null;
     const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
     const parsedUsesLimit = usesPerCustomerLimitRaw ? Number(usesPerCustomerLimitRaw) : null;
     if (parsedUsesLimit !== null && (!Number.isFinite(parsedUsesLimit) || parsedUsesLimit < 1)) {
@@ -327,6 +331,18 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       usageCappedCustomerIds: usesPerCustomerLimit === null ? [] : (existing.usageCappedCustomerIds ?? []),
     });
 
+    // Update native Shopify usageLimit field
+    const appDiscountId = discountId.replace("DiscountCodeNode", "DiscountCodeApp");
+    await admin.graphql(
+      `#graphql
+      mutation UpdateUsageLimit($id: ID!, $input: DiscountCodeAppInput!) {
+        discountCodeAppUpdate(id: $id, codeAppDiscount: $input) {
+          userErrors { field message }
+        }
+      }`,
+      { variables: { id: appDiscountId, input: { usageLimit } } }
+    );
+
     let eligibilityWarning: string | null = null;
     if (eligibilityMode !== "all") {
       eligibilityWarning = await applyEligibility(
@@ -433,6 +449,7 @@ export default function SingleCodeDetailsPage() {
   const [productTitles, setProductTitles] = useState<string[]>([]);
   const [collectionIds, setCollectionIds] = useState<string[]>(loaderData.collectionIds);
   const [collectionTitles, setCollectionTitles] = useState<string[]>(loaderData.collectionTitles);
+  const [usageLimit, setUsageLimit] = useState(loaderData.usageLimit != null ? String(loaderData.usageLimit) : "");
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState(String(loaderData.usesPerCustomerLimit ?? ""));
   const [maxCartItems, setMaxCartItems] = useState(loaderData.maxCartItems ? String(loaderData.maxCartItems) : "");
   const [maxDiscountAmount, setMaxDiscountAmount] = useState(loaderData.maxDiscountAmount ? String(loaderData.maxDiscountAmount) : "");
@@ -489,6 +506,7 @@ export default function SingleCodeDetailsPage() {
     form.set("allowedCountries", JSON.stringify(allowedCountries));
     form.set("productIds", JSON.stringify(productIds));
     form.set("collectionIds", JSON.stringify(collectionIds));
+    form.set("usageLimit", usageLimit);
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
     form.set("maxCartItems", maxCartItems);
     form.set("maxDiscountAmount", maxDiscountAmount);
@@ -561,6 +579,11 @@ export default function SingleCodeDetailsPage() {
                 </span>
               </div>
             </div>
+            {loaderData.usageLimit != null && (
+              <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                Max total uses: {loaderData.usageLimit.toLocaleString()} ({Math.max(0, loaderData.usageLimit - loaderData.usageCount).toLocaleString()} remaining)
+              </div>
+            )}
             {loaderData.endsAt && (
               <div style={{ fontSize: "13px", color: "#6d7175" }}>
                 Expires: {new Date(loaderData.endsAt).toLocaleDateString()}
@@ -743,6 +766,17 @@ export default function SingleCodeDetailsPage() {
               ) : (
                 <UpgradeNote feature="maxCartItems" />
               )}
+            </div>
+            <div style={{ marginTop: "16px" }}>
+              <s-number-field
+                label="Maximum total uses (optional)"
+                inputMode="numeric"
+                value={usageLimit}
+                min={1}
+                placeholder="Unlimited"
+                details="Leave blank for unlimited uses. Set a number to cap the total times this code can be redeemed across all customers."
+                onInput={numericInputHandler("integer", setUsageLimit)}
+              />
             </div>
             <div style={{ marginTop: "16px" }}>
               {features.usesPerCustomer ? (
