@@ -4,7 +4,7 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { useFetcher, useLoaderData } from "react-router";
+import { useFetcher, useLoaderData, useNavigate } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -362,6 +362,7 @@ export default function CreateBulkDiscount() {
   const [eligibilityMode, setEligibilityMode] = useState<"all" | "tags" | "segment">("all");
   const [requiredTag, setRequiredTag] = useState("");
   const [blockedTag, setBlockedTag] = useState("");
+  const navigate = useNavigate();
   const [selectedSegmentId, setSelectedSegmentId] = useState("");
   const [codeMode, setCodeMode] = useState<"generate" | "import">("generate");
   const [endsAt, setEndsAt] = useState("");
@@ -841,6 +842,14 @@ export default function CreateBulkDiscount() {
           {result.eligibilityWarning ? (
             <s-paragraph>Customer eligibility warning: {result.eligibilityWarning as string}</s-paragraph>
           ) : null}
+          {typeof result.discountId === "string" && (
+            <s-button
+              slot="secondary-actions"
+              onClick={() => navigate(`/app/discounts/${(result.discountId as string).split("/").pop()}`)}
+            >
+              View
+            </s-button>
+          )}
         </s-banner>
         </div>
       )}
