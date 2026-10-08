@@ -217,7 +217,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const scanRes = await admin.graphql(
       `#graphql
-      query FindFunctionNode($after: String) {
+      query FindFunctionNode {
         discountNodes(first: 50, query: "function_id:discount-rejection-function-js") {
           nodes {
             id
@@ -228,8 +228,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
           }
         }
-      }`,
-      { variables: { after: null } }
+      }`
     );
     const scanData = await scanRes.json();
     for (const n of scanData.data?.discountNodes?.nodes ?? []) {
