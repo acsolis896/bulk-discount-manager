@@ -89,10 +89,10 @@ describe("reusable code limit", () => {
     expect(r).toMatchObject({ allowed: true, limit: null });
   });
 
-  test("a grandfathered shop keeps its 3 on Free but cannot add a 4th", async () => {
-    seed(MAISON, 3);
+  test("a grandfathered shop may have 5 on Free but cannot add a 6th", async () => {
+    seed(MAISON, 5);
     const r = await checkReusableQuota(fakeAdmin({ existing: rows.map((x) => x.discountId) }), billingFor(null), MAISON);
-    expect(r).toMatchObject({ allowed: false, limit: 3, current: 3 });
+    expect(r).toMatchObject({ allowed: false, limit: 5, current: 5 });
   });
 });
 

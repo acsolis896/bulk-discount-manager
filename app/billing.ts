@@ -68,7 +68,9 @@ const GRANDFATHERED: {
   /** Gated feature -> shops that already used it and may keep using it. */
   features: Partial<Record<PlanFeature, string[]>>;
 } = {
-  reusableCodes: { "81xhhk-h2.myshopify.com": 3 },
+  // Raised from 3 to 5 on 2026-10-08 as a goodwill allowance for a pre-revenue merchant, meant to be
+  // revisited around 2026-12-08 (it does not expire by itself).
+  reusableCodes: { "81xhhk-h2.myshopify.com": 5 },
   features: {},
 };
 

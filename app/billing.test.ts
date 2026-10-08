@@ -74,8 +74,8 @@ describe("features (when locks are on)", () => {
 });
 
 describe("grandfathering (existing merchants keep what they had)", () => {
-  test("a shop with 3 reusable codes may keep 3 on Free, but a new Free shop gets 2", () => {
-    expect(reusableLimitFor("Free", MAISON)).toBe(3);
+  test("the grandfathered shop may have 5 reusable codes on Free, but a new Free shop gets 2", () => {
+    expect(reusableLimitFor("Free", MAISON)).toBe(5);
     expect(reusableLimitFor("Free", NEW_SHOP)).toBe(2);
   });
 
