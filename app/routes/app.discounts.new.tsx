@@ -14,6 +14,8 @@ import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../f
 import { saveFunctionConfig, discountNodeId, configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { UpgradeNote } from "../components/UpgradeNote";
+import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota, getPlanFeatures } from "../billing.server";
 import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
@@ -504,65 +506,178 @@ export default function CreateBulkDiscount() {
 
   return (
     <s-page heading="Create Bulk Discount Codes">
-      <s-section heading="Discount details">
-        <s-form-layout>
-          <s-text-field
-            label="Title"
-            value={title}
-            onInput={(e: InputEvent) => setTitle((e.target as HTMLInputElement).value)}
-            details="The discount set title will be shown in the Shopify admin, not visible to customers at checkout"
-          />
-          <div style={{ marginTop: "16px" }}>
-            <s-stack direction="block" gap="small">
-              <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {(["percentage", "fixedAmount"] as const).map((type) => (
-                  <s-button
-                    key={type}
-                    variant={discountType === type ? "primary" : "secondary"}
-                    onClick={() => setDiscountType(type)}
-                  >
-                    {type === "percentage" ? "Percentage" : "Fixed amount"}
-                  </s-button>
-                ))}
-              </div>
-              {discountType === "percentage" ? (
-                <s-number-field
-                  label="Percentage off"
-                  inputMode="decimal"
-                  value={percentage}
-                  min={1}
-                  max={100}
-                  suffix="%"
-                  onInput={numericInputHandler("decimal", setPercentage)}
+      <FormStyles />
+      <s-section>
+        <CardTitle>Discount set</CardTitle>
+        <s-text-field
+          label="Title"
+          value={title}
+          onInput={(e: InputEvent) => setTitle((e.target as HTMLInputElement).value)}
+          details="The discount set title will be shown in the Shopify admin, not visible to customers at checkout"
+        />
+
+        <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
+          <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}>Codes</div>
+          <s-stack direction="block" gap="base">
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {(["generate", "import"] as const).map((mode) => (
+                <s-button
+                  key={mode}
+                  variant={codeMode === mode ? "primary" : "secondary"}
+                  onClick={() => setCodeMode(mode)}
+                >
+                  {mode === "generate" ? "Generate randomly" : "Import from CSV"}
+                </s-button>
+              ))}
+            </div>
+
+            {codeMode === "generate" && (
+              <s-form-layout>
+                <s-text-field
+                  label="Code prefix"
+                  value={prefix}
+                  onInput={(e: InputEvent) => setPrefix((e.target as HTMLInputElement).value)}
+                  details={previewCode ? `Preview: ${previewCode}` : "Letters and numbers only, e.g. WELCOME — a dash and random characters will be added automatically"}
                 />
-              ) : (
-                <s-number-field
-                  label="Amount off"
-                  inputMode="decimal"
-                  value={fixedAmount}
-                  min={0.01}
-                  step={0.01}
-                  prefix="$"
-                  onInput={numericInputHandler("decimal", setFixedAmount)}
+                <div style={{ marginTop: "16px" }}>
+                  <s-number-field
+                    label="Number of codes"
+                    inputMode="numeric"
+                    value={codeCount}
+                    min={1}
+                    max={5000}
+                    onInput={numericInputHandler("integer", setCodeCount)}
+                    details="Maximum 5,000 per batch"
+                  />
+                </div>
+                <div style={{ marginTop: "16px" }}>
+                  <s-number-field
+                    label="Code length"
+                    inputMode="numeric"
+                    value={codeLength}
+                    min={4}
+                    max={12}
+                    onInput={numericInputHandler("integer", setCodeLength)}
+                    details="Number of random characters after the prefix (4–12)"
+                  />
+                </div>
+              </s-form-layout>
+            )}
+
+            {codeMode === "import" && (
+              <s-stack direction="block" gap="base">
+                <s-paragraph>
+                  Upload a CSV file with a header row and a column named <strong>Code</strong> — each row becomes
+                  one discount code, converted to uppercase automatically. Maximum 5,000 codes per file.
+                </s-paragraph>
+                <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
+                  Optional: add a <strong>Status</strong> column and mark rows "Used" to record them as
+                  already-redeemed instead of active codes.
+                </s-paragraph>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleFileChange as unknown as React.ChangeEventHandler<HTMLInputElement>}
+                  style={{ fontSize: "14px" }}
                 />
-              )}
-            </s-stack>
+                {csvPreview && (
+                  <s-banner tone="success" title={`${csvPreview.count} codes detected`}>
+                    <s-paragraph>First code: {csvPreview.sample}. Codes marked "Used" will be uploaded to Shopify and flagged as previously used in the app.</s-paragraph>
+                  </s-banner>
+                )}
+                {csvFile && !csvPreview && (
+                  <s-banner tone="critical" title='No "Code" column found'>
+                    <s-paragraph>Make sure the CSV has a header row with a column named exactly "Code".</s-paragraph>
+                  </s-banner>
+                )}
+              </s-stack>
+            )}
+          </s-stack>
+        </div>
+      </s-section>
+
+      <s-section>
+        <CardTitle>Discount value</CardTitle>
+        <s-stack direction="block" gap="small">
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {(["percentage", "fixedAmount"] as const).map((type) => (
+              <s-button
+                key={type}
+                variant={discountType === type ? "primary" : "secondary"}
+                onClick={() => setDiscountType(type)}
+              >
+                {type === "percentage" ? "Percentage" : "Fixed amount"}
+              </s-button>
+            ))}
           </div>
-          <div style={{ marginTop: "16px" }}>
-            <s-checkbox
-              label="Only apply discount once per order"
-              checked={oncePerOrder}
-              onChange={(e: { target: { checked: boolean } }) => setOncePerOrder(e.target.checked)}
-              details={
-                oncePerOrder
-                  ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
-                  : maxDiscountedItems.trim()
-                    ? `The discount will be taken off up to ${maxDiscountedItems.trim()} eligible items in the cart, highest-priced first.`
-                    : "The discount will be taken off every eligible item in the cart."
-              }
+          {discountType === "percentage" ? (
+            <s-number-field
+              label="Percentage off"
+              inputMode="decimal"
+              value={percentage}
+              min={1}
+              max={100}
+              suffix="%"
+              onInput={numericInputHandler("decimal", setPercentage)}
             />
-          </div>
+          ) : (
+            <s-number-field
+              label="Amount off"
+              inputMode="decimal"
+              value={fixedAmount}
+              min={0.01}
+              step={0.01}
+              prefix="$"
+              onInput={numericInputHandler("decimal", setFixedAmount)}
+            />
+          )}
+        </s-stack>
+
+        <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
+          <s-stack direction="block" gap="base">
+            <div style={{ fontSize: "14px", fontWeight: 600 }}>Eligible items</div>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {(["product", "collection"] as const).map((type) => (
+                <s-button
+                  key={type}
+                  variant={selectionType === type ? "primary" : "secondary"}
+                  onClick={() => handleSelectionTypeChange(type)}
+                >
+                  {type === "product" ? "Products" : "Collections"}
+                </s-button>
+              ))}
+            </div>
+            <s-button onClick={handlePickItems}>
+              {selectedItems.length > 0
+                ? `${selectedItems.length} ${selectionType}${selectedItems.length > 1 ? "s" : ""} selected — change`
+                : `Select ${selectionType}s`}
+            </s-button>
+            {selectedItems.length > 0 && (
+              <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                <s-stack direction="block" gap="small">
+                  {selectedItems.map((p) => (
+                    <s-text key={p.id}>{p.title}</s-text>
+                  ))}
+                </s-stack>
+              </s-box>
+            )}
+          </s-stack>
+        </div>
+
+        <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
+          <s-checkbox
+            label="Only apply discount once per order"
+            checked={oncePerOrder}
+            onChange={(e: { target: { checked: boolean } }) => setOncePerOrder(e.target.checked)}
+            details={
+              oncePerOrder
+                ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
+                : maxDiscountedItems.trim()
+                  ? `The discount will be taken off up to ${maxDiscountedItems.trim()} eligible items in the cart, highest-priced first.`
+                  : "The discount will be taken off every eligible item in the cart."
+            }
+          />
           {MAX_DISCOUNTED_ITEMS_ENABLED && !oncePerOrder && (
             <div style={{ marginTop: "12px", marginLeft: "22px", paddingLeft: "12px", borderLeft: "2px solid #c9cccf" }}>
               <s-number-field
@@ -577,208 +692,94 @@ export default function CreateBulkDiscount() {
               />
             </div>
           )}
-          <div style={{ marginTop: "16px" }}>
-            <s-date-field
-              label="Expiration date"
-              value={endsAt}
-              onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
-              details="Optional — leave blank for no expiration"
-            />
-          </div>
-          <div style={{ marginTop: "16px" }}>
+        </div>
+      </s-section>
+
+      <s-section>
+        <CardTitle>Customer eligibility</CardTitle>
+        <div>
           <s-stack direction="block" gap="small">
-            <s-checkbox
-              label="Limit number of times each code can be used in total (1)"
-              checked={usageLimitOne}
-              onChange={(e: { target: { checked: boolean } }) => setUsageLimitOne(e.target.checked)}
-            />
-            <s-checkbox
-              label="Limit to one use per customer"
-              checked={oncePerCustomer}
-              onChange={(e: { target: { checked: boolean } }) => setOncePerCustomer(e.target.checked)}
-            />
-          </s-stack>
-          </div>
-        </s-form-layout>
-      </s-section>
-
-      <s-section heading="Codes">
-        <s-stack direction="block" gap="base">
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {(["generate", "import"] as const).map((mode) => (
-              <s-button
-                key={mode}
-                variant={codeMode === mode ? "primary" : "secondary"}
-                onClick={() => setCodeMode(mode)}
-              >
-                {mode === "generate" ? "Generate randomly" : "Import from CSV"}
-              </s-button>
-            ))}
-          </div>
-
-          {codeMode === "generate" && (
-            <s-form-layout>
-              <s-text-field
-                label="Code prefix"
-                value={prefix}
-                onInput={(e: InputEvent) => setPrefix((e.target as HTMLInputElement).value)}
-                details={previewCode ? `Preview: ${previewCode}` : "Letters and numbers only, e.g. WELCOME — a dash and random characters will be added automatically"}
-              />
-              <div style={{ marginTop: "16px" }}>
-                <s-number-field
-                  label="Number of codes"
-                  inputMode="numeric"
-                  value={codeCount}
-                  min={1}
-                  max={5000}
-                  onInput={numericInputHandler("integer", setCodeCount)}
-                  details="Maximum 5,000 per batch"
-                />
-              </div>
-              <div style={{ marginTop: "16px" }}>
-                <s-number-field
-                  label="Code length"
-                  inputMode="numeric"
-                  value={codeLength}
-                  min={4}
-                  max={12}
-                  onInput={numericInputHandler("integer", setCodeLength)}
-                  details="Number of random characters after the prefix (4–12)"
-                />
-              </div>
-            </s-form-layout>
-          )}
-
-          {codeMode === "import" && (
-            <s-stack direction="block" gap="base">
-              <s-paragraph>
-                Upload a CSV file with a header row and a column named <strong>Code</strong> — each row becomes
-                one discount code, converted to uppercase automatically. Maximum 5,000 codes per file.
-              </s-paragraph>
-              <s-paragraph style={{ fontSize: "13px", color: "#6d7175" }}>
-                Optional: add a <strong>Status</strong> column and mark rows "Used" to record them as
-                already-redeemed instead of active codes.
-              </s-paragraph>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={handleFileChange as unknown as React.ChangeEventHandler<HTMLInputElement>}
-                style={{ fontSize: "14px" }}
-              />
-              {csvPreview && (
-                <s-banner tone="success" title={`${csvPreview.count} codes detected`}>
-                  <s-paragraph>First code: {csvPreview.sample}. Codes marked "Used" will be uploaded to Shopify and flagged as previously used in the app.</s-paragraph>
-                </s-banner>
-              )}
-              {csvFile && !csvPreview && (
-                <s-banner tone="critical" title='No "Code" column found'>
-                  <s-paragraph>Make sure the CSV has a header row with a column named exactly "Code".</s-paragraph>
-                </s-banner>
-              )}
-            </s-stack>
-          )}
-        </s-stack>
-      </s-section>
-
-      <s-section heading="Eligible items">
-        <s-paragraph>
-          {oncePerOrder
-            ? "The discount applies to the highest-priced eligible item in the cart — 1 unit only."
-            : maxDiscountedItems.trim()
-              ? `The discount applies to up to ${maxDiscountedItems.trim()} eligible items in the cart, highest-priced first.`
-              : "The discount applies to every eligible item in the cart."}
-        </s-paragraph>
-        <s-stack direction="block" gap="base">
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {(["product", "collection"] as const).map((type) => (
-              <s-button
-                key={type}
-                variant={selectionType === type ? "primary" : "secondary"}
-                onClick={() => handleSelectionTypeChange(type)}
-              >
-                {type === "product" ? "Products" : "Collections"}
-              </s-button>
-            ))}
-          </div>
-          <s-button onClick={handlePickItems}>
-            {selectedItems.length > 0
-              ? `${selectedItems.length} ${selectionType}${selectedItems.length > 1 ? "s" : ""} selected — change`
-              : `Select ${selectionType}s`}
-          </s-button>
-          {selectedItems.length > 0 && (
-            <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-              <s-stack direction="block" gap="small">
-                {selectedItems.map((p) => (
-                  <s-text key={p.id}>{p.title}</s-text>
-                ))}
-              </s-stack>
-            </s-box>
-          )}
-        </s-stack>
-      </s-section>
-
-      {countryRestrictionEnabled && (
-        <s-section heading="Countries">
-          {features.countryRestriction ? (
-            <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
-          ) : (
-            <UpgradeNote feature="countryRestriction" />
-          )}
-        </s-section>
-      )}
-
-      <s-section heading="Customer eligibility">
-        <s-stack direction="block" gap="small">
-          <s-paragraph>Choose which customers can use these discount codes.</s-paragraph>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {(["all", "tags", "segment"] as const)
-            .map((mode) => (
-              <s-button
-                key={mode}
-                variant={eligibilityMode === mode ? "primary" : "secondary"}
-                onClick={() => setEligibilityMode(mode)}
-              >
-                {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
-              </s-button>
-            ))}
-          </div>
-
-          {eligibilityMode === "tags" && (
-            <s-form-layout>
-              <s-text-field
-                label="Required customer tag"
-                value={requiredTag}
-                placeholder="e.g. VIP"
-                details="Customers must have this tag to use any of these codes"
-                onInput={(e: InputEvent) => setRequiredTag((e.target as HTMLInputElement).value)}
-              />
-              <s-text-field
-                label="Blocked customer tag (optional)"
-                value={blockedTag}
-                placeholder="e.g. VIP-USED"
-                details="Customers with this tag will be excluded"
-                onInput={(e: InputEvent) => setBlockedTag((e.target as HTMLInputElement).value)}
-              />
-            </s-form-layout>
-          )}
-
-          {eligibilityMode === "segment" && (
-            <s-select
-              label="Customer segment"
-              placeholder="Select a segment…"
-              value={selectedSegmentId}
-              onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
-            >
-              {segments.map((s: { id: string; name: string }) => (
-                <s-option key={s.id} value={s.id}>{s.name}</s-option>
+            <div style={{ fontSize: "14px", fontWeight: 600 }}>Customers</div>
+            <s-paragraph>Choose which customers can use these discount codes.</s-paragraph>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {(["all", "tags", "segment"] as const)
+              .map((mode) => (
+                <s-button
+                  key={mode}
+                  variant={eligibilityMode === mode ? "primary" : "secondary"}
+                  onClick={() => setEligibilityMode(mode)}
+                >
+                  {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
+                </s-button>
               ))}
-            </s-select>
+            </div>
+
+            {eligibilityMode === "tags" && (
+              <s-form-layout>
+                <s-text-field
+                  label="Required customer tag"
+                  value={requiredTag}
+                  placeholder="e.g. VIP"
+                  details="Customers must have this tag to use any of these codes"
+                  onInput={(e: InputEvent) => setRequiredTag((e.target as HTMLInputElement).value)}
+                />
+                <s-text-field
+                  label="Blocked customer tag (optional)"
+                  value={blockedTag}
+                  placeholder="e.g. VIP-USED"
+                  details="Customers with this tag will be excluded"
+                  onInput={(e: InputEvent) => setBlockedTag((e.target as HTMLInputElement).value)}
+                />
+              </s-form-layout>
+            )}
+
+            {eligibilityMode === "segment" && (
+              <s-select
+                label="Customer segment"
+                placeholder="Select a segment…"
+                value={selectedSegmentId}
+                onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
+              >
+                {segments.map((s: { id: string; name: string }) => (
+                  <s-option key={s.id} value={s.id}>{s.name}</s-option>
+                ))}
+              </s-select>
+            )}
+          </s-stack>
+
+          {countryRestrictionEnabled && (
+            <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
+              <s-stack direction="block" gap="small">
+                <div style={{ fontSize: "14px", fontWeight: 600 }}>Countries</div>
+                {features.countryRestriction ? (
+                  <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+                ) : (
+                  <UpgradeNote feature="countryRestriction" />
+                )}
+              </s-stack>
+            </div>
           )}
+        </div>
+      </s-section>
+
+      <s-section>
+        <CardTitle>Maximum discount uses</CardTitle>
+        <s-stack direction="block" gap="small">
+          <s-checkbox
+            label="Limit number of times each code can be used in total (1)"
+            checked={usageLimitOne}
+            onChange={(e: { target: { checked: boolean } }) => setUsageLimitOne(e.target.checked)}
+          />
+          <s-checkbox
+            label="Limit to one use per customer"
+            checked={oncePerCustomer}
+            onChange={(e: { target: { checked: boolean } }) => setOncePerCustomer(e.target.checked)}
+          />
         </s-stack>
       </s-section>
 
-      <s-section heading="Combinations">
+      <s-section>
+        <CardTitle>Combinations</CardTitle>
         <s-stack direction="block" gap="small">
           <s-paragraph>Choose whether this discount can be combined with other discount types.</s-paragraph>
           <s-checkbox
@@ -797,6 +798,16 @@ export default function CreateBulkDiscount() {
             onChange={(e: { target: { checked: boolean } }) => setCombinesWithShipping(e.target.checked)}
           />
         </s-stack>
+      </s-section>
+
+      <s-section>
+        <CardTitle>Expiration</CardTitle>
+        <s-date-field
+          label="Expiration date"
+          value={endsAt}
+          onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
+          details="Optional — leave blank for no expiration"
+        />
       </s-section>
 
       <s-stack direction="inline" gap="base">
