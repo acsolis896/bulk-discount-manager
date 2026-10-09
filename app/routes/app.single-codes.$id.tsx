@@ -663,7 +663,7 @@ export default function SingleCodeDetailsPage() {
             )}
           </s-stack>
 
-          <div style={{ marginTop: "20px" }}>
+          <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
             <s-stack direction="block" gap="small">
               <div style={{ fontSize: "14px", fontWeight: 600 }}>Eligible items</div>
               <s-paragraph>
@@ -680,7 +680,7 @@ export default function SingleCodeDetailsPage() {
             </s-stack>
           </div>
 
-          <div style={{ marginTop: "20px" }}>
+          <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
             <s-checkbox
               label="Only apply discount once per order"
               checked={oncePerOrder}
@@ -711,8 +711,8 @@ export default function SingleCodeDetailsPage() {
         </s-section>
 
         <s-section>
-          <CardTitle>Eligibility</CardTitle>
-          <s-stack direction="block" gap="base">
+          <CardTitle>Customer eligibility</CardTitle>
+          <div>
             <s-stack direction="block" gap="small">
               <div style={{ fontSize: "14px", fontWeight: 600 }}>Customers</div>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -761,16 +761,18 @@ export default function SingleCodeDetailsPage() {
             </s-stack>
 
             {countryRestrictionEnabled && (
-              <s-stack direction="block" gap="small">
-                <div style={{ fontSize: "14px", fontWeight: 600 }}>Countries</div>
-                {features.countryRestriction ? (
-                  <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
-                ) : (
-                  <UpgradeNote feature="countryRestriction" />
-                )}
-              </s-stack>
+              <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
+                <s-stack direction="block" gap="small">
+                  <div style={{ fontSize: "14px", fontWeight: 600 }}>Countries</div>
+                  {features.countryRestriction ? (
+                    <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+                  ) : (
+                    <UpgradeNote feature="countryRestriction" />
+                  )}
+                </s-stack>
+              </div>
             )}
-          </s-stack>
+          </div>
         </s-section>
 
         <s-section>
