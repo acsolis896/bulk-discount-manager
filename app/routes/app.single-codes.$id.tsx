@@ -607,9 +607,8 @@ export default function SingleCodeDetailsPage() {
           </div>
         </s-section>
 
-        <s-section heading="Discount">
+        <s-section heading="Discount value">
           <s-stack direction="block" gap="small">
-            <div style={{ fontSize: "14px", fontWeight: 600 }}>Discount value</div>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {(["percentage", "fixedAmount"] as const).map((type) => (
                 <s-button
@@ -660,7 +659,25 @@ export default function SingleCodeDetailsPage() {
               />
             )}
           </s-stack>
-          <div style={{ marginTop: "16px" }}>
+
+          <div style={{ marginTop: "20px" }}>
+            <s-stack direction="block" gap="small">
+              <div style={{ fontSize: "14px", fontWeight: 600 }}>Eligible items</div>
+              <s-paragraph>
+                {collectionIds.length > 0
+                  ? `${collectionIds.length} collection${collectionIds.length > 1 ? "s" : ""}: ${collectionTitles.join(", ")}`
+                  : productIds.length > 0
+                    ? `${productIds.length} product${productIds.length > 1 ? "s" : ""}: ${productTitles.join(", ")}`
+                    : "None selected"}
+              </s-paragraph>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <s-button onClick={handlePickCollections}>Browse collections</s-button>
+                <s-button onClick={handlePickProducts}>Browse products</s-button>
+              </div>
+            </s-stack>
+          </div>
+
+          <div style={{ marginTop: "20px" }}>
             <s-checkbox
               label="Only apply discount once per order"
               checked={oncePerOrder}
@@ -690,7 +707,85 @@ export default function SingleCodeDetailsPage() {
           )}
         </s-section>
 
-        <s-section heading="Limits">
+        <s-section heading="Eligibility">
+          <s-stack direction="block" gap="base">
+            <s-stack direction="block" gap="small">
+              <div style={{ fontSize: "14px", fontWeight: 600 }}>Customers</div>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {(["all", "tags", "segment"] as const).map((mode) => (
+                  <s-button
+                    key={mode}
+                    variant={eligibilityMode === mode ? "primary" : "secondary"}
+                    onClick={() => setEligibilityMode(mode)}
+                  >
+                    {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
+                  </s-button>
+                ))}
+              </div>
+
+              {eligibilityMode === "tags" && (
+                <>
+                  <s-text-field
+                    label="Required customer tag"
+                    value={requiredTag}
+                    placeholder="e.g. GUIDE50"
+                    details="Customers must have this tag to use the code"
+                    onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
+                  />
+                  <s-text-field
+                    label="Blocked customer tag"
+                    value={blockedTag}
+                    placeholder="e.g. GUIDE50-USED"
+                    details="Customers with this tag will be rejected (usage limit reached)"
+                    onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
+                  />
+                </>
+              )}
+
+              {eligibilityMode === "segment" && (
+                <s-select
+                  label="Customer segment"
+                  placeholder="Select a segment…"
+                  value={selectedSegmentId}
+                  onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
+                >
+                  {loaderData.segments.map((s: { id: string; name: string }) => (
+                    <s-option key={s.id} value={s.id}>{s.name}</s-option>
+                  ))}
+                </s-select>
+              )}
+            </s-stack>
+
+            {countryRestrictionEnabled && (
+              <s-stack direction="block" gap="small">
+                <div style={{ fontSize: "14px", fontWeight: 600 }}>Countries</div>
+                {features.countryRestriction ? (
+                  <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+                ) : (
+                  <UpgradeNote feature="countryRestriction" />
+                )}
+              </s-stack>
+            )}
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Cart requirements">
+          {features.maxCartItems ? (
+            <s-number-field
+              label="Maximum items in the cart (optional)"
+              inputMode="numeric"
+              value={maxCartItems}
+              min={1}
+              placeholder="No limit"
+              details="Stops this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
+              onInput={numericInputHandler("integer", setMaxCartItems)}
+            />
+          ) : (
+            <UpgradeNote feature="maxCartItems" />
+          )}
+        </s-section>
+
+        <s-section heading="Maximum discount uses">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", alignItems: "start" }}>
             <s-number-field
               label="Maximum total uses (optional)"
@@ -723,98 +818,6 @@ export default function SingleCodeDetailsPage() {
               <s-button variant="tertiary" onClick={handleResetUsage} disabled={isSaving}>
                 Reset usage counts
               </s-button>
-            </div>
-          )}
-        </s-section>
-
-        <s-section heading="Where it applies">
-          <s-stack direction="block" gap="base">
-            <s-stack direction="block" gap="small">
-              <div style={{ fontSize: "14px", fontWeight: 600 }}>Eligible items</div>
-              <s-paragraph>
-                {collectionIds.length > 0
-                  ? `${collectionIds.length} collection${collectionIds.length > 1 ? "s" : ""}: ${collectionTitles.join(", ")}`
-                  : productIds.length > 0
-                    ? `${productIds.length} product${productIds.length > 1 ? "s" : ""}: ${productTitles.join(", ")}`
-                    : "None selected"}
-              </s-paragraph>
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <s-button onClick={handlePickCollections}>Browse collections</s-button>
-                <s-button onClick={handlePickProducts}>Browse products</s-button>
-              </div>
-            </s-stack>
-
-            {countryRestrictionEnabled && (
-              <s-stack direction="block" gap="small">
-                <div style={{ fontSize: "14px", fontWeight: 600 }}>Countries</div>
-                {features.countryRestriction ? (
-                  <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
-                ) : (
-                  <UpgradeNote feature="countryRestriction" />
-                )}
-              </s-stack>
-            )}
-
-            {features.maxCartItems ? (
-              <s-number-field
-                label="Maximum items in the cart (optional)"
-                inputMode="numeric"
-                value={maxCartItems}
-                min={1}
-                placeholder="No limit"
-                details="Stops this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
-                onInput={numericInputHandler("integer", setMaxCartItems)}
-              />
-            ) : (
-              <UpgradeNote feature="maxCartItems" />
-            )}
-          </s-stack>
-        </s-section>
-
-        <s-section heading="Customer eligibility">
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {(["all", "tags", "segment"] as const).map((mode) => (
-              <s-button
-                key={mode}
-                variant={eligibilityMode === mode ? "primary" : "secondary"}
-                onClick={() => setEligibilityMode(mode)}
-              >
-                {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
-              </s-button>
-            ))}
-          </div>
-
-          {eligibilityMode === "tags" && (
-            <div style={{ marginTop: "16px" }}>
-              <s-text-field
-                label="Required customer tag"
-                value={requiredTag}
-                placeholder="e.g. GUIDE50"
-                details="Customers must have this tag to use the code"
-                onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
-              />
-              <s-text-field
-                label="Blocked customer tag"
-                value={blockedTag}
-                placeholder="e.g. GUIDE50-USED"
-                details="Customers with this tag will be rejected (usage limit reached)"
-                onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
-              />
-            </div>
-          )}
-
-          {eligibilityMode === "segment" && (
-            <div style={{ marginTop: "16px" }}>
-              <s-select
-                label="Customer segment"
-                placeholder="Select a segment…"
-                value={selectedSegmentId}
-                onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
-              >
-                {loaderData.segments.map((s: { id: string; name: string }) => (
-                  <s-option key={s.id} value={s.id}>{s.name}</s-option>
-                ))}
-              </s-select>
             </div>
           )}
         </s-section>
