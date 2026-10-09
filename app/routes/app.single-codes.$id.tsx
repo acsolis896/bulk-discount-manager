@@ -14,6 +14,7 @@ import { configSizeProblem, splitCollections, expandCollectionProducts } from ".
 import { CountryPicker } from "../components/CountryPicker";
 import { UpgradeNote } from "../components/UpgradeNote";
 import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 import { parseAllowedCountries } from "../countries";
 import { applyEligibility, listSegments } from "../eligibility.server";
 
@@ -537,6 +538,7 @@ export default function SingleCodeDetailsPage() {
 
   return (
     <s-page heading={loaderData.title}>
+      <FormStyles />
       <div style={{ marginBottom: "16px" }}>
         <s-button onClick={() => navigate("/app/single-codes")}>← Back to Reusable codes</s-button>
       </div>

@@ -12,6 +12,7 @@ import { saveFunctionConfig, configSizeProblem, splitCollections, expandCollecti
 import { CountryPicker } from "../components/CountryPicker";
 import { UpgradeNote } from "../components/UpgradeNote";
 import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 import { parseAllowedCountries } from "../countries";
 import { checkReusableQuota, getPlanFeatures } from "../billing.server";
 import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
@@ -406,6 +407,7 @@ export default function NewSingleCodePage() {
 
   return (
     <s-page heading="Create reusable code">
+      <FormStyles />
       {result?.error && (
         <s-banner tone="critical" style={{ marginBottom: "16px" }}>
           <s-paragraph>{result.error}</s-paragraph>
