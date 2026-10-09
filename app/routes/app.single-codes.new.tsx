@@ -460,6 +460,20 @@ export default function NewSingleCodePage() {
                   details="Percentage off the eligible product"
                   onInput={numericInputHandler("decimal", setPercentage)}
                 />
+                {features.discountCap ? (
+                  <s-number-field
+                    label={`Maximum discount per order${currencyCode ? ` (${currencyCode})` : ""} (optional)`}
+                    inputMode="decimal"
+                    value={maxDiscountAmount}
+                    min={0.01}
+                    step={0.01}
+                    placeholder="No cap"
+                    details="Leave blank for no cap. If the percentage comes to more than this amount on an order, the discount is limited to this amount. Enter it in your store's currency."
+                    onInput={numericInputHandler("decimal", setMaxDiscountAmount)}
+                  />
+                ) : (
+                  <UpgradeNote feature="discountCap" />
+                )}
               </>
             ) : (
               <s-number-field
@@ -503,36 +517,19 @@ export default function NewSingleCodePage() {
             />
           </div>
         )}
-        {discountType === "percentage" && (
-          <div style={{ marginTop: "16px" }}>
-            {features.discountCap ? (
-              <s-number-field
-                label={`Maximum discount per order${currencyCode ? ` (${currencyCode})` : ""} (optional)`}
-                inputMode="decimal"
-                value={maxDiscountAmount}
-                min={0.01}
-                step={0.01}
-                placeholder="No cap"
-                details="Leave blank for no cap. If the percentage comes to more than this amount on an order, the discount is limited to this amount. Enter it in your store's currency."
-                onInput={numericInputHandler("decimal", setMaxDiscountAmount)}
-              />
-            ) : (
-              <UpgradeNote feature="discountCap" />
-            )}
-          </div>
-        )}
-        <div style={{ marginTop: "16px" }}>
+      </s-section>
+
+      <s-section heading="Limits">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", alignItems: "start" }}>
           <s-number-field
             label="Maximum total uses (optional)"
             inputMode="numeric"
             value={usageLimit}
             min={1}
             placeholder="Unlimited"
-            details="Leave blank for unlimited. Set a number to cap total redemptions across all customers — e.g. 100."
+            details="Cap total redemptions across all customers — e.g. 100."
             onInput={numericInputHandler("integer", setUsageLimit)}
           />
-        </div>
-        <div style={{ marginTop: "16px" }}>
           {features.usesPerCustomer ? (
             <s-number-field
               label="Limit uses per customer (optional)"
@@ -540,29 +537,12 @@ export default function NewSingleCodePage() {
               value={usesPerCustomerLimit}
               min={1}
               placeholder="Unlimited"
-              details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code — e.g. 5."
+              details="Cap how many times each customer can redeem this code — e.g. 5."
               onInput={numericInputHandler("integer", setUsesPerCustomerLimit)}
             />
           ) : (
             <UpgradeNote feature="usesPerCustomer" />
           )}
-        </div>
-        <div style={{ marginTop: "16px" }}>
-          {features.maxCartItems ? (
-            <s-number-field
-              label="Maximum items in the cart (optional)"
-              inputMode="numeric"
-              value={maxCartItems}
-              min={1}
-              placeholder="No limit"
-              details="Leave blank for no limit. Set a number to stop this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
-              onInput={numericInputHandler("integer", setMaxCartItems)}
-            />
-          ) : (
-            <UpgradeNote feature="maxCartItems" />
-          )}
-        </div>
-        <div style={{ marginTop: "16px" }}>
           <s-date-field
             label="Expiration date (optional)"
             value={endsAt}
@@ -571,27 +551,47 @@ export default function NewSingleCodePage() {
         </div>
       </s-section>
 
-      <s-section heading="Eligible items">
-        <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-          <s-button onClick={handlePickCollections}>Browse collections</s-button>
-          <s-button onClick={handlePickProducts}>Browse products</s-button>
-        </div>
-        {selectedLabel ? (
-          <s-paragraph>{selectedLabel}</s-paragraph>
-        ) : (
-          <s-paragraph>No items selected yet.</s-paragraph>
-        )}
-      </s-section>
+      <s-section heading="Where it applies">
+        <s-stack direction="block" gap="base">
+          <s-stack direction="block" gap="small">
+            <div style={{ fontSize: "14px", fontWeight: 600 }}>Eligible items</div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <s-button onClick={handlePickCollections}>Browse collections</s-button>
+              <s-button onClick={handlePickProducts}>Browse products</s-button>
+            </div>
+            {selectedLabel ? (
+              <s-paragraph>{selectedLabel}</s-paragraph>
+            ) : (
+              <s-paragraph>No items selected yet.</s-paragraph>
+            )}
+          </s-stack>
 
-      {countryRestrictionEnabled && (
-        <s-section heading="Countries">
-          {features.countryRestriction ? (
-            <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
-          ) : (
-            <UpgradeNote feature="countryRestriction" />
+          {countryRestrictionEnabled && (
+            <s-stack direction="block" gap="small">
+              <div style={{ fontSize: "14px", fontWeight: 600 }}>Countries</div>
+              {features.countryRestriction ? (
+                <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+              ) : (
+                <UpgradeNote feature="countryRestriction" />
+              )}
+            </s-stack>
           )}
-        </s-section>
-      )}
+
+          {features.maxCartItems ? (
+            <s-number-field
+              label="Maximum items in the cart (optional)"
+              inputMode="numeric"
+              value={maxCartItems}
+              min={1}
+              placeholder="No limit"
+              details="Stops this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
+              onInput={numericInputHandler("integer", setMaxCartItems)}
+            />
+          ) : (
+            <UpgradeNote feature="maxCartItems" />
+          )}
+        </s-stack>
+      </s-section>
 
       <s-section heading="Customer eligibility">
         <s-stack direction="block" gap="small">

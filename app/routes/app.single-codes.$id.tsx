@@ -607,147 +607,31 @@ export default function SingleCodeDetailsPage() {
           </div>
         </s-section>
 
-        <s-section heading="Edit eligible items">
-            <s-paragraph>
-              {collectionIds.length > 0
-                ? `${collectionIds.length} collection${collectionIds.length > 1 ? "s" : ""}: ${collectionTitles.join(", ")}`
-                : productIds.length > 0
-                  ? `${productIds.length} product${productIds.length > 1 ? "s" : ""}: ${productTitles.join(", ")}`
-                  : "None selected"}
-            </s-paragraph>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
-              <s-button onClick={handlePickCollections}>Browse collections</s-button>
-              <s-button onClick={handlePickProducts}>Browse products</s-button>
-            </div>
-          </s-section>
-
-          {countryRestrictionEnabled && (
-            <s-section heading="Countries">
-              {features.countryRestriction ? (
-                <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
-              ) : (
-                <UpgradeNote feature="countryRestriction" />
-              )}
-            </s-section>
-          )}
-
-          <s-section heading="Edit customer eligibility">
+        <s-section heading="Discount">
+          <s-stack direction="block" gap="small">
+            <div style={{ fontSize: "14px", fontWeight: 600 }}>Discount value</div>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {(["all", "tags", "segment"] as const)
-              .map((mode) => (
+              {(["percentage", "fixedAmount"] as const).map((type) => (
                 <s-button
-                  key={mode}
-                  variant={eligibilityMode === mode ? "primary" : "secondary"}
-                  onClick={() => setEligibilityMode(mode)}
+                  key={type}
+                  variant={discountType === type ? "primary" : "secondary"}
+                  onClick={() => setDiscountType(type)}
                 >
-                  {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
+                  {type === "percentage" ? "Percentage" : "Fixed amount"}
                 </s-button>
               ))}
             </div>
-
-            {eligibilityMode === "tags" && (
-              <div style={{ marginTop: "16px" }}>
-                <s-text-field
-                  label="Required customer tag"
-                  value={requiredTag}
-                  placeholder="e.g. GUIDE50"
-                  details="Customers must have this tag to use the code"
-                  onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
-                />
-                <s-text-field
-                  label="Blocked customer tag"
-                  value={blockedTag}
-                  placeholder="e.g. GUIDE50-USED"
-                  details="Customers with this tag will be rejected (usage limit reached)"
-                  onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
-                />
-              </div>
-            )}
-
-            {eligibilityMode === "segment" && (
-              <div style={{ marginTop: "16px" }}>
-                <s-select
-                  label="Customer segment"
-                  placeholder="Select a segment…"
-                  value={selectedSegmentId}
-                  onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
-                >
-                  {loaderData.segments.map((s: { id: string; name: string }) => (
-                    <s-option key={s.id} value={s.id}>{s.name}</s-option>
-                  ))}
-                </s-select>
-              </div>
-            )}
-            <div style={{ marginTop: "16px" }}>
-              <s-stack direction="block" gap="small">
-                <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  {(["percentage", "fixedAmount"] as const).map((type) => (
-                    <s-button
-                      key={type}
-                      variant={discountType === type ? "primary" : "secondary"}
-                      onClick={() => setDiscountType(type)}
-                    >
-                      {type === "percentage" ? "Percentage" : "Fixed amount"}
-                    </s-button>
-                  ))}
-                </div>
-                {discountType === "percentage" ? (
-                  <>
-                    <s-number-field
-                      label="Discount percentage"
-                      inputMode="decimal"
-                      value={percentage}
-                      min={1}
-                      max={100}
-                      details="Percentage off the eligible product"
-                      onInput={numericInputHandler("decimal", setPercentage)}
-                    />
-                  </>
-                ) : (
-                  <s-number-field
-                    label="Amount off"
-                    inputMode="decimal"
-                    value={fixedAmount}
-                    min={0.01}
-                    step={0.01}
-                    prefix="$"
-                    details="Fixed amount off the eligible product"
-                    onInput={numericInputHandler("decimal", setFixedAmount)}
-                  />
-                )}
-              </s-stack>
-            </div>
-            <div style={{ marginTop: "16px" }}>
-              <s-checkbox
-                label="Only apply discount once per order"
-                checked={oncePerOrder}
-                onChange={(e: { target: { checked: boolean } }) => setOncePerOrder(e.target.checked)}
-                details={
-                  oncePerOrder
-                    ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
-                    : maxDiscountedItems.trim()
-                      ? `The discount will be taken off up to ${maxDiscountedItems.trim()} eligible items in the cart, highest-priced first.`
-                      : "The discount will be taken off every eligible item in the cart."
-                }
-              />
-            </div>
-            {MAX_DISCOUNTED_ITEMS_ENABLED && !oncePerOrder && (
-              <div style={{ marginTop: "12px", marginLeft: "22px", paddingLeft: "12px", borderLeft: "2px solid #c9cccf" }}>
+            {discountType === "percentage" ? (
+              <>
                 <s-number-field
-                  label="Max items discounted (optional)"
-                  inputMode="numeric"
+                  label="Discount percentage"
+                  inputMode="decimal"
+                  value={percentage}
                   min={1}
-                  step={1}
-                  value={maxDiscountedItems}
-                  placeholder="All eligible items"
-                  details="Leave blank to discount every eligible item. Set a number to cap how many items get the discount per order — the highest-priced items are discounted first."
-                  onInput={numericInputHandler("integer", setMaxDiscountedItems)}
+                  max={100}
+                  details="Percentage off the eligible product"
+                  onInput={numericInputHandler("decimal", setPercentage)}
                 />
-              </div>
-            )}
-            {discountType === "percentage" && (
-              <div style={{ marginTop: "16px" }}>
                 {features.discountCap ? (
                   <s-number-field
                     label={`Maximum discount per order${loaderData.currencyCode ? ` (${loaderData.currencyCode})` : ""} (optional)`}
@@ -762,59 +646,177 @@ export default function SingleCodeDetailsPage() {
                 ) : (
                   <UpgradeNote feature="discountCap" />
                 )}
-              </div>
-            )}
-            <div style={{ marginTop: "16px" }}>
-              {features.maxCartItems ? (
-                <s-number-field
-                  label="Maximum items in the cart (optional)"
-                  inputMode="numeric"
-                  value={maxCartItems}
-                  min={1}
-                  placeholder="No limit"
-                  details="Leave blank for no limit. Set a number to stop this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
-                  onInput={numericInputHandler("integer", setMaxCartItems)}
-                />
-              ) : (
-                <UpgradeNote feature="maxCartItems" />
-              )}
-            </div>
-            <div style={{ marginTop: "16px" }}>
+              </>
+            ) : (
               <s-number-field
-                label="Maximum total uses (optional)"
+                label="Amount off"
+                inputMode="decimal"
+                value={fixedAmount}
+                min={0.01}
+                step={0.01}
+                prefix="$"
+                details="Fixed amount off the eligible product"
+                onInput={numericInputHandler("decimal", setFixedAmount)}
+              />
+            )}
+          </s-stack>
+          <div style={{ marginTop: "16px" }}>
+            <s-checkbox
+              label="Only apply discount once per order"
+              checked={oncePerOrder}
+              onChange={(e: { target: { checked: boolean } }) => setOncePerOrder(e.target.checked)}
+              details={
+                oncePerOrder
+                  ? "Applies to the highest-priced eligible item in the cart — 1 unit only."
+                  : maxDiscountedItems.trim()
+                    ? `The discount will be taken off up to ${maxDiscountedItems.trim()} eligible items in the cart, highest-priced first.`
+                    : "The discount will be taken off every eligible item in the cart."
+              }
+            />
+          </div>
+          {MAX_DISCOUNTED_ITEMS_ENABLED && !oncePerOrder && (
+            <div style={{ marginTop: "12px", marginLeft: "22px", paddingLeft: "12px", borderLeft: "2px solid #c9cccf" }}>
+              <s-number-field
+                label="Max items discounted (optional)"
                 inputMode="numeric"
-                value={usageLimit}
                 min={1}
-                placeholder="Unlimited"
-                details="Leave blank for unlimited uses. Set a number to cap the total times this code can be redeemed across all customers."
-                onInput={numericInputHandler("integer", setUsageLimit)}
+                step={1}
+                value={maxDiscountedItems}
+                placeholder="All eligible items"
+                details="Leave blank to discount every eligible item. Set a number to cap how many items get the discount per order — the highest-priced items are discounted first."
+                onInput={numericInputHandler("integer", setMaxDiscountedItems)}
               />
             </div>
-            <div style={{ marginTop: "16px" }}>
-              {features.usesPerCustomer ? (
-                <s-number-field
-                  label="Limit uses per customer (optional)"
-                  inputMode="numeric"
-                  value={usesPerCustomerLimit}
-                  min={1}
-                  placeholder="Unlimited"
-                  details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code."
-                  onInput={numericInputHandler("integer", setUsesPerCustomerLimit)}
-                />
-              ) : (
-                <UpgradeNote feature="usesPerCustomer" />
-              )}
-            </div>
-            {loaderData.usesPerCustomerLimit != null && (
-              <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
-                <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
-                  {loaderData.usageCappedCount} customer{loaderData.usageCappedCount === 1 ? "" : "s"} currently at the limit
-                </s-text>
-                <s-button variant="tertiary" onClick={handleResetUsage} disabled={isSaving}>
-                  Reset usage counts
-                </s-button>
-              </div>
+          )}
+        </s-section>
+
+        <s-section heading="Limits">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", alignItems: "start" }}>
+            <s-number-field
+              label="Maximum total uses (optional)"
+              inputMode="numeric"
+              value={usageLimit}
+              min={1}
+              placeholder="Unlimited"
+              details="Cap total redemptions across all customers."
+              onInput={numericInputHandler("integer", setUsageLimit)}
+            />
+            {features.usesPerCustomer ? (
+              <s-number-field
+                label="Limit uses per customer (optional)"
+                inputMode="numeric"
+                value={usesPerCustomerLimit}
+                min={1}
+                placeholder="Unlimited"
+                details="Cap how many times each customer can redeem this code."
+                onInput={numericInputHandler("integer", setUsesPerCustomerLimit)}
+              />
+            ) : (
+              <UpgradeNote feature="usesPerCustomer" />
             )}
+          </div>
+          {loaderData.usesPerCustomerLimit != null && (
+            <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
+              <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
+                {loaderData.usageCappedCount} customer{loaderData.usageCappedCount === 1 ? "" : "s"} currently at the limit
+              </s-text>
+              <s-button variant="tertiary" onClick={handleResetUsage} disabled={isSaving}>
+                Reset usage counts
+              </s-button>
+            </div>
+          )}
+        </s-section>
+
+        <s-section heading="Where it applies">
+          <s-stack direction="block" gap="base">
+            <s-stack direction="block" gap="small">
+              <div style={{ fontSize: "14px", fontWeight: 600 }}>Eligible items</div>
+              <s-paragraph>
+                {collectionIds.length > 0
+                  ? `${collectionIds.length} collection${collectionIds.length > 1 ? "s" : ""}: ${collectionTitles.join(", ")}`
+                  : productIds.length > 0
+                    ? `${productIds.length} product${productIds.length > 1 ? "s" : ""}: ${productTitles.join(", ")}`
+                    : "None selected"}
+              </s-paragraph>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <s-button onClick={handlePickCollections}>Browse collections</s-button>
+                <s-button onClick={handlePickProducts}>Browse products</s-button>
+              </div>
+            </s-stack>
+
+            {countryRestrictionEnabled && (
+              <s-stack direction="block" gap="small">
+                <div style={{ fontSize: "14px", fontWeight: 600 }}>Countries</div>
+                {features.countryRestriction ? (
+                  <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+                ) : (
+                  <UpgradeNote feature="countryRestriction" />
+                )}
+              </s-stack>
+            )}
+
+            {features.maxCartItems ? (
+              <s-number-field
+                label="Maximum items in the cart (optional)"
+                inputMode="numeric"
+                value={maxCartItems}
+                min={1}
+                placeholder="No limit"
+                details="Stops this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
+                onInput={numericInputHandler("integer", setMaxCartItems)}
+              />
+            ) : (
+              <UpgradeNote feature="maxCartItems" />
+            )}
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Customer eligibility">
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {(["all", "tags", "segment"] as const).map((mode) => (
+              <s-button
+                key={mode}
+                variant={eligibilityMode === mode ? "primary" : "secondary"}
+                onClick={() => setEligibilityMode(mode)}
+              >
+                {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
+              </s-button>
+            ))}
+          </div>
+
+          {eligibilityMode === "tags" && (
+            <div style={{ marginTop: "16px" }}>
+              <s-text-field
+                label="Required customer tag"
+                value={requiredTag}
+                placeholder="e.g. GUIDE50"
+                details="Customers must have this tag to use the code"
+                onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
+              />
+              <s-text-field
+                label="Blocked customer tag"
+                value={blockedTag}
+                placeholder="e.g. GUIDE50-USED"
+                details="Customers with this tag will be rejected (usage limit reached)"
+                onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
+              />
+            </div>
+          )}
+
+          {eligibilityMode === "segment" && (
+            <div style={{ marginTop: "16px" }}>
+              <s-select
+                label="Customer segment"
+                placeholder="Select a segment…"
+                value={selectedSegmentId}
+                onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
+              >
+                {loaderData.segments.map((s: { id: string; name: string }) => (
+                  <s-option key={s.id} value={s.id}>{s.name}</s-option>
+                ))}
+              </s-select>
+            </div>
+          )}
         </s-section>
       </div>
 
