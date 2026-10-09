@@ -13,6 +13,7 @@ import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../bi
 import { configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { UpgradeNote } from "../components/UpgradeNote";
+import { CardTitle } from "../components/CardTitle";
 import { parseAllowedCountries } from "../countries";
 import { applyEligibility, listSegments } from "../eligibility.server";
 
@@ -553,7 +554,8 @@ export default function SingleCodeDetailsPage() {
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-        <s-section heading="Overview">
+        <s-section>
+          <CardTitle>Overview</CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div style={{ display: "flex", gap: "24px" }}>
               <div>
@@ -607,7 +609,8 @@ export default function SingleCodeDetailsPage() {
           </div>
         </s-section>
 
-        <s-section heading="Discount value">
+        <s-section>
+          <CardTitle>Discount value</CardTitle>
           <s-stack direction="block" gap="small">
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {(["percentage", "fixedAmount"] as const).map((type) => (
@@ -707,7 +710,8 @@ export default function SingleCodeDetailsPage() {
           )}
         </s-section>
 
-        <s-section heading="Eligibility">
+        <s-section>
+          <CardTitle>Eligibility</CardTitle>
           <s-stack direction="block" gap="base">
             <s-stack direction="block" gap="small">
               <div style={{ fontSize: "14px", fontWeight: 600 }}>Customers</div>
@@ -769,7 +773,8 @@ export default function SingleCodeDetailsPage() {
           </s-stack>
         </s-section>
 
-        <s-section heading="Cart requirements">
+        <s-section>
+          <CardTitle>Cart requirements</CardTitle>
           {features.maxCartItems ? (
             <s-number-field
               label="Maximum items in the cart (optional)"
@@ -785,7 +790,8 @@ export default function SingleCodeDetailsPage() {
           )}
         </s-section>
 
-        <s-section heading="Maximum discount uses">
+        <s-section>
+          <CardTitle>Maximum discount uses</CardTitle>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", alignItems: "start" }}>
             <s-number-field
               label="Maximum total uses (optional)"
