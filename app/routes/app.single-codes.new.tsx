@@ -11,6 +11,8 @@ import { getShopCurrencyCode } from "../shop.server";
 import { saveFunctionConfig, configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { UpgradeNote } from "../components/UpgradeNote";
+import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 import { parseAllowedCountries } from "../countries";
 import { checkReusableQuota, getPlanFeatures } from "../billing.server";
 import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
@@ -44,6 +46,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const countriesResult = parseAllowedCountries(String(formData.get("allowedCountries") || ""));
   if ("error" in countriesResult) return { error: countriesResult.error };
   const allowedCountries = countriesResult.countries;
+  const usageLimitRaw = Number(formData.get("usageLimit") || 0);
+  const usageLimit = usageLimitRaw > 0 ? Math.floor(usageLimitRaw) : null;
   const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
   const parsedUsesLimit = usesPerCustomerLimitRaw ? Number(usesPerCustomerLimitRaw) : null;
   if (parsedUsesLimit !== null && (!Number.isFinite(parsedUsesLimit) || parsedUsesLimit < 1)) {
@@ -154,6 +158,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           startsAt: new Date().toISOString(),
           ...(endsAt ? { endsAt } : {}),
           code,
+          ...(usageLimit !== null ? { usageLimit } : {}),
           discountClasses: ["PRODUCT"],
           combinesWith: {
             productDiscounts: combinesWithProduct,
@@ -307,6 +312,7 @@ export default function NewSingleCodePage() {
   const [oncePerOrder, setOncePerOrder] = useState(true);
   const [maxDiscountedItems, setMaxDiscountedItems] = useState("");
   const [allowedCountries, setAllowedCountries] = useState<string[]>([]);
+  const [usageLimit, setUsageLimit] = useState("");
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState("");
   const [maxCartItems, setMaxCartItems] = useState("");
   const [maxDiscountAmount, setMaxDiscountAmount] = useState("");
@@ -376,6 +382,7 @@ export default function NewSingleCodePage() {
     form.set("oncePerOrder", oncePerOrder ? "1" : "0");
     form.set("maxDiscountedItems", maxDiscountedItems);
     form.set("allowedCountries", JSON.stringify(allowedCountries));
+    form.set("usageLimit", usageLimit);
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
     form.set("maxCartItems", maxCartItems);
     form.set("maxDiscountAmount", maxDiscountAmount);
@@ -400,6 +407,7 @@ export default function NewSingleCodePage() {
 
   return (
     <s-page heading="Create reusable code">
+      <FormStyles />
       {result?.error && (
         <s-banner tone="critical" style={{ marginBottom: "16px" }}>
           <s-paragraph>{result.error}</s-paragraph>
@@ -415,7 +423,8 @@ export default function NewSingleCodePage() {
         </s-banner>
       )}
 
-      <s-section heading="Details">
+      <s-section>
+        <CardTitle>Discount code</CardTitle>
         <s-text-field
           label="Title"
           value={title}
@@ -430,47 +439,78 @@ export default function NewSingleCodePage() {
           details="The code customers enter at checkout"
           onInput={(e: { target: { value: string } }) => setCode(e.target.value.toUpperCase())}
         />
-        <div style={{ marginTop: "16px" }}>
-          <s-stack direction="block" gap="small">
-            <s-text emphasis="bold" style={{ fontSize: "14px" }}>Discount value</s-text>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {(["percentage", "fixedAmount"] as const).map((type) => (
-                <s-button
-                  key={type}
-                  variant={discountType === type ? "primary" : "secondary"}
-                  onClick={() => setDiscountType(type)}
-                >
-                  {type === "percentage" ? "Percentage" : "Fixed amount"}
-                </s-button>
-              ))}
-            </div>
-            {discountType === "percentage" ? (
-              <>
-                <s-number-field
-                  label="Discount percentage"
-                  inputMode="decimal"
-                  value={percentage}
-                  min={1}
-                  max={100}
-                  details="Percentage off the eligible product"
-                  onInput={numericInputHandler("decimal", setPercentage)}
-                />
-              </>
-            ) : (
+      </s-section>
+
+      <s-section>
+        <CardTitle>Discount value</CardTitle>
+        <s-stack direction="block" gap="small">
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {(["percentage", "fixedAmount"] as const).map((type) => (
+              <s-button
+                key={type}
+                variant={discountType === type ? "primary" : "secondary"}
+                onClick={() => setDiscountType(type)}
+              >
+                {type === "percentage" ? "Percentage" : "Fixed amount"}
+              </s-button>
+            ))}
+          </div>
+          {discountType === "percentage" ? (
+            <>
               <s-number-field
-                label="Amount off"
+                label="Discount percentage"
                 inputMode="decimal"
-                value={fixedAmount}
-                min={0.01}
-                step={0.01}
-                prefix="$"
-                details="Fixed amount off the eligible product"
-                onInput={numericInputHandler("decimal", setFixedAmount)}
+                value={percentage}
+                min={1}
+                max={100}
+                details="Percentage off the eligible product"
+                onInput={numericInputHandler("decimal", setPercentage)}
               />
+              {features.discountCap ? (
+                <s-number-field
+                  label={`Maximum discount per order${currencyCode ? ` (${currencyCode})` : ""} (optional)`}
+                  inputMode="decimal"
+                  value={maxDiscountAmount}
+                  min={0.01}
+                  step={0.01}
+                  placeholder="No cap"
+                  details="Leave blank for no cap. If the percentage comes to more than this amount on an order, the discount is limited to this amount. Enter it in your store's currency."
+                  onInput={numericInputHandler("decimal", setMaxDiscountAmount)}
+                />
+              ) : (
+                <UpgradeNote feature="discountCap" />
+              )}
+            </>
+          ) : (
+            <s-number-field
+              label="Amount off"
+              inputMode="decimal"
+              value={fixedAmount}
+              min={0.01}
+              step={0.01}
+              prefix="$"
+              details="Fixed amount off the eligible product"
+              onInput={numericInputHandler("decimal", setFixedAmount)}
+            />
+          )}
+        </s-stack>
+
+        <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
+          <s-stack direction="block" gap="small">
+            <div style={{ fontSize: "14px", fontWeight: 600 }}>Eligible items</div>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <s-button onClick={handlePickCollections}>Browse collections</s-button>
+              <s-button onClick={handlePickProducts}>Browse products</s-button>
+            </div>
+            {selectedLabel ? (
+              <s-paragraph>{selectedLabel}</s-paragraph>
+            ) : (
+              <s-paragraph>No items selected yet.</s-paragraph>
             )}
           </s-stack>
         </div>
-        <div style={{ marginTop: "16px" }}>
+
+        <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
           <s-checkbox
             label="Only apply discount once per order"
             checked={oncePerOrder}
@@ -498,25 +538,104 @@ export default function NewSingleCodePage() {
             />
           </div>
         )}
-        {discountType === "percentage" && (
-          <div style={{ marginTop: "16px" }}>
-            {features.discountCap ? (
-              <s-number-field
-                label={`Maximum discount per order${currencyCode ? ` (${currencyCode})` : ""} (optional)`}
-                inputMode="decimal"
-                value={maxDiscountAmount}
-                min={0.01}
-                step={0.01}
-                placeholder="No cap"
-                details="Leave blank for no cap. If the percentage comes to more than this amount on an order, the discount is limited to this amount. Enter it in your store's currency."
-                onInput={numericInputHandler("decimal", setMaxDiscountAmount)}
-              />
-            ) : (
-              <UpgradeNote feature="discountCap" />
+      </s-section>
+
+      <s-section>
+        <CardTitle>Customer eligibility</CardTitle>
+        <div>
+          <s-stack direction="block" gap="small">
+            <div style={{ fontSize: "14px", fontWeight: 600 }}>Customers</div>
+            <s-paragraph>Choose which customers can use this code.</s-paragraph>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {(["all", "tags", "segment"] as const)
+              .map((mode) => (
+                <s-button
+                  key={mode}
+                  variant={eligibilityMode === mode ? "primary" : "secondary"}
+                  onClick={() => setEligibilityMode(mode)}
+                >
+                  {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
+                </s-button>
+              ))}
+            </div>
+
+            {eligibilityMode === "tags" && (
+              <>
+                <s-text-field
+                  label="Required customer tag"
+                  value={requiredTag}
+                  placeholder="e.g. GUIDE50"
+                  details="Customers must have this tag to use the code"
+                  onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
+                />
+                <s-text-field
+                  label="Blocked customer tag"
+                  value={blockedTag}
+                  placeholder="e.g. GUIDE50-USED"
+                  details="Customers with this tag will be rejected (usage limit reached)"
+                  onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
+                />
+              </>
             )}
-          </div>
+
+            {eligibilityMode === "segment" && (
+              <s-select
+                label="Customer segment"
+                placeholder="Select a segment…"
+                value={selectedSegmentId}
+                onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
+              >
+                {segments.map((s: { id: string; name: string }) => (
+                  <s-option key={s.id} value={s.id}>{s.name}</s-option>
+                ))}
+              </s-select>
+            )}
+          </s-stack>
+
+          {countryRestrictionEnabled && (
+            <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
+              <s-stack direction="block" gap="small">
+                <div style={{ fontSize: "14px", fontWeight: 600 }}>Countries</div>
+                {features.countryRestriction ? (
+                  <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
+                ) : (
+                  <UpgradeNote feature="countryRestriction" />
+                )}
+              </s-stack>
+            </div>
+          )}
+        </div>
+      </s-section>
+
+      <s-section>
+        <CardTitle>Cart requirements</CardTitle>
+        {features.maxCartItems ? (
+          <s-number-field
+            label="Maximum items in the cart (optional)"
+            inputMode="numeric"
+            value={maxCartItems}
+            min={1}
+            placeholder="No limit"
+            details="Stops this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
+            onInput={numericInputHandler("integer", setMaxCartItems)}
+          />
+        ) : (
+          <UpgradeNote feature="maxCartItems" />
         )}
-        <div style={{ marginTop: "16px" }}>
+      </s-section>
+
+      <s-section>
+        <CardTitle>Maximum discount uses</CardTitle>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", alignItems: "start" }}>
+          <s-number-field
+            label="Maximum total uses (optional)"
+            inputMode="numeric"
+            value={usageLimit}
+            min={1}
+            placeholder="Unlimited"
+            details="Cap total redemptions across all customers — e.g. 100."
+            onInput={numericInputHandler("integer", setUsageLimit)}
+          />
           {features.usesPerCustomer ? (
             <s-number-field
               label="Limit uses per customer (optional)"
@@ -524,110 +643,17 @@ export default function NewSingleCodePage() {
               value={usesPerCustomerLimit}
               min={1}
               placeholder="Unlimited"
-              details="Leave blank for unlimited uses. Set a number to cap how many times each customer can redeem this code — e.g. 5."
+              details="Cap how many times each customer can redeem this code — e.g. 5."
               onInput={numericInputHandler("integer", setUsesPerCustomerLimit)}
             />
           ) : (
             <UpgradeNote feature="usesPerCustomer" />
           )}
         </div>
-        <div style={{ marginTop: "16px" }}>
-          {features.maxCartItems ? (
-            <s-number-field
-              label="Maximum items in the cart (optional)"
-              inputMode="numeric"
-              value={maxCartItems}
-              min={1}
-              placeholder="No limit"
-              details="Leave blank for no limit. Set a number to stop this code applying when the cart holds more than that many items in total, counting every product and quantity. Use 1 for single-item orders only."
-              onInput={numericInputHandler("integer", setMaxCartItems)}
-            />
-          ) : (
-            <UpgradeNote feature="maxCartItems" />
-          )}
-        </div>
-        <div style={{ marginTop: "16px" }}>
-          <s-date-field
-            label="Expiration date (optional)"
-            value={endsAt}
-            onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
-          />
-        </div>
       </s-section>
 
-      <s-section heading="Eligible items">
-        <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-          <s-button onClick={handlePickCollections}>Browse collections</s-button>
-          <s-button onClick={handlePickProducts}>Browse products</s-button>
-        </div>
-        {selectedLabel ? (
-          <s-paragraph>{selectedLabel}</s-paragraph>
-        ) : (
-          <s-paragraph>No items selected yet.</s-paragraph>
-        )}
-      </s-section>
-
-      {countryRestrictionEnabled && (
-        <s-section heading="Countries">
-          {features.countryRestriction ? (
-            <CountryPicker value={allowedCountries} onChange={setAllowedCountries} />
-          ) : (
-            <UpgradeNote feature="countryRestriction" />
-          )}
-        </s-section>
-      )}
-
-      <s-section heading="Customer eligibility">
-        <s-stack direction="block" gap="small">
-          <s-paragraph>Choose which customers can use this code.</s-paragraph>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {(["all", "tags", "segment"] as const)
-            .map((mode) => (
-              <s-button
-                key={mode}
-                variant={eligibilityMode === mode ? "primary" : "secondary"}
-                onClick={() => setEligibilityMode(mode)}
-              >
-                {mode === "all" ? "All customers" : mode === "tags" ? "Customer tags" : "Existing segment"}
-              </s-button>
-            ))}
-          </div>
-
-          {eligibilityMode === "tags" && (
-            <>
-              <s-text-field
-                label="Required customer tag"
-                value={requiredTag}
-                placeholder="e.g. GUIDE50"
-                details="Customers must have this tag to use the code"
-                onInput={(e: { target: { value: string } }) => setRequiredTag(e.target.value)}
-              />
-              <s-text-field
-                label="Blocked customer tag"
-                value={blockedTag}
-                placeholder="e.g. GUIDE50-USED"
-                details="Customers with this tag will be rejected (usage limit reached)"
-                onInput={(e: { target: { value: string } }) => setBlockedTag(e.target.value)}
-              />
-            </>
-          )}
-
-          {eligibilityMode === "segment" && (
-            <s-select
-              label="Customer segment"
-              placeholder="Select a segment…"
-              value={selectedSegmentId}
-              onChange={(e: InputEvent) => setSelectedSegmentId((e.target as HTMLSelectElement).value)}
-            >
-              {segments.map((s: { id: string; name: string }) => (
-                <s-option key={s.id} value={s.id}>{s.name}</s-option>
-              ))}
-            </s-select>
-          )}
-        </s-stack>
-      </s-section>
-
-      <s-section heading="Combinations">
+      <s-section>
+        <CardTitle>Combinations</CardTitle>
         <s-paragraph>By default, this discount cannot be combined with other discounts.</s-paragraph>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
           <s-checkbox
@@ -646,6 +672,15 @@ export default function NewSingleCodePage() {
             onChange={(e: { target: { checked: boolean } }) => setCombinesWithShipping(e.target.checked)}
           />
         </div>
+      </s-section>
+
+      <s-section>
+        <CardTitle>Expiration</CardTitle>
+        <s-date-field
+          label="Expiration date (optional)"
+          value={endsAt}
+          onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
+        />
       </s-section>
 
       <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
