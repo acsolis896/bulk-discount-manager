@@ -266,6 +266,30 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       }
     }
 
+    // The maximum total uses is Shopify's own usageLimit field. Saved first, so a failure here
+    // stops the save before any other setting has changed.
+    const appDiscountId = discountId.replace("DiscountCodeNode", "DiscountCodeApp");
+    const limitRes = await admin.graphql(
+      `#graphql
+      mutation UpdateUsageLimit($id: ID!, $input: DiscountCodeAppInput!) {
+        discountCodeAppUpdate(id: $id, codeAppDiscount: $input) {
+          userErrors { field message }
+        }
+      }`,
+      { variables: { id: appDiscountId, input: { usageLimit } } }
+    );
+    const limitData = (await limitRes.json()) as {
+      data?: { discountCodeAppUpdate?: { userErrors?: { message: string }[] } | null };
+      errors?: { message?: string }[];
+    };
+    const limitErrors = limitData.data?.discountCodeAppUpdate?.userErrors ?? [];
+    if (limitErrors.length > 0) {
+      return { error: `Updating maximum total uses: ${limitErrors.map((e) => e.message).join(", ")}` };
+    }
+    if (!limitData.data?.discountCodeAppUpdate) {
+      return { error: `Updating maximum total uses: ${limitData.errors?.[0]?.message ?? "Shopify did not confirm the change"}.` };
+    }
+
     const newConfig = {
       ...existing,
       productIds: resolvedProductIds,
@@ -330,18 +354,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       usesPerCustomerLimit,
       usageCappedCustomerIds: usesPerCustomerLimit === null ? [] : (existing.usageCappedCustomerIds ?? []),
     });
-
-    // Update native Shopify usageLimit field
-    const appDiscountId = discountId.replace("DiscountCodeNode", "DiscountCodeApp");
-    await admin.graphql(
-      `#graphql
-      mutation UpdateUsageLimit($id: ID!, $input: DiscountCodeAppInput!) {
-        discountCodeAppUpdate(id: $id, codeAppDiscount: $input) {
-          userErrors { field message }
-        }
-      }`,
-      { variables: { id: appDiscountId, input: { usageLimit } } }
-    );
 
     let eligibilityWarning: string | null = null;
     if (eligibilityMode !== "all") {

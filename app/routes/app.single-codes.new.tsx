@@ -529,7 +529,7 @@ export default function NewSingleCodePage() {
             min={1}
             placeholder="Unlimited"
             details="Leave blank for unlimited. Set a number to cap total redemptions across all customers — e.g. 100."
-            onInput={(e: InputEvent) => setUsageLimit((e.target as HTMLInputElement).value)}
+            onInput={numericInputHandler("integer", setUsageLimit)}
           />
         </div>
         <div style={{ marginTop: "16px" }}>
