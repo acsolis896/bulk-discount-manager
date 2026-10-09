@@ -10,6 +10,8 @@ import { checkCodeQuota } from "../billing.server";
 import { countryName } from "../countries";
 import { useCountryRestrictionEnabled } from "../feature-flags";
 import { saveFunctionConfig, configSizeProblem, configByteLength, configTooLargeForFunction, splitCollections, expandCollectionProducts } from "../function-config.server";
+import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 
 type RedeemCode = { code: string; usageCount: number };
 type ParsedCode = { code: string; used: boolean };
@@ -777,6 +779,7 @@ export default function DiscountDetails() {
 
   return (
     <s-page heading={title ?? "Discount"}>
+      <FormStyles />
       {error && (
         <s-banner title="Error" tone="critical">
           <s-paragraph>{error}</s-paragraph>
@@ -840,7 +843,8 @@ export default function DiscountDetails() {
 
       <div className="discount-detail-grid">
         <div style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
-          <s-section heading="Summary">
+          <s-section>
+            <CardTitle>Summary</CardTitle>
             <s-stack direction="inline" gap="base">
               <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
                 <s-stack direction="block" gap="none">
@@ -878,7 +882,8 @@ export default function DiscountDetails() {
           </s-section>
 
           {codePerformance.length > 0 && (
-            <s-section heading="Code performance">
+            <s-section>
+              <CardTitle>Code performance</CardTitle>
               <s-stack direction="block" gap="base">
                 <s-paragraph style={{ color: "#6d7175", fontSize: "13px" }}>
                   Ranked by uses. Revenue is the gross total of orders that used each code — useful for
@@ -948,7 +953,8 @@ export default function DiscountDetails() {
             </s-section>
           )}
 
-          <s-section heading={`Codes${totalCount >= 2000 ? " (first 2,000)" : ""}`}>
+          <s-section>
+            <CardTitle>{`Codes${totalCount >= 2000 ? " (first 2,000)" : ""}`}</CardTitle>
             <s-stack direction="block" gap="base">
               {/* Search */}
               <s-search-field
@@ -1047,7 +1053,8 @@ export default function DiscountDetails() {
           </s-section>
 
           {preUsedCodes.length > 0 && (
-            <s-section heading="Previously used codes (historical)">
+            <s-section>
+              <CardTitle>Previously used codes (historical)</CardTitle>
               <s-stack direction="block" gap="base">
                 <s-paragraph>
                   These codes were imported as already used and are not active in Shopify.
@@ -1093,7 +1100,8 @@ export default function DiscountDetails() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
-          <s-section heading="Details">
+          <s-section>
+            <CardTitle>Details</CardTitle>
             <s-stack direction="block" gap="base">
               <div>
                 {status === "ACTIVE" ? (
@@ -1115,7 +1123,8 @@ export default function DiscountDetails() {
             </s-stack>
           </s-section>
 
-          <s-section heading="Expiration date">
+          <s-section>
+            <CardTitle>Expiration</CardTitle>
             <s-stack direction="block" gap="base">
               {(fetcher.data as { endsAtUpdated?: boolean })?.endsAtUpdated && (
                 <s-banner tone="success">
@@ -1148,7 +1157,8 @@ export default function DiscountDetails() {
             </s-stack>
           </s-section>
 
-          <s-section heading="Combinations">
+          <s-section>
+            <CardTitle>Combinations</CardTitle>
             <s-stack direction="block" gap="small">
               {(fetcher.data as { combinationsUpdated?: boolean })?.combinationsUpdated && (
                 <s-banner tone="success">
@@ -1184,7 +1194,8 @@ export default function DiscountDetails() {
             </s-stack>
           </s-section>
 
-          <s-section heading="Eligible items">
+          <s-section>
+            <CardTitle>Eligible items</CardTitle>
             <s-stack direction="block" gap="base">
               <s-paragraph>
                 The discount applies to the highest-priced eligible item in the cart — 1 unit only.
@@ -1254,7 +1265,8 @@ export default function DiscountDetails() {
             </s-stack>
           </s-section>
 
-          <s-section heading="Add more codes">
+          <s-section>
+            <CardTitle>Add more codes</CardTitle>
             <s-stack direction="block" gap="base">
               {(fetcher.data as { addedCodes?: boolean })?.addedCodes && (
                 <s-banner tone="success">
