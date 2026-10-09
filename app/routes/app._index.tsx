@@ -3,6 +3,8 @@ import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { getRecentCodeStats } from "../home-stats.server";
+import { formatMoney } from "../home-stats";
 import { CardTitle } from "../components/CardTitle";
 import { FormStyles } from "../components/FormStyles";
 
@@ -41,7 +43,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   ];
   const showChecklist = checklist.some((c) => !c.done);
 
-  return { isFirstVisit, checklist, showChecklist };
+  // Only shown once the store has a discount; a failure here must not break the Home page.
+  let stats = null;
+  if (hasAnyDiscount) {
+    try {
+      stats = await getRecentCodeStats(session.shop);
+    } catch (error) {
+      console.error("Failed to load recent code stats", error);
+    }
+  }
+
+  return { isFirstVisit, checklist, showChecklist, stats };
 };
 
 type Card = { href: string; title: string; description: string; icon: string };
@@ -92,7 +104,7 @@ const CONTACT_CARD: Card = {
 };
 
 export default function Home() {
-  const { isFirstVisit, checklist, showChecklist } = useLoaderData<typeof loader>();
+  const { isFirstVisit, checklist, showChecklist, stats } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
 
   const renderCard = (card: Card) => (
@@ -161,6 +173,39 @@ export default function Home() {
               </div>
             ))}
           </s-stack>
+        </s-section>
+      )}
+
+      {stats && (
+        <s-section>
+          <CardTitle>Last 30 days</CardTitle>
+          {stats.orders === 0 ? (
+            <s-paragraph>
+              No orders have used your codes in the last 30 days. When a customer uses one at checkout, it will show up here.
+            </s-paragraph>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
+              <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                <div style={{ fontSize: "24px", fontWeight: 650 }}>{stats.orders.toLocaleString("en-US")}</div>
+                <div style={{ fontSize: "13px", color: "#6d7175" }}>Orders that used a code</div>
+              </s-box>
+              <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                <div style={{ fontSize: "24px", fontWeight: 650 }}>{formatMoney(stats.sales[0].total, stats.sales[0].currency)}</div>
+                <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                  Sales from those orders
+                  {stats.sales.length > 1 ? ` (${stats.sales[0].currency}; ${stats.sales.length - 1} more currenc${stats.sales.length - 1 === 1 ? "y" : "ies"} not shown)` : ""}
+                </div>
+              </s-box>
+              {stats.topCode && (
+                <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                  <div style={{ fontSize: "24px", fontWeight: 650, fontFamily: "monospace", wordBreak: "break-all" }}>{stats.topCode.code}</div>
+                  <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                    Most used code ({stats.topCode.orders.toLocaleString("en-US")} order{stats.topCode.orders === 1 ? "" : "s"})
+                  </div>
+                </s-box>
+              )}
+            </div>
+          )}
         </s-section>
       )}
 
