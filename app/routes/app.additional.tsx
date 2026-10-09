@@ -3,6 +3,8 @@ import { useLoaderData, useNavigate, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 
 type DiscountSet = {
   numericId: string;
@@ -230,12 +232,14 @@ export default function DiscountSets() {
 
   return (
     <s-page heading="Discount Sets">
+      <FormStyles />
       <style>
         {`.set-row { transition: background-color 0.1s; }
           .set-row:hover { background-color: var(--s-color-bg-subdued, #f6f6f7); }`}
       </style>
 
-      <s-section heading="Overview">
+      <s-section>
+        <CardTitle>Overview</CardTitle>
         <s-stack direction="inline" gap="base">
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
             <s-stack direction="inline" gap="small" style={{ alignItems: "center" }}>
@@ -276,7 +280,8 @@ export default function DiscountSets() {
         </s-stack>
       </s-section>
 
-      <s-section heading="All discount sets">
+      <s-section>
+        <CardTitle>All discount sets</CardTitle>
         {sets.length === 0 ? (
           <s-stack direction="block" gap="base">
             <s-paragraph>No discount sets created yet.</s-paragraph>

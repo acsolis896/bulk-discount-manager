@@ -4,6 +4,8 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { FEATURE_LOCKS_ENABLED, PLAN_LIMITS, type PlanTier } from "../billing";
 import { getPlanUsage } from "../billing.server";
+import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 
 // Matches the app handle Shopify shows in admin.shopify.com URLs for this
 // app (e.g. .../apps/bulk-discount-manager-7) — used to deep-link merchants
@@ -61,7 +63,9 @@ export default function PlansPage() {
 
   return (
     <s-page heading="Plans">
-      <s-section heading="View or change plan">
+      <FormStyles />
+      <s-section>
+        <CardTitle>View or change plan</CardTitle>
         <s-stack direction="block" gap="base">
           <s-paragraph>
             You're on the <s-text emphasis="bold">{isCustomPlan ? planName : tier}</s-text> plan
@@ -76,7 +80,8 @@ export default function PlansPage() {
         </s-stack>
       </s-section>
 
-      <s-section heading="Compare plans">
+      <s-section>
+        <CardTitle>Compare plans</CardTitle>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" }}>
           {PLANS.map((planTier) => {
             const isCurrent = !isCustomPlan && tier === planTier;

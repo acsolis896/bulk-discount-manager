@@ -3,6 +3,8 @@ import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
@@ -73,6 +75,7 @@ export default function SingleCodesPage() {
 
   return (
     <s-page heading="Reusable Codes">
+      <FormStyles />
       {dbError && (
         <s-banner tone="critical" style={{ marginBottom: "16px" }}>
           <s-paragraph>Database error: {dbError}. The table may not have been created yet — try redeploying the app.</s-paragraph>
@@ -85,11 +88,12 @@ export default function SingleCodesPage() {
       </div>
 
       {codes.length === 0 ? (
-        <s-section heading="">
+        <s-section>
           <s-paragraph>No reusable codes created yet.</s-paragraph>
         </s-section>
       ) : (
-        <s-section heading="All reusable codes">
+        <s-section>
+          <CardTitle>All reusable codes</CardTitle>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px", marginBottom: "4px" }}>
               <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 2 }}>Code</span>

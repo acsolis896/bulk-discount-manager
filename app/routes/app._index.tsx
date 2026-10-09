@@ -3,6 +3,8 @@ import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
+import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
@@ -116,6 +118,7 @@ export default function Home() {
 
   return (
     <s-page heading="Airtight Discount Code Rules">
+      <FormStyles />
       <style>
         {`.home-card { transition: box-shadow 0.15s, border-color 0.15s; }
           .home-card:hover { box-shadow: 0 1px 6px rgba(0,0,0,0.08); border-color: #8a8a8a; }`}
@@ -133,7 +136,8 @@ export default function Home() {
       )}
 
       {showChecklist && (
-        <s-section heading="Getting started">
+        <s-section>
+          <CardTitle>Getting started</CardTitle>
           <s-stack direction="block" gap="small">
             {checklist.map((step) => (
               <div
@@ -160,19 +164,22 @@ export default function Home() {
         </s-section>
       )}
 
-      <s-section heading="Create a discount">
+      <s-section>
+        <CardTitle>Create a discount</CardTitle>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px" }}>
           {CREATE_CARDS.map(renderCard)}
         </div>
       </s-section>
 
-      <s-section heading="Manage & configure">
+      <s-section>
+        <CardTitle>Manage & configure</CardTitle>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px" }}>
           {MANAGE_CARDS.map(renderCard)}
         </div>
       </s-section>
 
-      <s-section heading="Need help?">
+      <s-section>
+        <CardTitle>Need help?</CardTitle>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px", maxWidth: "240px" }}>
           {renderCard(CONTACT_CARD)}
         </div>

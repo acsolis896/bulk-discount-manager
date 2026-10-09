@@ -1,6 +1,8 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 
 type TawkWindow = { Tawk_API?: { toggle?: () => void } };
 
@@ -16,7 +18,9 @@ export default function ContactPage() {
 
   return (
     <s-page heading="Contact Us">
-      <s-section heading="Email">
+      <FormStyles />
+      <s-section>
+        <CardTitle>Email</CardTitle>
         <s-stack direction="inline" gap="base" style={{ alignItems: "flex-start" }}>
           <s-icon type="email" tone="info" />
           <s-stack direction="block" gap="base">
@@ -34,7 +38,8 @@ export default function ContactPage() {
         </s-stack>
       </s-section>
 
-      <s-section heading="Live chat">
+      <s-section>
+        <CardTitle>Live chat</CardTitle>
         <s-stack direction="inline" gap="base" style={{ alignItems: "flex-start" }}>
           <s-icon type="chat" tone="info" />
           <s-stack direction="block" gap="base">

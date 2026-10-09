@@ -6,6 +6,8 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { getCurrentPlan } from "../billing.server";
 import { blockedTypeLimitFor } from "../billing";
+import { CardTitle } from "../components/CardTitle";
+import { FormStyles } from "../components/FormStyles";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -440,12 +442,14 @@ export default function SettingsPage() {
 
   return (
     <s-page heading="Discount Rules">
+      <FormStyles />
       <style>
         {`.blocked-type-row { transition: background-color 0.1s; }
           .blocked-type-row:hover { background-color: var(--s-color-bg-subdued, #f6f6f7); }`}
       </style>
 
-      <s-section heading="Blocked product types">
+      <s-section>
+        <CardTitle>Blocked product types</CardTitle>
         <s-stack direction="block" gap="base">
           <s-paragraph>
             Discount codes will not apply when any item in the cart has one of the following product types.
@@ -521,7 +525,8 @@ export default function SettingsPage() {
         </s-stack>
       </s-section>
 
-      <s-section heading="Sync customer eligibility">
+      <s-section>
+        <CardTitle>Sync customer eligibility</CardTitle>
         <s-stack direction="block" gap="base">
           <s-paragraph>
             For each single-code discount, fetches all customers with the required tag (eligible) and blocked tag (usage limit reached) from Shopify and updates the discount's customer lists. Run this after tagging or un-tagging customers.
