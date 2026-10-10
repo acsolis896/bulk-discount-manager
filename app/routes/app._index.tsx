@@ -109,13 +109,10 @@ type UseCase = {
 
 const USE_CASES: UseCase[] = [
   {
-    title: "Influencer, affiliate and employee codes",
-    icon: "star",
-    blurb: "Give each partner or employee their own permanent code. Use a reusable code for one person, or a bulk set when you have many.",
-    buttons: [
-      { label: "Create a reusable code", href: "/app/single-codes/new" },
-      { label: "Create a bulk set", href: "/app/discounts/new" },
-    ],
+    title: "Discount one item per order",
+    icon: "discount-code",
+    blurb: "Apply a percentage or a fixed amount to just the highest-priced eligible item in the cart, such as 50% off one item. Shopify's own percentage discounts apply to every eligible item.",
+    buttons: [{ label: "Create a reusable code", href: "/app/single-codes/new" }],
   },
   {
     title: "Bring your existing codes",
@@ -124,10 +121,13 @@ const USE_CASES: UseCase[] = [
     buttons: [{ label: "Import a bulk set", href: "/app/discounts/new" }],
   },
   {
-    title: "Discount one item per order",
-    icon: "discount-code",
-    blurb: "Apply a percentage or a fixed amount to just the highest-priced eligible item in the cart, such as 50% off one item. Shopify's own percentage discounts apply to every eligible item.",
-    buttons: [{ label: "Create a reusable code", href: "/app/single-codes/new" }],
+    title: "Influencer, affiliate and employee codes",
+    icon: "star",
+    blurb: "Give each partner or employee their own permanent code. Use a reusable code for one person, or a bulk set when you have many.",
+    buttons: [
+      { label: "Create a reusable code", href: "/app/single-codes/new" },
+      { label: "Create a bulk set", href: "/app/discounts/new" },
+    ],
   },
   {
     title: "Limited-quantity or limited-time offer",
