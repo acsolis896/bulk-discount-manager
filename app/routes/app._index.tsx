@@ -111,7 +111,7 @@ const USE_CASES: UseCase[] = [
   {
     title: "Influencer, affiliate and employee codes",
     icon: "star",
-    blurb: "Give each partner or employee their own code: a reusable code per person, or a bulk set imported from a CSV.",
+    blurb: "Give each partner or employee their own permanent code. Use a reusable code for one person, or a bulk set when you have many.",
     buttons: [
       { label: "Create a reusable code", href: "/app/single-codes/new" },
       { label: "Create a bulk set", href: "/app/discounts/new" },
