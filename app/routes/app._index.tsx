@@ -48,7 +48,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     { key: "rules", label: "Add a blocked product type rule (optional)", done: blockedTypeCount > 0, href: "/app/settings", optional: true },
     { key: "usage", label: "See a code used at checkout", done: hasAnyUsage, href: "/app/additional", optional: false },
   ];
-  const showChecklist = checklist.some((c) => !c.optional && !c.done);
+  // For testing: GETTING_STARTED_ALWAYS_SHOW=true keeps the card on the page even when every step is done.
+  // Leave it unset on production.
+  const alwaysShow = process.env.GETTING_STARTED_ALWAYS_SHOW === "true";
+  const showChecklist = alwaysShow || checklist.some((c) => !c.optional && !c.done);
 
   // Only shown once the store has a discount; a failure here must not break the Home page.
   let stats = null;
@@ -103,26 +106,12 @@ const MANAGE_CARDS: Card[] = [
   },
 ];
 
-const USE_CASE_CARDS: Card[] = [
-  {
-    href: "/app/single-codes/new",
-    title: "Influencer or affiliate codes",
-    description: "A permanent code for each partner, with a limit per customer if you want one.",
-    icon: "star",
-  },
-  {
-    href: "/app/single-codes/new",
-    title: "Employee discount",
-    description: "A reusable code that only customers with a tag or segment can use.",
-    icon: "person",
-  },
-  {
-    href: "/app/settings",
-    title: "Protect a free gift",
-    description: "Block discount codes when a gift-with-purchase product is in the cart.",
-    icon: "gift",
-  },
-];
+const GIFT_CARD: Card = {
+  href: "/app/settings",
+  title: "Protect a free gift",
+  description: "Block discount codes when a gift-with-purchase product is in the cart.",
+  icon: "gift",
+};
 
 const CONTACT_CARD: Card = {
   href: "/app/contact",
@@ -208,7 +197,32 @@ export default function Home() {
           <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
             <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}>Start from a use case</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px" }}>
-              {USE_CASE_CARDS.map(renderCard)}
+              <s-box padding="base" borderWidth="base" borderRadius="base" background="base">
+                <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                  <span style={{ color: ICON_PURPLE, flexShrink: 0 }}>
+                    <s-icon type={"star" as never} />
+                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div style={{ fontSize: "14px", fontWeight: 600 }}>Influencer, affiliate and employee codes</div>
+                    <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                      Give each partner or employee their own code. Choose what fits:
+                    </div>
+                    <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                      <strong>Reusable code:</strong> one permanent code per person, with optional limits per customer or tag-based access.
+                    </div>
+                    <div>
+                      <s-button onClick={() => navigate("/app/single-codes/new")}>Create a reusable code</s-button>
+                    </div>
+                    <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                      <strong>Bulk set:</strong> import many named codes at once from a CSV.
+                    </div>
+                    <div>
+                      <s-button onClick={() => navigate("/app/discounts/new")}>Create a bulk set</s-button>
+                    </div>
+                  </div>
+                </div>
+              </s-box>
+              {renderCard(GIFT_CARD)}
             </div>
           </div>
         </s-section>
