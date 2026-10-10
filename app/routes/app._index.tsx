@@ -187,11 +187,11 @@ export default function Home() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
               <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
                 <div style={{ fontSize: "24px", fontWeight: 650 }}>{stats.orders.toLocaleString("en-US")}</div>
-                <div style={{ fontSize: "13px", color: "#6d7175" }}>Orders that used a code</div>
+                <div style={{ fontSize: "13px", color: "#6d7175", marginTop: "8px" }}>Orders that used a code</div>
               </s-box>
               <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
                 <div style={{ fontSize: "24px", fontWeight: 650 }}>{formatMoney(stats.sales[0].total, stats.sales[0].currency)}</div>
-                <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                <div style={{ fontSize: "13px", color: "#6d7175", marginTop: "8px" }}>
                   Sales from those orders
                   {stats.sales.length > 1 ? ` (${stats.sales[0].currency}; ${stats.sales.length - 1} more currenc${stats.sales.length - 1 === 1 ? "y" : "ies"} not shown)` : ""}
                 </div>
@@ -199,7 +199,7 @@ export default function Home() {
               {stats.topCode && (
                 <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
                   <div style={{ fontSize: "24px", fontWeight: 650, fontFamily: "monospace", wordBreak: "break-all" }}>{stats.topCode.code}</div>
-                  <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                  <div style={{ fontSize: "13px", color: "#6d7175", marginTop: "8px" }}>
                     Most used code ({stats.topCode.orders.toLocaleString("en-US")} order{stats.topCode.orders === 1 ? "" : "s"})
                   </div>
                 </s-box>
