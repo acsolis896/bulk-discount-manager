@@ -118,10 +118,10 @@ const USE_CASES: UseCase[] = [
     ],
   },
   {
-    title: "Unique codes for a campaign or giveaway",
+    title: "Bring your existing codes",
     icon: "discount-add",
-    blurb: "Generate hundreds or thousands of single-use codes at once, then export them for an email or a giveaway.",
-    buttons: [{ label: "Create a bulk set", href: "/app/discounts/new" }],
+    blurb: "Import codes you already have from a CSV, including ones already used, so your history carries over.",
+    buttons: [{ label: "Import a bulk set", href: "/app/discounts/new" }],
   },
   {
     title: "Discount one item per order",
@@ -264,6 +264,36 @@ export default function Home() {
 
           <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
             <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}>Start from a use case</div>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "16px",
+                padding: "20px",
+                marginBottom: "12px",
+                border: `1px solid ${ICON_PURPLE}`,
+                borderRadius: "8px",
+                background: "#f6f2fd",
+              }}
+            >
+              <div style={{ flex: "1 1 360px", minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                  <span style={{ color: ICON_PURPLE, display: "inline-flex" }}>
+                    <s-icon type={"discount-add" as never} />
+                  </span>
+                  <div style={{ fontSize: "16px", fontWeight: 650 }}>Bulk discount codes</div>
+                </div>
+                <div style={{ fontSize: "14px", color: "#444" }}>
+                  Shopify&apos;s admin creates discount codes one at a time. Create up to 5,000 unique codes in a single batch, single-use or
+                  reusable, or import your own from a CSV, then export them for emails, giveaways and partners.
+                </div>
+              </div>
+              <div>
+                <s-button variant="primary" onClick={() => navigate("/app/discounts/new")}>Create a bulk set</s-button>
+              </div>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "12px", alignItems: "stretch" }}>
               {USE_CASES.map(renderUseCase)}
             </div>
