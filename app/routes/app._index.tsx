@@ -261,43 +261,6 @@ export default function Home() {
               </div>
             ))}
           </div>
-
-          <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
-            <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}>Start from a use case</div>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "16px",
-                padding: "20px",
-                marginBottom: "12px",
-                border: `1px solid ${ICON_PURPLE}`,
-                borderRadius: "8px",
-                background: "#f6f2fd",
-              }}
-            >
-              <div style={{ flex: "1 1 360px", minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-                  <span style={{ color: ICON_PURPLE, display: "inline-flex" }}>
-                    <s-icon type={"discount-add" as never} />
-                  </span>
-                  <div style={{ fontSize: "16px", fontWeight: 650 }}>Bulk discount codes</div>
-                </div>
-                <div style={{ fontSize: "14px", color: "#444" }}>
-                  Shopify&apos;s admin creates discount codes one at a time. Create up to 5,000 unique codes in a single batch, single-use or
-                  reusable, or import your own from a CSV, then export them for emails, giveaways and partners.
-                </div>
-              </div>
-              <div>
-                <s-button variant="primary" onClick={() => navigate("/app/discounts/new")}>Create a bulk set</s-button>
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "12px", alignItems: "stretch" }}>
-              {USE_CASES.map(renderUseCase)}
-            </div>
-          </div>
         </s-section>
       )}
 
@@ -333,6 +296,43 @@ export default function Home() {
           )}
         </s-section>
       )}
+
+      <s-section>
+        <CardTitle>Start from a use case</CardTitle>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "16px",
+            padding: "20px",
+            marginBottom: "12px",
+            border: `1px solid ${ICON_PURPLE}`,
+            borderRadius: "8px",
+            background: "#f6f2fd",
+          }}
+        >
+          <div style={{ flex: "1 1 360px", minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+              <span style={{ color: ICON_PURPLE, display: "inline-flex" }}>
+                <s-icon type={"discount-add" as never} />
+              </span>
+              <div style={{ fontSize: "16px", fontWeight: 650 }}>Bulk discount codes</div>
+            </div>
+            <div style={{ fontSize: "14px", color: "#444" }}>
+              Shopify&apos;s admin creates discount codes one at a time. Create up to 5,000 unique codes in a single batch, single-use or
+              reusable, or import your own from a CSV, then export them for emails, giveaways and partners.
+            </div>
+          </div>
+          <div>
+            <s-button variant="primary" onClick={() => navigate("/app/discounts/new")}>Create a bulk set</s-button>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "12px", alignItems: "stretch" }}>
+          {USE_CASES.map(renderUseCase)}
+        </div>
+      </s-section>
 
       <div role="heading" aria-level={2} style={{ fontSize: "24px", fontWeight: 650, lineHeight: "32px", margin: "32px 4px 12px" }}>
         Quick links
