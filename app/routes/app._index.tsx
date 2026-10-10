@@ -104,39 +104,38 @@ type UseCase = {
   title: string;
   icon: string;
   blurb: string;
-  options: { lead?: string; text: string; button: string; href: string }[];
+  buttons: { label: string; href: string }[];
 };
 
 const USE_CASES: UseCase[] = [
   {
     title: "Influencer, affiliate and employee codes",
     icon: "star",
-    blurb: "Give each partner or employee their own code. Choose what fits:",
-    options: [
-      { lead: "Reusable code:", text: "one permanent code per person, with optional limits per customer or tag-based access.", button: "Create a reusable code", href: "/app/single-codes/new" },
-      { lead: "Bulk set:", text: "import many named codes at once from a CSV.", button: "Create a bulk set", href: "/app/discounts/new" },
+    blurb: "Give each partner or employee their own code: a reusable code per person, or a bulk set imported from a CSV.",
+    buttons: [
+      { label: "Create a reusable code", href: "/app/single-codes/new" },
+      { label: "Create a bulk set", href: "/app/discounts/new" },
     ],
   },
   {
     title: "Unique codes for a campaign or giveaway",
     icon: "discount-add",
     blurb: "Generate hundreds or thousands of single-use codes at once, then export them for an email or a giveaway.",
-    options: [{ text: "", button: "Create a bulk set", href: "/app/discounts/new" }],
+    buttons: [{ label: "Create a bulk set", href: "/app/discounts/new" }],
   },
   {
     title: "Discount one item per order",
     icon: "discount-code",
     blurb: "Apply a percentage or a fixed amount to just the highest-priced eligible item in the cart, such as 50% off one item. Shopify's own percentage discounts apply to every eligible item.",
-    options: [{ text: "", button: "Create a reusable code", href: "/app/single-codes/new" }],
+    buttons: [{ label: "Create a reusable code", href: "/app/single-codes/new" }],
+  },
+  {
+    title: "Protect a free gift",
+    icon: "shield-check-mark",
+    blurb: "Block discount codes when a gift-with-purchase product is in the cart.",
+    buttons: [{ label: "Open Rules", href: "/app/settings" }],
   },
 ];
-
-const GIFT_CARD: Card = {
-  href: "/app/settings",
-  title: "Protect a free gift",
-  description: "Block discount codes when a gift-with-purchase product is in the cart.",
-  icon: "shield-check-mark",
-};
 
 const CONTACT_CARD: Card = {
   href: "/app/contact",
@@ -149,31 +148,36 @@ export default function Home() {
   const { isFirstVisit, checklist, showChecklist, stats } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
 
+  // Every use case has the same shape (icon and title, a sentence, buttons pinned to the bottom), and
+  // the grid stretches the boxes to one height, so a longer sentence doesn't make one box lopsided.
   const renderUseCase = (u: UseCase) => (
-    <s-box key={u.title} padding="base" borderWidth="base" borderRadius="base" background="base">
-      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-        <span style={{ color: ICON_PURPLE, flexShrink: 0 }}>
+    <div
+      key={u.title}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+        height: "100%",
+        boxSizing: "border-box",
+        padding: "16px",
+        border: "1px solid #e1e3e5",
+        borderRadius: "8px",
+        background: "#fff",
+      }}
+    >
+      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        <span style={{ color: ICON_PURPLE, flexShrink: 0, display: "inline-flex" }}>
           <s-icon type={u.icon as never} />
         </span>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 600 }}>{u.title}</div>
-          <div style={{ fontSize: "13px", color: "#6d7175" }}>{u.blurb}</div>
-          {u.options.map((o) => (
-            <div key={o.button} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {o.text && (
-                <div style={{ fontSize: "13px", color: "#6d7175" }}>
-                  {o.lead && <strong>{o.lead} </strong>}
-                  {o.text}
-                </div>
-              )}
-              <div>
-                <s-button onClick={() => navigate(o.href)}>{o.button}</s-button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <div style={{ fontSize: "14px", fontWeight: 600 }}>{u.title}</div>
       </div>
-    </s-box>
+      <div style={{ fontSize: "13px", color: "#6d7175" }}>{u.blurb}</div>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "auto", paddingTop: "6px" }}>
+        {u.buttons.map((b) => (
+          <s-button key={b.label} onClick={() => navigate(b.href)}>{b.label}</s-button>
+        ))}
+      </div>
+    </div>
   );
 
   const renderCard = (card: Card) => (
@@ -248,9 +252,8 @@ export default function Home() {
 
           <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
             <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}>Start from a use case</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "12px", alignItems: "stretch" }}>
               {USE_CASES.map(renderUseCase)}
-              {renderCard(GIFT_CARD)}
             </div>
           </div>
         </s-section>
