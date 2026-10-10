@@ -292,7 +292,7 @@ export default function Home() {
         </s-section>
       )}
 
-      <div role="heading" aria-level={2} style={{ fontSize: "20px", fontWeight: 650, lineHeight: "28px", margin: "8px 4px 0" }}>
+      <div role="heading" aria-level={2} style={{ fontSize: "20px", fontWeight: 650, lineHeight: "28px", margin: "16px 4px 12px" }}>
         Quick links
       </div>
 
