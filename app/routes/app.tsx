@@ -5,6 +5,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
+import { LoadingPage } from "../components/LoadingPage";
 
 const TAWK_PROPERTY_ID = "6a98490aef935f3443550c67";
 const TAWK_WIDGET_ID = "1k1hdqkhp";
@@ -68,11 +69,7 @@ export default function App() {
         <s-link href="/app/contact">Contact Us</s-link>
       </s-app-nav>
       {isLoading ? (
-        <s-page heading="Loading…">
-          <s-section heading="">
-            <s-paragraph>Loading…</s-paragraph>
-          </s-section>
-        </s-page>
+        <LoadingPage />
       ) : (
         <Outlet />
       )}
