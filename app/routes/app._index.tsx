@@ -130,6 +130,18 @@ const USE_CASES: UseCase[] = [
     buttons: [{ label: "Create a reusable code", href: "/app/single-codes/new" }],
   },
   {
+    title: "Limited-quantity or limited-time offer",
+    icon: "clock",
+    blurb: "Cap a code at a set number of uses, an expiration date or both, such as the first 100 customers.",
+    buttons: [{ label: "Create a reusable code", href: "/app/single-codes/new" }],
+  },
+  {
+    title: "Cap a percentage discount",
+    icon: "cash-dollar",
+    blurb: "Set a maximum discount per order, such as 20% off up to $50.",
+    buttons: [{ label: "Create a reusable code", href: "/app/single-codes/new" }],
+  },
+  {
     title: "Protect a free gift",
     icon: "shield-check-mark",
     blurb: "Block discount codes when a gift-with-purchase product is in the cart.",
