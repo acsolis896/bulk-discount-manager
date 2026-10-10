@@ -292,6 +292,10 @@ export default function Home() {
         </s-section>
       )}
 
+      <div role="heading" aria-level={2} style={{ fontSize: "20px", fontWeight: 650, lineHeight: "28px", margin: "8px 4px 0" }}>
+        Quick links
+      </div>
+
       <s-section>
         <CardTitle>Create a discount</CardTitle>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px" }}>
