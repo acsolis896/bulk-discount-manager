@@ -35,13 +35,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const blockedTypeCount = await db.blockedProductType.count({ where: { shop: session.shop } });
 
+  // A reusable code with a per-customer limit is the sign a merchant has used the app's own limits.
+  const limitedCodeCount = await db.singleCodeDiscount.count({
+    where: { shop: session.shop, usesPerCustomerLimit: { not: null } },
+  });
+
   const isFirstVisit = !hasAnyDiscount;
+  // Optional steps are shown as bonus ticks; only the required ones keep the card on the page.
   const checklist = [
-    { key: "create", label: "Create your first discount", done: hasAnyDiscount, href: "/app/discounts/new" },
-    { key: "rules", label: "Add a blocked product type rule (optional)", done: blockedTypeCount > 0, href: "/app/settings" },
-    { key: "usage", label: "See a code used at checkout", done: hasAnyUsage, href: "/app/additional" },
+    { key: "create", label: "Create your first discount", done: hasAnyDiscount, href: "/app/discounts/new", optional: false },
+    { key: "limit", label: "Set a per-customer limit on a reusable code (optional)", done: limitedCodeCount > 0, href: "/app/single-codes/new", optional: true },
+    { key: "rules", label: "Add a blocked product type rule (optional)", done: blockedTypeCount > 0, href: "/app/settings", optional: true },
+    { key: "usage", label: "See a code used at checkout", done: hasAnyUsage, href: "/app/additional", optional: false },
   ];
-  const showChecklist = checklist.some((c) => !c.done);
+  const showChecklist = checklist.some((c) => !c.optional && !c.done);
 
   // Only shown once the store has a discount; a failure here must not break the Home page.
   let stats = null;
@@ -96,6 +103,27 @@ const MANAGE_CARDS: Card[] = [
   },
 ];
 
+const USE_CASE_CARDS: Card[] = [
+  {
+    href: "/app/single-codes/new",
+    title: "Influencer or affiliate codes",
+    description: "A permanent code for each partner, with a limit per customer if you want one.",
+    icon: "star",
+  },
+  {
+    href: "/app/single-codes/new",
+    title: "Employee discount",
+    description: "A reusable code that only customers with a tag or segment can use.",
+    icon: "person",
+  },
+  {
+    href: "/app/settings",
+    title: "Protect a free gift",
+    description: "Block discount codes when a gift-with-purchase product is in the cart.",
+    icon: "gift",
+  },
+];
+
 const CONTACT_CARD: Card = {
   href: "/app/contact",
   title: "Contact Us",
@@ -109,7 +137,7 @@ export default function Home() {
 
   const renderCard = (card: Card) => (
     <s-box
-      key={card.href}
+      key={card.title}
       className="home-card"
       onClick={() => navigate(card.href)}
       padding="base"
@@ -150,6 +178,9 @@ export default function Home() {
       {showChecklist && (
         <s-section>
           <CardTitle>Getting started</CardTitle>
+          <div style={{ fontSize: "13px", color: "#6d7175", marginTop: "-8px", marginBottom: "12px" }}>
+            {checklist.filter((c) => c.done).length} of {checklist.length} steps done
+          </div>
           <s-stack direction="block" gap="small">
             {checklist.map((step) => (
               <div
@@ -173,6 +204,13 @@ export default function Home() {
               </div>
             ))}
           </s-stack>
+
+          <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
+            <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}>Start from a use case</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px" }}>
+              {USE_CASE_CARDS.map(renderCard)}
+            </div>
+          </div>
         </s-section>
       )}
 
