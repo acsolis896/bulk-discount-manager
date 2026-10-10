@@ -100,6 +100,37 @@ const MANAGE_CARDS: Card[] = [
   },
 ];
 
+type UseCase = {
+  title: string;
+  icon: string;
+  blurb: string;
+  options: { lead?: string; text: string; button: string; href: string }[];
+};
+
+const USE_CASES: UseCase[] = [
+  {
+    title: "Influencer, affiliate and employee codes",
+    icon: "star",
+    blurb: "Give each partner or employee their own code. Choose what fits:",
+    options: [
+      { lead: "Reusable code:", text: "one permanent code per person, with optional limits per customer or tag-based access.", button: "Create a reusable code", href: "/app/single-codes/new" },
+      { lead: "Bulk set:", text: "import many named codes at once from a CSV.", button: "Create a bulk set", href: "/app/discounts/new" },
+    ],
+  },
+  {
+    title: "Unique codes for a campaign or giveaway",
+    icon: "discount-add",
+    blurb: "Generate hundreds or thousands of single-use codes at once, then export them for an email or a giveaway.",
+    options: [{ text: "", button: "Create a bulk set", href: "/app/discounts/new" }],
+  },
+  {
+    title: "Discount one item per order",
+    icon: "discount-code",
+    blurb: "Apply a percentage or a fixed amount to just the highest-priced eligible item in the cart, such as 50% off one item. Shopify's own percentage discounts apply to every eligible item.",
+    options: [{ text: "", button: "Create a reusable code", href: "/app/single-codes/new" }],
+  },
+];
+
 const GIFT_CARD: Card = {
   href: "/app/settings",
   title: "Protect a free gift",
@@ -117,6 +148,33 @@ const CONTACT_CARD: Card = {
 export default function Home() {
   const { isFirstVisit, checklist, showChecklist, stats } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+
+  const renderUseCase = (u: UseCase) => (
+    <s-box key={u.title} padding="base" borderWidth="base" borderRadius="base" background="base">
+      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+        <span style={{ color: ICON_PURPLE, flexShrink: 0 }}>
+          <s-icon type={u.icon as never} />
+        </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 600 }}>{u.title}</div>
+          <div style={{ fontSize: "13px", color: "#6d7175" }}>{u.blurb}</div>
+          {u.options.map((o) => (
+            <div key={o.button} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {o.text && (
+                <div style={{ fontSize: "13px", color: "#6d7175" }}>
+                  {o.lead && <strong>{o.lead} </strong>}
+                  {o.text}
+                </div>
+              )}
+              <div>
+                <s-button onClick={() => navigate(o.href)}>{o.button}</s-button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </s-box>
+  );
 
   const renderCard = (card: Card) => (
     <s-box
@@ -191,31 +249,7 @@ export default function Home() {
           <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
             <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}>Start from a use case</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px" }}>
-              <s-box padding="base" borderWidth="base" borderRadius="base" background="base">
-                <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                  <span style={{ color: ICON_PURPLE, flexShrink: 0 }}>
-                    <s-icon type={"star" as never} />
-                  </span>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <div style={{ fontSize: "14px", fontWeight: 600 }}>Influencer, affiliate and employee codes</div>
-                    <div style={{ fontSize: "13px", color: "#6d7175" }}>
-                      Give each partner or employee their own code. Choose what fits:
-                    </div>
-                    <div style={{ fontSize: "13px", color: "#6d7175" }}>
-                      <strong>Reusable code:</strong> one permanent code per person, with optional limits per customer or tag-based access.
-                    </div>
-                    <div>
-                      <s-button onClick={() => navigate("/app/single-codes/new")}>Create a reusable code</s-button>
-                    </div>
-                    <div style={{ fontSize: "13px", color: "#6d7175" }}>
-                      <strong>Bulk set:</strong> import many named codes at once from a CSV.
-                    </div>
-                    <div>
-                      <s-button onClick={() => navigate("/app/discounts/new")}>Create a bulk set</s-button>
-                    </div>
-                  </div>
-                </div>
-              </s-box>
+              {USE_CASES.map(renderUseCase)}
               {renderCard(GIFT_CARD)}
             </div>
           </div>
