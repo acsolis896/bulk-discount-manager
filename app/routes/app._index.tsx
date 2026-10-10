@@ -35,16 +35,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const blockedTypeCount = await db.blockedProductType.count({ where: { shop: session.shop } });
 
-  // A reusable code with a per-customer limit is the sign a merchant has used the app's own limits.
-  const limitedCodeCount = await db.singleCodeDiscount.count({
-    where: { shop: session.shop, usesPerCustomerLimit: { not: null } },
-  });
-
   const isFirstVisit = !hasAnyDiscount;
   // Optional steps are shown as bonus ticks; only the required ones keep the card on the page.
   const checklist = [
-    { key: "create", label: "Create your first discount", done: hasAnyDiscount, href: "/app/discounts/new", optional: false },
-    { key: "limit", label: "Set a per-customer limit on a reusable code (optional)", done: limitedCodeCount > 0, href: "/app/single-codes/new", optional: true },
+    { key: "create", label: "Create your first discount (bulk or reusable)", done: hasAnyDiscount, href: "/app/discounts/new", optional: false },
     { key: "rules", label: "Add a blocked product type rule (optional)", done: blockedTypeCount > 0, href: "/app/settings", optional: true },
     { key: "usage", label: "See a code used at checkout", done: hasAnyUsage, href: "/app/additional", optional: false },
   ];
@@ -110,7 +104,7 @@ const GIFT_CARD: Card = {
   href: "/app/settings",
   title: "Protect a free gift",
   description: "Block discount codes when a gift-with-purchase product is in the cart.",
-  icon: "gift",
+  icon: "shield-check-mark",
 };
 
 const CONTACT_CARD: Card = {
@@ -170,7 +164,7 @@ export default function Home() {
           <div style={{ fontSize: "13px", color: "#6d7175", marginTop: "-8px", marginBottom: "12px" }}>
             {checklist.filter((c) => c.done).length} of {checklist.length} steps done
           </div>
-          <s-stack direction="block" gap="small">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "8px" }}>
             {checklist.map((step) => (
               <div
                 key={step.key}
@@ -192,7 +186,7 @@ export default function Home() {
                 <s-text style={step.done ? { textDecoration: "line-through" } : {}}>{step.label}</s-text>
               </div>
             ))}
-          </s-stack>
+          </div>
 
           <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid #e1e3e5" }}>
             <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}>Start from a use case</div>
