@@ -441,7 +441,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <s-page heading="Discount Rules">
+    <s-page heading="Blocked products">
       <FormStyles />
       <style>
         {`.blocked-type-row { transition: background-color 0.1s; }

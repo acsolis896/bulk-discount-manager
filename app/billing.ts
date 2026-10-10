@@ -29,7 +29,7 @@ export interface PlanLimits {
   reusableCodes: number | null;
   /** Active (never used) bulk codes at once (null = unlimited). */
   bulkCodes: number | null;
-  /** Blocked product types on the Rules page (null = unlimited). */
+  /** Blocked product types on the Blocked products page (null = unlimited). */
   blockedProductTypes: number | null;
   features: Record<PlanFeature, boolean>;
   prioritySupport: boolean;

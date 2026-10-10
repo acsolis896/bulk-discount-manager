@@ -64,7 +64,7 @@ export default function App() {
         <s-link href="/app/discounts/new">Create bulk discounts</s-link>
         <s-link href="/app/single-codes/new">Create reusable codes</s-link>
         <s-link href="/app/additional">Discount sets</s-link>
-        <s-link href="/app/settings">Rules</s-link>
+        <s-link href="/app/settings">Blocked products</s-link>
         <s-link href="/app/plans">Plans</s-link>
         <s-link href="/app/contact">Contact Us</s-link>
       </s-app-nav>

@@ -39,7 +39,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Optional steps are shown as bonus ticks; only the required ones keep the card on the page.
   const checklist = [
     { key: "create", label: "Create your first discount (bulk or reusable)", done: hasAnyDiscount, href: "/app/discounts/new", optional: false },
-    { key: "rules", label: "Add a blocked product type rule (optional)", done: blockedTypeCount > 0, href: "/app/settings", optional: true },
+    { key: "rules", label: "Block discounts on a product type (optional)", done: blockedTypeCount > 0, href: "/app/settings", optional: true },
     { key: "usage", label: "See a code used at checkout", done: hasAnyUsage, href: "/app/additional", optional: false },
   ];
   // For testing: GETTING_STARTED_ALWAYS_SHOW=true keeps the card on the page even when every step is done.
@@ -88,7 +88,7 @@ const MANAGE_CARDS: Card[] = [
   },
   {
     href: "/app/settings",
-    title: "Rules",
+    title: "Blocked products",
     description: "Configure product types that automatically block discount codes at checkout.",
     icon: "shield-check-mark",
   },
@@ -145,7 +145,7 @@ const USE_CASES: UseCase[] = [
     title: "Protect a free gift",
     icon: "shield-check-mark",
     blurb: "Block discount codes when a gift-with-purchase product is in the cart.",
-    buttons: [{ label: "Open Rules", href: "/app/settings" }],
+    buttons: [{ label: "Manage blocked products", href: "/app/settings" }],
   },
 ];
 
