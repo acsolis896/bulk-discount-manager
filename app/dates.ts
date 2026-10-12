@@ -55,3 +55,9 @@ export function formatDateInZone(iso: string, timeZone: string): string {
   const zone = isValidZone(timeZone) ? timeZone : "UTC";
   return new Date(iso).toLocaleDateString("en-US", { timeZone: zone });
 }
+
+/** An ISO moment -> "Dec 31, 2026", the date in the time zone. */
+export function formatMediumDateInZone(iso: string, timeZone: string): string {
+  const zone = isValidZone(timeZone) ? timeZone : "UTC";
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: zone });
+}

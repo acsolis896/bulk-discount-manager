@@ -20,6 +20,8 @@ import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota, getPlanFeatures } from "../billing.server";
 import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
 import { applyEligibility, listSegments } from "../eligibility.server";
+import { getShopTimeZone } from "../shop.server";
+import { endOfDayIso } from "../dates";
 import { shouldRequestReviewAfterCreation } from "../review-prompt";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -70,7 +72,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const allowedCountries = countriesResult.countries;
     const codeMode = String(formData.get("codeMode") || "generate");
     const endsAtRaw = String(formData.get("endsAt") || "");
-    const endsAt = endsAtRaw ? new Date(`${endsAtRaw}T23:59:59-08:00`).toISOString() : null;
+    // The chosen date is the end of that day in the store's own time zone.
+    const endsAt = endsAtRaw ? endOfDayIso(endsAtRaw, await getShopTimeZone(admin)) : null;
+    if (endsAtRaw && !endsAt) return { error: "The expiration date isn't a valid date." };
     const usageLimitOne = formData.get("usageLimitOne") === "1";
     const oncePerCustomer = formData.get("oncePerCustomer") === "1";
     const combinesWithProduct = formData.get("combinesWithProduct") === "1";
