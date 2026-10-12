@@ -16,6 +16,7 @@ import { CountryPicker } from "../components/CountryPicker";
 import { UpgradeNote } from "../components/UpgradeNote";
 import { CardTitle } from "../components/CardTitle";
 import { FormStyles } from "../components/FormStyles";
+import { DatePickerRoom, DatePickerSpace } from "../components/DatePickerRoom";
 import { parseAllowedCountries } from "../countries";
 import { checkCodeQuota, getPlanFeatures } from "../billing.server";
 import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
@@ -368,6 +369,7 @@ export default function CreateBulkDiscount() {
   const [selectedSegmentId, setSelectedSegmentId] = useState("");
   const [codeMode, setCodeMode] = useState<"generate" | "import">("generate");
   const [endsAt, setEndsAt] = useState("");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [usageLimitOne, setUsageLimitOne] = useState(true);
   const [oncePerCustomer, setOncePerCustomer] = useState(true);
   const [combinesWithProduct, setCombinesWithProduct] = useState(false);
@@ -802,12 +804,14 @@ export default function CreateBulkDiscount() {
 
       <s-section>
         <CardTitle>Expiration</CardTitle>
-        <s-date-field
-          label="Expiration date"
-          value={endsAt}
-          onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
-          details="Optional — leave blank for no expiration"
-        />
+        <DatePickerRoom onOpenChange={setDatePickerOpen}>
+          <s-date-field
+            label="Expiration date"
+            value={endsAt}
+            onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
+            details="Optional — leave blank for no expiration"
+          />
+        </DatePickerRoom>
       </s-section>
 
       <s-stack direction="inline" gap="base">
@@ -864,6 +868,7 @@ export default function CreateBulkDiscount() {
         </s-banner>
         </div>
       )}
+      <DatePickerSpace open={datePickerOpen} />
     </s-page>
   );
 }
