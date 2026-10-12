@@ -37,10 +37,6 @@ function parseCSVCodes(text: string): ParsedCode[] {
     .filter((c): c is ParsedCode => c !== null);
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-}
-
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
     const { admin, session } = await authenticate.admin(request);
@@ -722,7 +718,7 @@ export default function DiscountDetails() {
     const rows = [
       "Code,Uses,Revenue,Last Used",
       ...codePerformance.map(
-        (c: CodePerformanceRow) => `${c.code},${c.uses},${c.revenue.toFixed(2)},${c.lastUsed ? c.lastUsed.slice(0, 10) : ""}`
+        (c: CodePerformanceRow) => `${c.code},${c.uses},${c.revenue.toFixed(2)},${c.lastUsed ? dateInZone(c.lastUsed, timeZone) : ""}`
       ),
     ];
     const blob = new Blob([rows.join("\n")], { type: "text/csv" });
@@ -732,7 +728,7 @@ export default function DiscountDetails() {
     a.download = `${title ?? "discount"}-code-performance.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [codePerformance, title]);
+  }, [codePerformance, title, timeZone]);
 
   const handleExport = useCallback((unusedOnly = false) => {
     const filtered = unusedOnly ? codes.filter((c: RedeemCode) => c.usageCount === 0) : codes;
@@ -921,7 +917,7 @@ export default function DiscountDetails() {
                     <span style={{ width: "70px", textAlign: "right" }}>{c.uses}</span>
                     <span style={{ width: "100px", textAlign: "right" }}>${c.revenue.toFixed(2)}</span>
                     <span style={{ width: "100px", textAlign: "right", fontSize: "13px", color: "#6d7175" }}>
-                      {c.lastUsed ? formatDate(c.lastUsed) : "—"}
+                      {c.lastUsed ? formatMediumDateInZone(c.lastUsed, timeZone) : "—"}
                     </span>
                   </div>
                 ))}
