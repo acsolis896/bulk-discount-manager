@@ -21,7 +21,9 @@ export function DatePickerRoom({ children, onSpaceChange }: { children: ReactNod
         const fieldBottom = el.getBoundingClientRect().bottom + window.scrollY;
         const roomBelow = document.documentElement.scrollHeight - fieldBottom;
         onSpaceChange(Math.max(0, Math.ceil(CALENDAR_HEIGHT - roomBelow)));
-        requestAnimationFrame(() => el.scrollIntoView({ block: "center", behavior: "smooth" }));
+        // Scroll only after the click that opened the calendar has finished. Scrolling right away moves
+        // the field out from under the pointer, and the calendar then never opens.
+        window.setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 350);
       }}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onSpaceChange(0);
