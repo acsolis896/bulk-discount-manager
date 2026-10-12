@@ -8,18 +8,35 @@ import { getCurrentPlan } from "../billing.server";
 import { blockedTypeLimitFor } from "../billing";
 import { CardTitle } from "../components/CardTitle";
 import { FormStyles } from "../components/FormStyles";
+import { OTHER_PRODUCT_TYPE, pickableProductTypes } from "../product-types";
+
+// The product types already used on the store's products, for the dropdown. A failure here just means
+// the page falls back to typing a name.
+async function loadStoreProductTypes(admin: { graphql: (query: string) => Promise<Response> }): Promise<string[]> {
+  try {
+    const res = await admin.graphql(`#graphql
+      query ShopProductTypes {
+        productTypes(first: 250) { nodes }
+      }`);
+    const data = (await res.json()) as { data?: { productTypes?: { nodes?: string[] } | null } };
+    return (data.data?.productTypes?.nodes ?? []).filter((t): t is string => typeof t === "string");
+  } catch {
+    return [];
+  }
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+  const shopProductTypes = await loadStoreProductTypes(admin);
   try {
     const rows = await db.blockedProductType.findMany({
       where: { shop: session.shop },
       orderBy: { createdAt: "asc" },
       select: { id: true, productType: true },
     });
-    return { blockedTypes: rows, dbError: null };
+    return { blockedTypes: rows, shopProductTypes, dbError: null };
   } catch (err: unknown) {
-    return { blockedTypes: [], dbError: err instanceof Error ? err.message : String(err) };
+    return { blockedTypes: [], shopProductTypes, dbError: err instanceof Error ? err.message : String(err) };
   }
 };
 
@@ -395,9 +412,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function SettingsPage() {
-  const { blockedTypes, dbError } = useLoaderData<typeof loader>();
+  const { blockedTypes, shopProductTypes, dbError } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const [newType, setNewType] = useState("");
+  const [choice, setChoice] = useState("");
+
+  // Pick from the store's own product types, or type one that isn't listed ("Other").
+  const options = pickableProductTypes(shopProductTypes, blockedTypes.map((t: { productType: string }) => t.productType));
+  const typing = options.length === 0 || choice === OTHER_PRODUCT_TYPE;
+  const typeToAdd = typing ? newType.trim() : choice;
 
   const isFetcherBusy = fetcher.state !== "idle";
   const [forcedIdle, setForcedIdle] = useState(false);
@@ -419,12 +442,13 @@ export default function SettingsPage() {
   const result = fetcher.data;
 
   const handleAdd = () => {
-    if (!newType.trim()) return;
+    if (!typeToAdd) return;
     const form = new FormData();
     form.append("intent", "add");
-    form.append("productType", newType.trim());
+    form.append("productType", typeToAdd);
     fetcher.submit(form, { method: "post" });
     setNewType("");
+    setChoice("");
   };
 
   const handleRemove = (id: string) => {
@@ -508,19 +532,40 @@ export default function SettingsPage() {
 
           {/* Add new */}
           <div style={{ display: "flex", gap: "8px", alignItems: "flex-end", marginTop: "8px" }}>
-            <div style={{ flex: 1 }}>
-              <s-text-field
-                label="Add product type"
-                labelAccessibilityVisibility="exclusive"
-                placeholder="e.g. Accessories"
-                value={newType}
-                onInput={(e: InputEvent) => setNewType((e.target as HTMLInputElement).value)}
-                onKeyDown={(e: KeyboardEvent) => e.key === "Enter" && handleAdd()}
-              />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+              {options.length > 0 && (
+                <s-select
+                  label="Add product type"
+                  labelAccessibilityVisibility="exclusive"
+                  placeholder="Select a product type…"
+                  value={choice}
+                  onChange={(e: { target: unknown }) => setChoice((e.target as HTMLSelectElement).value)}
+                >
+                  {options.map((type) => (
+                    <s-option key={type} value={type}>{type}</s-option>
+                  ))}
+                  <s-option value={OTHER_PRODUCT_TYPE}>Other (type a name)…</s-option>
+                </s-select>
+              )}
+              {typing && (
+                <s-text-field
+                  label="Product type name"
+                  labelAccessibilityVisibility="exclusive"
+                  placeholder="e.g. Accessories"
+                  value={newType}
+                  onInput={(e: InputEvent) => setNewType((e.target as HTMLInputElement).value)}
+                  onKeyDown={(e: KeyboardEvent) => e.key === "Enter" && handleAdd()}
+                />
+              )}
             </div>
-            <s-button variant="primary" onClick={handleAdd} disabled={isSubmitting || !newType.trim()}>
+            <s-button variant="primary" onClick={handleAdd} disabled={isSubmitting || !typeToAdd}>
               {isSubmitting && fetcher.formData?.get("intent") === "add" ? "Adding…" : "Add"}
             </s-button>
+          </div>
+          <div style={{ fontSize: "13px", color: "#6d7175" }}>
+            {shopProductTypes.length === 0
+              ? "None of your products have a product type yet. Set one on a product in Shopify, or type a name above."
+              : "These are the product types used on your products. Products without a product type can't be blocked."}
           </div>
         </s-stack>
       </s-section>
