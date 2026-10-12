@@ -13,7 +13,6 @@ import { CountryPicker } from "../components/CountryPicker";
 import { UpgradeNote } from "../components/UpgradeNote";
 import { CardTitle } from "../components/CardTitle";
 import { FormStyles } from "../components/FormStyles";
-import { DatePickerRoom, DatePickerSpace } from "../components/DatePickerRoom";
 import { parseAllowedCountries } from "../countries";
 import { checkReusableQuota, getPlanFeatures } from "../billing.server";
 import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
@@ -306,7 +305,6 @@ export default function NewSingleCodePage() {
   const shopify = useAppBridge();
 
   const [title, setTitle] = useState("");
-  const [datePickerSpace, setDatePickerSpace] = useState(0);
   const [code, setCode] = useState("");
   const [discountType, setDiscountType] = useState<"percentage" | "fixedAmount">("percentage");
   const [percentage, setPercentage] = useState("50");
@@ -655,6 +653,15 @@ export default function NewSingleCodePage() {
       </s-section>
 
       <s-section>
+        <CardTitle>Expiration</CardTitle>
+        <s-date-field
+          label="Expiration date (optional)"
+          value={endsAt}
+          onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
+        />
+      </s-section>
+
+      <s-section>
         <CardTitle>Combinations</CardTitle>
         <s-paragraph>By default, this discount cannot be combined with other discounts.</s-paragraph>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
@@ -676,17 +683,6 @@ export default function NewSingleCodePage() {
         </div>
       </s-section>
 
-      <s-section>
-        <CardTitle>Expiration</CardTitle>
-        <DatePickerRoom onSpaceChange={setDatePickerSpace}>
-          <s-date-field
-            label="Expiration date (optional)"
-            value={endsAt}
-            onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
-          />
-        </DatePickerRoom>
-      </s-section>
-
       <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
         <s-button
           variant="primary"
@@ -697,7 +693,6 @@ export default function NewSingleCodePage() {
         </s-button>
         <s-button onClick={() => navigate("/app/single-codes")}>Cancel</s-button>
       </div>
-      <DatePickerSpace px={datePickerSpace} />
     </s-page>
   );
 }
