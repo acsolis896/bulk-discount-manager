@@ -1,54 +1,88 @@
-import { useEffect, useRef } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { COUNTRY_OPTIONS, countryName } from "../countries";
+import { searchCountries } from "../country-search";
 
-// Typing letters into a closed dropdown changes its selection (and fires a change) on every key, so
-// "United K" would add several countries. Changes that come from the keyboard wait a moment for the
-// selection to settle and then add only the country it landed on. Clicking a country, or pressing Enter,
-// adds it straight away.
-const TYPING_SETTLE_MS = 300;
-const KEY_WINDOW_MS = 150;
-
+/**
+ * Pick the countries a code is valid in: type part of a name, click a suggestion (or press Enter for the
+ * top one) and it becomes a chip. This replaces a dropdown, where typing letters changed the selection
+ * on every key and added several countries.
+ */
 export function CountryPicker({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
-  const available = COUNTRY_OPTIONS.filter((c) => !value.includes(c.code));
-  const valueRef = useRef(value);
-  valueRef.current = value;
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastKey = useRef<{ key: string; at: number }>({ key: "", at: 0 });
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const matches = searchCountries(query, COUNTRY_OPTIONS, value);
+  const searching = query.trim().length > 0;
 
-  const commit = (el: HTMLSelectElement) => {
-    const picked = el.value;
-    if (picked && !valueRef.current.includes(picked)) onChange([...valueRef.current, picked]);
-    el.value = "";
+  const add = (code: string) => {
+    if (!value.includes(code)) onChange([...value, code]);
+    setQuery("");
+    setActive(0);
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "ArrowDown" && matches.length > 0) {
+      e.preventDefault();
+      setActive((i) => Math.min(i + 1, matches.length - 1));
+    } else if (e.key === "ArrowUp" && matches.length > 0) {
+      e.preventDefault();
+      setActive((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter" && matches.length > 0) {
+      e.preventDefault();
+      add(matches[Math.min(active, matches.length - 1)].code);
+    } else if (e.key === "Escape") {
+      setQuery("");
+      setActive(0);
+    }
   };
 
   return (
     <s-stack direction="block" gap="small">
-      <div role="presentation" onKeyDown={(e) => { lastKey.current = { key: e.key, at: Date.now() }; }}>
-      <s-select
+      <div role="presentation" onKeyDown={handleKeyDown}>
+      <s-text-field
         label="Only valid in these countries (optional)"
-        placeholder="Add a country…"
-        value=""
+        placeholder="Search for a country…"
+        value={query}
         details="Leave empty to allow any country. Checked against the country Shopify uses at checkout, which follows the shipping address, so it works for guests too. The code won't apply for shoppers in other countries."
-        onChange={(e: { target: unknown }) => {
-          const el = e.target as HTMLSelectElement;
-          if (timer.current) clearTimeout(timer.current);
-          const { key, at } = lastKey.current;
-          const typing = Date.now() - at < KEY_WINDOW_MS && key !== "Enter";
-          if (typing) {
-            timer.current = setTimeout(() => commit(el), TYPING_SETTLE_MS);
-          } else {
-            commit(el);
-          }
+        onInput={(e) => {
+          setQuery((e.currentTarget as unknown as HTMLInputElement).value);
+          setActive(0);
         }}
-      >
-        {available.map((c) => (
-          <s-option key={c.code} value={c.code}>{c.name}</s-option>
-        ))}
-      </s-select>
+      />
       </div>
+      {searching && (
+        <div role="listbox" aria-label="Matching countries" style={{ border: "1px solid #e1e3e5", borderRadius: "8px", overflow: "hidden", background: "#fff" }}>
+          {matches.length === 0 ? (
+            <div style={{ padding: "10px 12px", fontSize: "14px", color: "#6d7175" }}>No matching countries</div>
+          ) : (
+            matches.map((c, i) => (
+              <button
+                key={c.code}
+                type="button"
+                role="option"
+                aria-selected={i === active}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => add(c.code)}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "none",
+                  borderBottom: i === matches.length - 1 ? "none" : "1px solid #e1e3e5",
+                  background: i === active ? "#f1f1f1" : "#fff",
+                  font: "inherit",
+                  fontSize: "14px",
+                  textAlign: "left",
+                  cursor: "pointer",
+                }}
+              >
+                <span>{c.name}</span>
+                <span style={{ color: "#6d7175" }}>{c.code}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
       {value.length > 0 && (
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {value.map((code) => (
