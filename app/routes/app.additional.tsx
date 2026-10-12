@@ -149,6 +149,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return { error: "Unknown intent" };
 };
 
+// The header and every row use the same columns, so the values line up under their headings.
+const ROW_COLUMNS = "minmax(0, 3fr) 90px minmax(0, 2fr) minmax(0, 2fr) 200px";
+
 function formatDate(iso: string | null) {
   if (!iso) return "No expiration";
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -170,12 +173,12 @@ function DiscountSetRow({ s, navigate }: { s: DiscountSet; navigate: (path: stri
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
-    <div className="set-row" style={{ display: "flex", alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", borderRadius: "6px", gap: "12px" }}>
-      <div style={{ flex: 3, display: "flex", alignItems: "center", gap: "8px" }}>
+    <div className="set-row" style={{ display: "grid", gridTemplateColumns: ROW_COLUMNS, alignItems: "center", padding: "12px 12px", borderBottom: "1px solid #e1e3e5", borderRadius: "6px", gap: "12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
         <s-icon type={s.isReusableCode ? "discount-code" : "discount-add"} tone="neutral" size="small" />
         <span style={{ fontSize: "14px" }}>{s.title}</span>
       </div>
-      <div style={{ width: "80px" }}>
+      <div>
         {s.status === "ACTIVE" ? (
           <s-badge tone="success">Active</s-badge>
         ) : s.status === "EXPIRED" ? (
@@ -184,10 +187,10 @@ function DiscountSetRow({ s, navigate }: { s: DiscountSet; navigate: (path: stri
           <s-badge>{s.status.charAt(0) + s.status.slice(1).toLowerCase()}</s-badge>
         )}
       </div>
-      <span style={{ flex: 2, fontSize: "14px", color: "#6d7175" }}>
+      <span style={{ fontSize: "14px", color: "#6d7175" }}>
         {s.isReusableCode ? `${s.usedCodes} uses (Reusable)` : `${s.usedCodes} / ${s.totalCodes} (${setUsageRate}%)`}
       </span>
-      <span style={{ flex: 2, fontSize: "14px", color: "#6d7175" }}>{formatDate(s.endsAt)}</span>
+      <span style={{ fontSize: "14px", color: "#6d7175" }}>{formatDate(s.endsAt)}</span>
       <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
         <s-button
           disabled={busy}
@@ -240,44 +243,20 @@ export default function DiscountSets() {
 
       <s-section>
         <CardTitle>Overview</CardTitle>
-        <s-stack direction="inline" gap="base">
-          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="inline" gap="small" style={{ alignItems: "center" }}>
-              <s-icon type="collection-list" tone="info" />
-              <s-stack direction="block" gap="none">
-                <s-text emphasis="bold" style={{ fontSize: "24px" }}>{sets.length}</s-text>
-                <s-text>Total sets</s-text>
-              </s-stack>
-            </s-stack>
-          </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="inline" gap="small" style={{ alignItems: "center" }}>
-              <s-icon type="status-active" tone="success" />
-              <s-stack direction="block" gap="none">
-                <s-text emphasis="bold" style={{ fontSize: "24px" }}>{activeSets}</s-text>
-                <s-text>Active</s-text>
-              </s-stack>
-            </s-stack>
-          </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="block" gap="none">
-              <s-text emphasis="bold" style={{ fontSize: "24px" }}>{totalCodes.toLocaleString()}</s-text>
-              <s-text>Total codes</s-text>
-            </s-stack>
-          </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="block" gap="none">
-              <s-text emphasis="bold" style={{ fontSize: "24px" }}>{totalUsed.toLocaleString()}</s-text>
-              <s-text>Codes used</s-text>
-            </s-stack>
-          </s-box>
-          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-            <s-stack direction="block" gap="none">
-              <s-text emphasis="bold" style={{ fontSize: "24px" }}>{usageRate}%</s-text>
-              <s-text>Usage rate</s-text>
-            </s-stack>
-          </s-box>
-        </s-stack>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
+          {[
+            { value: sets.length.toLocaleString(), label: "Total sets" },
+            { value: activeSets.toLocaleString(), label: "Active sets" },
+            { value: totalCodes.toLocaleString(), label: "Total codes" },
+            { value: totalUsed.toLocaleString(), label: "Codes used" },
+            { value: `${usageRate}%`, label: "Usage rate" },
+          ].map((stat) => (
+            <s-box key={stat.label} padding="base" borderWidth="base" borderRadius="base" background="subdued">
+              <div style={{ fontSize: "24px", fontWeight: 650 }}>{stat.value}</div>
+              <div style={{ fontSize: "13px", color: "#6d7175", marginTop: "8px" }}>{stat.label}</div>
+            </s-box>
+          ))}
+        </div>
       </s-section>
 
       <s-section>
@@ -290,12 +269,12 @@ export default function DiscountSets() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
             {/* Header row */}
-            <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px", marginBottom: "4px" }}>
-              <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 3 }}>Title</span>
-              <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "80px" }}>Status</span>
-              <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 2 }}>Usage</span>
-              <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 2 }}>Expires</span>
-              <span style={{ width: "230px" }}></span>
+            <div style={{ display: "grid", gridTemplateColumns: ROW_COLUMNS, alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px", marginBottom: "4px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175" }}>Title</span>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175" }}>Status</span>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175" }}>Usage</span>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175" }}>Expires</span>
+              <span></span>
             </div>
             {sets.map((s: DiscountSet) => (
               <DiscountSetRow key={s.numericId} s={s} navigate={navigate} />
