@@ -13,6 +13,7 @@ import { CountryPicker } from "../components/CountryPicker";
 import { UpgradeNote } from "../components/UpgradeNote";
 import { CardTitle } from "../components/CardTitle";
 import { FormStyles } from "../components/FormStyles";
+import { DatePickerRoom, DatePickerSpace } from "../components/DatePickerRoom";
 import { parseAllowedCountries } from "../countries";
 import { checkReusableQuota, getPlanFeatures } from "../billing.server";
 import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
@@ -305,6 +306,7 @@ export default function NewSingleCodePage() {
   const shopify = useAppBridge();
 
   const [title, setTitle] = useState("");
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [code, setCode] = useState("");
   const [discountType, setDiscountType] = useState<"percentage" | "fixedAmount">("percentage");
   const [percentage, setPercentage] = useState("50");
@@ -676,11 +678,13 @@ export default function NewSingleCodePage() {
 
       <s-section>
         <CardTitle>Expiration</CardTitle>
-        <s-date-field
-          label="Expiration date (optional)"
-          value={endsAt}
-          onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
-        />
+        <DatePickerRoom onOpenChange={setDatePickerOpen}>
+          <s-date-field
+            label="Expiration date (optional)"
+            value={endsAt}
+            onChange={(e: InputEvent) => setEndsAt((e.target as HTMLInputElement).value)}
+          />
+        </DatePickerRoom>
       </s-section>
 
       <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
@@ -693,6 +697,7 @@ export default function NewSingleCodePage() {
         </s-button>
         <s-button onClick={() => navigate("/app/single-codes")}>Cancel</s-button>
       </div>
+      <DatePickerSpace open={datePickerOpen} />
     </s-page>
   );
 }
