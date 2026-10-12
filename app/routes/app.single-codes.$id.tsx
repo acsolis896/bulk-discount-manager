@@ -186,6 +186,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
     const usageLimitRaw = Number(formData.get("usageLimit") || 0);
     const usageLimit = usageLimitRaw > 0 ? Math.floor(usageLimitRaw) : null;
+    // The expiration date, same format as when a code is created. Blank clears it; a request without the
+    // field leaves it alone.
+    const hasEndsAt = formData.has("endsAt");
+    const endsAtRaw = String(formData.get("endsAt") || "");
+    const endsAtIso = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
     const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
     const parsedUsesLimit = usesPerCustomerLimitRaw ? Number(usesPerCustomerLimitRaw) : null;
     if (parsedUsesLimit !== null && (!Number.isFinite(parsedUsesLimit) || parsedUsesLimit < 1)) {
@@ -268,7 +273,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       }
     }
 
-    // The maximum total uses is Shopify's own usageLimit field. Saved first, so a failure here
+    // The maximum total uses and the expiration date are Shopify's own fields. Saved first, so a failure here
     // stops the save before any other setting has changed.
     const appDiscountId = discountId.replace("DiscountCodeNode", "DiscountCodeApp");
     const limitRes = await admin.graphql(
@@ -278,7 +283,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           userErrors { field message }
         }
       }`,
-      { variables: { id: appDiscountId, input: { usageLimit } } }
+      { variables: { id: appDiscountId, input: hasEndsAt ? { usageLimit, endsAt: endsAtIso } : { usageLimit } } }
     );
     const limitData = (await limitRes.json()) as {
       data?: { discountCodeAppUpdate?: { userErrors?: { message: string }[] } | null };
@@ -286,10 +291,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     };
     const limitErrors = limitData.data?.discountCodeAppUpdate?.userErrors ?? [];
     if (limitErrors.length > 0) {
-      return { error: `Updating maximum total uses: ${limitErrors.map((e) => e.message).join(", ")}` };
+      return { error: `Updating limits and expiration: ${limitErrors.map((e) => e.message).join(", ")}` };
     }
     if (!limitData.data?.discountCodeAppUpdate) {
-      return { error: `Updating maximum total uses: ${limitData.errors?.[0]?.message ?? "Shopify did not confirm the change"}.` };
+      return { error: `Updating limits and expiration: ${limitData.errors?.[0]?.message ?? "Shopify did not confirm the change"}.` };
     }
 
     const newConfig = {
@@ -464,6 +469,7 @@ export default function SingleCodeDetailsPage() {
   const [collectionIds, setCollectionIds] = useState<string[]>(loaderData.collectionIds);
   const [collectionTitles, setCollectionTitles] = useState<string[]>(loaderData.collectionTitles);
   const [usageLimit, setUsageLimit] = useState(loaderData.usageLimit != null ? String(loaderData.usageLimit) : "");
+  const [endsAt, setEndsAt] = useState(loaderData.endsAt ? new Date(loaderData.endsAt).toISOString().slice(0, 10) : "");
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState(String(loaderData.usesPerCustomerLimit ?? ""));
   const [maxCartItems, setMaxCartItems] = useState(loaderData.maxCartItems ? String(loaderData.maxCartItems) : "");
   const [maxDiscountAmount, setMaxDiscountAmount] = useState(loaderData.maxDiscountAmount ? String(loaderData.maxDiscountAmount) : "");
@@ -521,6 +527,7 @@ export default function SingleCodeDetailsPage() {
     form.set("productIds", JSON.stringify(productIds));
     form.set("collectionIds", JSON.stringify(collectionIds));
     form.set("usageLimit", usageLimit);
+    form.set("endsAt", endsAt);
     form.set("usesPerCustomerLimit", usesPerCustomerLimit);
     form.set("maxCartItems", maxCartItems);
     form.set("maxDiscountAmount", maxDiscountAmount);
@@ -775,6 +782,16 @@ export default function SingleCodeDetailsPage() {
               </div>
             )}
           </div>
+        </s-section>
+
+        <s-section>
+          <CardTitle>Expiration</CardTitle>
+          <s-date-field
+            label="Expiration date (optional)"
+            value={endsAt}
+            onChange={(e) => setEndsAt((e.currentTarget as unknown as HTMLInputElement).value)}
+            details="Leave blank for no expiration."
+          />
         </s-section>
 
         <s-section>
