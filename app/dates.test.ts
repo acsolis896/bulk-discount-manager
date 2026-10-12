@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { endOfDayIso, dateInZone, formatDateInZone } from "./dates";
+import { endOfDayIso, dateInZone, formatDateInZone, formatMediumDateInZone } from "./dates";
 
 describe("endOfDayIso", () => {
   test("the end of the day in New York (winter, UTC-5)", () => {
@@ -32,5 +32,13 @@ describe("reading the date back", () => {
       expect(dateInZone(iso, zone)).toBe("2026-12-31");
       expect(formatDateInZone(iso, zone)).toBe("12/31/2026");
     }
+  });
+});
+
+describe("formatMediumDateInZone", () => {
+  test("shows the date in the store's zone, not UTC", () => {
+    // 2027-01-01 04:59:59 UTC is still Dec 31 in New York.
+    expect(formatMediumDateInZone("2027-01-01T04:59:59.000Z", "America/New_York")).toBe("Dec 31, 2026");
+    expect(formatMediumDateInZone("2027-01-01T04:59:59.000Z", "UTC")).toBe("Jan 1, 2027");
   });
 });

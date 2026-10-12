@@ -11,6 +11,8 @@ import { countryName } from "../countries";
 import { useCountryRestrictionEnabled } from "../feature-flags";
 import { saveFunctionConfig, configSizeProblem, configByteLength, configTooLargeForFunction, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CardTitle } from "../components/CardTitle";
+import { getShopTimeZone } from "../shop.server";
+import { endOfDayIso, dateInZone, formatDateInZone, formatMediumDateInZone } from "../dates";
 import { FormStyles } from "../components/FormStyles";
 
 type RedeemCode = { code: string; usageCount: number };
@@ -245,7 +247,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .map((n: { id: string; title: string }) => ({ id: n.id, title: n.title }));
     }
 
-    return { numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error: null as string | null };
+    const timeZone = await getShopTimeZone(admin);
+    return { timeZone, numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -272,6 +275,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       eligibleCollections: [] as { id: string; title: string }[],
       eligibleCollectionIds: [] as string[],
       discountType: "percentage" as "percentage" | "fixedAmount",
+      timeZone: "UTC",
       endsAt: null as string | null,
       percentage: null as number | null,
       fixedAmount: null as number | null,
@@ -383,7 +387,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   if (intent === "updateEndsAt") {
     const endsAtRaw = String(formData.get("endsAt") || "");
-    const endsAt = endsAtRaw ? new Date(`${endsAtRaw}T23:59:59-08:00`).toISOString() : null;
+    const endsAt = endsAtRaw ? endOfDayIso(endsAtRaw, await getShopTimeZone(admin)) : null;
+    if (endsAtRaw && !endsAt) return { error: "The expiration date isn't a valid date." };
     const appDiscountId = gid.replace("DiscountCodeNode", "DiscountCodeApp");
 
     const res = await admin.graphql(
@@ -565,7 +570,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 export default function DiscountDetails() {
   const countryRestrictionEnabled = useCountryRestrictionEnabled();
-  const { title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error } = useLoaderData<typeof loader>();
+  const { timeZone, title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -590,7 +595,7 @@ export default function DiscountDetails() {
   const [confirmCode, setConfirmCode] = useState<string | null>(null);
   const [editingItems, setEditingItems] = useState(false);
 
-  const [endsAtInput, setEndsAtInput] = useState(endsAt ? new Date(endsAt).toISOString().split("T")[0] : "");
+  const [endsAtInput, setEndsAtInput] = useState(endsAt ? dateInZone(endsAt, timeZone) : "");
 
   const [comboChoices, setComboChoices] = useState({
     product: combinesWith.productDiscounts,
@@ -769,9 +774,9 @@ export default function DiscountDetails() {
     appliesOncePerCustomer ? "Limited to one use per customer" : "No per-customer usage limit",
     combos.length > 0 ? `Combines with ${combos.join(", ")}` : "Can't combine with other discounts",
     startsAt
-      ? `Active from ${formatDate(startsAt)}${endsAt ? ` to ${formatDate(endsAt)}` : " — no end date"}`
+      ? `Active from ${formatMediumDateInZone(startsAt, timeZone)}${endsAt ? ` to ${formatMediumDateInZone(endsAt, timeZone)}` : " — no end date"}`
       : endsAt
-        ? `Ends ${formatDate(endsAt)}`
+        ? `Ends ${formatMediumDateInZone(endsAt, timeZone)}`
         : "No date restrictions",
   ];
 
@@ -1133,7 +1138,7 @@ export default function DiscountDetails() {
               )}
               <s-paragraph>
                 {endsAt
-                  ? `Currently expires ${new Date(endsAt).toLocaleDateString("en-US", { timeZone: "America/Los_Angeles" })}.`
+                  ? `Currently expires ${formatDateInZone(endsAt, timeZone)}.`
                   : "No expiration date set."}
               </s-paragraph>
               <div style={{ display: "flex", alignItems: "flex-end", gap: "8px" }}>
