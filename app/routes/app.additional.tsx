@@ -87,10 +87,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const totalCodes = bulkSets.reduce((sum, s) => sum + s.totalCodes, 0);
   const totalUsed = bulkSets.reduce((sum, s) => sum + s.usedCodes, 0);
   const activeSets = sets.filter((s) => s.status === "ACTIVE").length;
-  // Reusable codes have no ceiling, so they get their own count of uses instead of a rate.
-  const reusableUses = sets.filter((s) => s.isReusableCode).reduce((sum, s) => sum + s.usedCodes, 0);
 
-  return { sets, totalCodes, totalUsed, activeSets, reusableUses };
+  return { sets, totalCodes, totalUsed, activeSets };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -231,7 +229,7 @@ function DiscountSetRow({ s, navigate }: { s: DiscountSet; navigate: (path: stri
 }
 
 export default function DiscountSets() {
-  const { sets, totalCodes, totalUsed, activeSets, reusableUses } = useLoaderData<typeof loader>();
+  const { sets, totalCodes, totalUsed, activeSets } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const usageRate = totalCodes > 0 ? Math.round((totalUsed / totalCodes) * 100) : 0;
 
@@ -249,10 +247,9 @@ export default function DiscountSets() {
           {[
             { value: sets.length.toLocaleString(), label: "Total sets" },
             { value: activeSets.toLocaleString(), label: "Active sets" },
-            { value: totalCodes.toLocaleString(), label: "Bulk codes" },
-            { value: totalUsed.toLocaleString(), label: "Bulk codes used" },
-            { value: `${usageRate}%`, label: "Bulk usage rate" },
-            { value: reusableUses.toLocaleString(), label: "Reusable code uses" },
+            { value: totalCodes.toLocaleString(), label: "Total codes" },
+            { value: totalUsed.toLocaleString(), label: "Codes used" },
+            { value: `${usageRate}%`, label: "Usage rate" },
           ].map((stat) => (
             <s-box key={stat.label} padding="base" borderWidth="base" borderRadius="base" background="subdued">
               <div style={{ fontSize: "24px", fontWeight: 650 }}>{stat.value}</div>
