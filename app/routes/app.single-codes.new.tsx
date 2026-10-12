@@ -306,7 +306,7 @@ export default function NewSingleCodePage() {
   const shopify = useAppBridge();
 
   const [title, setTitle] = useState("");
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [datePickerSpace, setDatePickerSpace] = useState(0);
   const [code, setCode] = useState("");
   const [discountType, setDiscountType] = useState<"percentage" | "fixedAmount">("percentage");
   const [percentage, setPercentage] = useState("50");
@@ -678,7 +678,7 @@ export default function NewSingleCodePage() {
 
       <s-section>
         <CardTitle>Expiration</CardTitle>
-        <DatePickerRoom onOpenChange={setDatePickerOpen}>
+        <DatePickerRoom onSpaceChange={setDatePickerSpace}>
           <s-date-field
             label="Expiration date (optional)"
             value={endsAt}
@@ -697,7 +697,7 @@ export default function NewSingleCodePage() {
         </s-button>
         <s-button onClick={() => navigate("/app/single-codes")}>Cancel</s-button>
       </div>
-      <DatePickerSpace open={datePickerOpen} />
+      <DatePickerSpace px={datePickerSpace} />
     </s-page>
   );
 }
