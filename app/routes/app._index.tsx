@@ -82,7 +82,7 @@ const CREATE_CARDS: Card[] = [
 const MANAGE_CARDS: Card[] = [
   {
     href: "/app/additional",
-    title: "Discount sets",
+    title: "View discount sets",
     description: "View and manage every discount set you've created with this app.",
     icon: "list-bulleted",
   },
