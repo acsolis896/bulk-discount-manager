@@ -601,7 +601,7 @@ export default function SingleCodeDetailsPage() {
               <div>
                 <div style={{ fontSize: "12px", color: "#6d7175", marginBottom: "4px" }}>Last used</div>
                 <span style={{ fontSize: "16px", fontWeight: 500 }}>
-                  {loaderData.lastUsed ? new Date(loaderData.lastUsed).toLocaleDateString() : "—"}
+                  {loaderData.lastUsed ? formatDateInZone(loaderData.lastUsed, loaderData.timeZone) : "—"}
                 </span>
               </div>
             </div>
