@@ -7,7 +7,8 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
-import { getShopCurrencyCode } from "../shop.server";
+import { getShopCurrencyCode, getShopTimeZone } from "../shop.server";
+import { endOfDayIso } from "../dates";
 import { saveFunctionConfig, configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
 import { UpgradeNote } from "../components/UpgradeNote";
@@ -75,7 +76,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const blockedTag = eligibilityMode === "tags" ? String(formData.get("blockedTag") || "").trim() : "";
   const selectedSegmentId = String(formData.get("segmentId") || "").trim();
   const endsAtRaw = String(formData.get("endsAt") || "");
-  const endsAt = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
+  // The chosen date is the end of that day in the store's own time zone.
+  const endsAt = endsAtRaw ? endOfDayIso(endsAtRaw, await getShopTimeZone(admin)) : null;
+  if (endsAtRaw && !endsAt) return { error: "The expiration date isn't a valid date." };
   const combinesWithProduct = formData.get("combinesWithProduct") === "1";
   const combinesWithOrder = formData.get("combinesWithOrder") === "1";
   const combinesWithShipping = formData.get("combinesWithShipping") === "1";
