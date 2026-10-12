@@ -369,7 +369,7 @@ export default function CreateBulkDiscount() {
   const [selectedSegmentId, setSelectedSegmentId] = useState("");
   const [codeMode, setCodeMode] = useState<"generate" | "import">("generate");
   const [endsAt, setEndsAt] = useState("");
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [datePickerSpace, setDatePickerSpace] = useState(0);
   const [usageLimitOne, setUsageLimitOne] = useState(true);
   const [oncePerCustomer, setOncePerCustomer] = useState(true);
   const [combinesWithProduct, setCombinesWithProduct] = useState(false);
@@ -804,7 +804,7 @@ export default function CreateBulkDiscount() {
 
       <s-section>
         <CardTitle>Expiration</CardTitle>
-        <DatePickerRoom onOpenChange={setDatePickerOpen}>
+        <DatePickerRoom onSpaceChange={setDatePickerSpace}>
           <s-date-field
             label="Expiration date"
             value={endsAt}
@@ -868,7 +868,7 @@ export default function CreateBulkDiscount() {
         </s-banner>
         </div>
       )}
-      <DatePickerSpace open={datePickerOpen} />
+      <DatePickerSpace px={datePickerSpace} />
     </s-page>
   );
 }
