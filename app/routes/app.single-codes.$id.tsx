@@ -7,7 +7,8 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
-import { getShopCurrencyCode } from "../shop.server";
+import { getShopCurrencyCode, getShopTimeZone } from "../shop.server";
+import { endOfDayIso, dateInZone, formatDateInZone } from "../dates";
 import { getCurrentPlan, getPlanFeatures } from "../billing.server";
 import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
 import { configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
@@ -140,6 +141,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     maxCartItems: Number.isInteger(config.maxCartItems) && (config.maxCartItems as number) > 0 ? (config.maxCartItems as number) : null,
     maxDiscountAmount: typeof config.maxDiscountAmount === "number" && config.maxDiscountAmount > 0 ? (config.maxDiscountAmount as number) : null,
     currencyCode: await getShopCurrencyCode(admin),
+    timeZone: await getShopTimeZone(admin),
     features: await getPlanFeatures(billing, session.shop, {
       countryRestriction: Array.isArray(config.allowedCountries) && config.allowedCountries.length > 0,
       discountCap: typeof config.maxDiscountAmount === "number",
@@ -190,7 +192,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     // field leaves it alone.
     const hasEndsAt = formData.has("endsAt");
     const endsAtRaw = String(formData.get("endsAt") || "");
-    const endsAtIso = endsAtRaw ? new Date(endsAtRaw).toISOString() : null;
+    const endsAtIso = endsAtRaw ? endOfDayIso(endsAtRaw, await getShopTimeZone(admin)) : null;
+    if (endsAtRaw && !endsAtIso) return { error: "The expiration date isn't a valid date." };
     const usesPerCustomerLimitRaw = String(formData.get("usesPerCustomerLimit") || "").trim();
     const parsedUsesLimit = usesPerCustomerLimitRaw ? Number(usesPerCustomerLimitRaw) : null;
     if (parsedUsesLimit !== null && (!Number.isFinite(parsedUsesLimit) || parsedUsesLimit < 1)) {
@@ -469,7 +472,7 @@ export default function SingleCodeDetailsPage() {
   const [collectionIds, setCollectionIds] = useState<string[]>(loaderData.collectionIds);
   const [collectionTitles, setCollectionTitles] = useState<string[]>(loaderData.collectionTitles);
   const [usageLimit, setUsageLimit] = useState(loaderData.usageLimit != null ? String(loaderData.usageLimit) : "");
-  const [endsAt, setEndsAt] = useState(loaderData.endsAt ? new Date(loaderData.endsAt).toISOString().slice(0, 10) : "");
+  const [endsAt, setEndsAt] = useState(loaderData.endsAt ? dateInZone(loaderData.endsAt, loaderData.timeZone) : "");
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState(String(loaderData.usesPerCustomerLimit ?? ""));
   const [maxCartItems, setMaxCartItems] = useState(loaderData.maxCartItems ? String(loaderData.maxCartItems) : "");
   const [maxDiscountAmount, setMaxDiscountAmount] = useState(loaderData.maxDiscountAmount ? String(loaderData.maxDiscountAmount) : "");
@@ -609,7 +612,7 @@ export default function SingleCodeDetailsPage() {
             )}
             {loaderData.endsAt && (
               <div style={{ fontSize: "13px", color: "#6d7175" }}>
-                Expires: {new Date(loaderData.endsAt).toLocaleDateString()}
+                Expires: {formatDateInZone(loaderData.endsAt, loaderData.timeZone)}
               </div>
             )}
             <div style={{ fontSize: "12px", color: "#6d7175" }}>
