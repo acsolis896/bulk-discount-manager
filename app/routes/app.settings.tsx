@@ -482,9 +482,22 @@ export default function SettingsPage() {
           </s-paragraph>
           <s-banner tone="info">
             <s-paragraph>
-              This only works for codes created through this app (bulk sets and reusable codes). Discount codes
+              Blocking only works for codes created through this app (bulk sets and reusable codes). Discount codes
               created directly in Shopify admin aren&apos;t affected by these rules.
             </s-paragraph>
+            <details style={{ marginTop: "8px" }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+                How to bring an existing Shopify code under these rules
+              </summary>
+              <div style={{ marginTop: "8px" }}>
+                <s-paragraph>
+                  Your existing codes aren&apos;t locked in. Delete the original in Shopify admin and recreate it here
+                  with the same code name, so your customers keep using the same code. Use a{" "}
+                  <s-link href="/app/single-codes/new">reusable code</s-link> for a single code, or{" "}
+                  <s-link href="/app/discounts/new">import a CSV</s-link> for many.
+                </s-paragraph>
+              </div>
+            </details>
           </s-banner>
 
           {dbError && (
