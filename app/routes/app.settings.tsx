@@ -480,6 +480,12 @@ export default function SettingsPage() {
             Product types are set on products in the Shopify admin under the product details. Changes here
             apply to every discount created with this app automatically — no extra step needed.
           </s-paragraph>
+          <s-banner tone="info">
+            <s-paragraph>
+              This only works for codes created through this app (bulk sets and reusable codes). Discount codes
+              created directly in Shopify admin aren&apos;t affected by these rules.
+            </s-paragraph>
+          </s-banner>
 
           {dbError && (
             <s-banner tone="critical">
