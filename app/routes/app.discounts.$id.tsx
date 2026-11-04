@@ -11,7 +11,8 @@ import { countryName } from "../countries";
 import { useCountryRestrictionEnabled } from "../feature-flags";
 import { saveFunctionConfig, configSizeProblem, configByteLength, configTooLargeForFunction, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CardTitle } from "../components/CardTitle";
-import { getShopTimeZone } from "../shop.server";
+import { getShopPrimaryUrl, getShopTimeZone } from "../shop.server";
+import { buildDiscountLink } from "../share-link";
 import { endOfDayIso, dateInZone, formatDateInZone, formatMediumDateInZone } from "../dates";
 import { FormStyles } from "../components/FormStyles";
 
@@ -244,7 +245,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
 
     const timeZone = await getShopTimeZone(admin);
-    return { timeZone, numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error: null as string | null };
+    const storeUrl = await getShopPrimaryUrl(admin);
+    return { timeZone, storeUrl, numericId, title, shop, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes: allCodes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error: null as string | null };
   } catch (err: unknown) {
     return {
       numericId: params.id,
@@ -272,6 +274,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       eligibleCollectionIds: [] as string[],
       discountType: "percentage" as "percentage" | "fixedAmount",
       timeZone: "UTC",
+      storeUrl: "",
       endsAt: null as string | null,
       percentage: null as number | null,
       fixedAmount: null as number | null,
@@ -566,7 +569,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 export default function DiscountDetails() {
   const countryRestrictionEnabled = useCountryRestrictionEnabled();
-  const { timeZone, title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error } = useLoaderData<typeof loader>();
+  const { timeZone, storeUrl, title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
@@ -589,6 +592,8 @@ export default function DiscountDetails() {
 
   const unusedCount = Math.max(0, totalCount - usedCount - preUsedCodes.length);
   const [confirmCode, setConfirmCode] = useState<string | null>(null);
+  const [landingPage, setLandingPage] = useState("");
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [editingItems, setEditingItems] = useState(false);
 
   const [endsAtInput, setEndsAtInput] = useState(endsAt ? dateInZone(endsAt, timeZone) : "");
@@ -747,6 +752,33 @@ export default function DiscountDetails() {
     URL.revokeObjectURL(url);
   }, [codes, preUsedCodes, codeDates, title]);
 
+  const handleExportLinks = useCallback((unusedOnly = false) => {
+    const filtered = unusedOnly ? codes.filter((c: RedeemCode) => c.usageCount === 0) : codes;
+    const quote = (text: string) => `"${text.replace(/"/g, '""')}"`;
+    const rows = [
+      "Code,Link,Status",
+      ...filtered.map(
+        (c: RedeemCode) => `${quote(c.code)},${quote(buildDiscountLink(storeUrl, c.code, landingPage))},${c.usageCount > 0 ? "Used" : "Unused"}`
+      ),
+    ];
+    const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title ?? "discount-codes"}${unusedOnly ? "-unused" : "-all"}-links.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [codes, storeUrl, landingPage, title]);
+
+  const handleCopyLink = useCallback(async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(buildDiscountLink(storeUrl, code, landingPage));
+      setCopiedCode(code);
+    } catch {
+      setCopiedCode(null);
+    }
+  }, [storeUrl, landingPage]);
+
   const combos: string[] = [];
   if (combinesWith.productDiscounts) combos.push("product discounts");
   if (combinesWith.orderDiscounts) combos.push("order discounts");
@@ -839,7 +871,11 @@ export default function DiscountDetails() {
 
       <style>
         {`.discount-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
-          @media (max-width: 900px) { .discount-detail-grid { grid-template-columns: 1fr; } }`}
+          @media (max-width: 900px) { .discount-detail-grid { grid-template-columns: 1fr; } }
+          .share-summary { cursor: pointer; display: flex; align-items: center; gap: 10px; list-style: none; font-size: 18px; font-weight: 650; }
+          .share-summary::-webkit-details-marker { display: none; }
+          .share-summary::before { content: ""; width: 8px; height: 8px; border-right: 2px solid #5c5f62; border-bottom: 2px solid #5c5f62; transform: rotate(-45deg); transition: transform 0.15s; flex-shrink: 0; }
+          details[open] > .share-summary::before { transform: rotate(45deg); }`}
       </style>
 
       <div className="discount-detail-grid">
@@ -881,6 +917,46 @@ export default function DiscountDetails() {
               )}
             </s-stack>
           </s-section>
+
+          {storeUrl && (
+            <s-section>
+              <details>
+                <summary className="share-summary">
+                  Share links
+                  <span style={{ marginLeft: "12px", fontSize: "13px", fontWeight: 400, color: "#6d7175" }}>
+                    Apply a code with a link
+                  </span>
+                </summary>
+                <div style={{ marginTop: "16px" }}>
+                  <s-stack direction="block" gap="base">
+                    <s-paragraph>
+                      Each code has its own link that applies it at checkout automatically. Export them all to turn
+                      each one into a QR code or to mail-merge into emails, or use Copy link on a single code below.
+                      They only work on your online store.
+                    </s-paragraph>
+                    <s-text-field
+                      label="Landing page (optional)"
+                      value={landingPage}
+                      placeholder="/collections/sale"
+                      details="Where shoppers land first, such as /products/your-product. Applies to every link. Leave blank for your home page."
+                      onInput={(e: { target: { value: string } }) => {
+                        setLandingPage(e.target.value);
+                        setCopiedCode(null);
+                      }}
+                    />
+                    <s-stack direction="inline" gap="base">
+                      <s-button variant="primary" onClick={() => handleExportLinks(false)} disabled={codes.length === 0}>
+                        Export all links (CSV)
+                      </s-button>
+                      <s-button onClick={() => handleExportLinks(true)} disabled={unusedCount === 0}>
+                        Export unused links only
+                      </s-button>
+                    </s-stack>
+                  </s-stack>
+                </div>
+              </details>
+            </s-section>
+          )}
 
           {codePerformance.length > 0 && (
             <s-section>
@@ -970,7 +1046,7 @@ export default function DiscountDetails() {
               <div style={{ display: "flex", alignItems: "center", padding: "8px 12px", background: "var(--s-color-bg-subdued, #f6f6f7)", borderRadius: "8px", gap: "12px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", flex: 1 }}>Code</span>
                 <span style={{ fontSize: "13px", fontWeight: 600, color: "#6d7175", width: "90px", textAlign: "center" }}>Status</span>
-                <span style={{ width: "68px" }}></span>
+                <span style={{ width: storeUrl ? "168px" : "68px" }}></span>
               </div>
 
               {pagedCodes.map((c: RedeemCode) => (
@@ -1004,14 +1080,21 @@ export default function DiscountDetails() {
                         </s-button>
                       </div>
                     ) : (
-                      <s-button
-                        variant="secondary"
-                        tone="critical"
-                        disabled={c.usageCount > 0}
-                        onClick={() => setConfirmCode(c.code)}
-                      >
-                        Disable
-                      </s-button>
+                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", minWidth: storeUrl ? "168px" : undefined }}>
+                        {storeUrl && (
+                          <s-button variant="secondary" onClick={() => handleCopyLink(c.code)}>
+                            {copiedCode === c.code ? "Copied" : "Copy link"}
+                          </s-button>
+                        )}
+                        <s-button
+                          variant="secondary"
+                          tone="critical"
+                          disabled={c.usageCount > 0}
+                          onClick={() => setConfirmCode(c.code)}
+                        >
+                          Disable
+                        </s-button>
+                      </div>
                     )}
                   </div>
                 </div>
