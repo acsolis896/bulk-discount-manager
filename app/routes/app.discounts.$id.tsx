@@ -6,6 +6,7 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
+import { CSV_TOO_LARGE_ERROR, MAX_CSV_BYTES } from "../csv-upload";
 import { checkCodeQuota } from "../billing.server";
 import { countryName } from "../countries";
 import { useCountryRestrictionEnabled } from "../feature-flags";
@@ -302,6 +303,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       if (!csvFile || typeof csvFile === "string") {
         return { error: "Please upload a CSV file." };
       }
+      if ((csvFile as File).size > MAX_CSV_BYTES) return { error: CSV_TOO_LARGE_ERROR };
       const text = await (csvFile as File).text();
       const parsed = parseCSVCodes(text);
       if (parsed.length === 0) {

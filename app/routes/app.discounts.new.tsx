@@ -10,6 +10,8 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
+import { CSV_TOO_LARGE_ERROR, MAX_CSV_BYTES } from "../csv-upload";
+import { BAD_FORM_ERROR, parseIdList } from "../form-ids";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
 import { saveFunctionConfig, discountNodeId, configSizeProblem, splitCollections, expandCollectionProducts } from "../function-config.server";
 import { CountryPicker } from "../components/CountryPicker";
@@ -86,8 +88,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const requiredTag = String(formData.get("requiredTag") || "").trim();
     const blockedTag = String(formData.get("blockedTag") || "").trim();
     const selectedSegmentId = String(formData.get("segmentId") || "").trim();
-    const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
-    const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
+    const productIds = parseIdList(formData.get("productIds"));
+    const collectionIds = parseIdList(formData.get("collectionIds"));
+    if (!productIds || !collectionIds) return { error: BAD_FORM_ERROR };
 
     if (discountType === "percentage") {
       if (!percentage || percentage < 1 || percentage > 100) {
@@ -112,6 +115,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       if (!csvFile || typeof csvFile === "string") {
         return { error: "Please upload a CSV file." };
       }
+      if ((csvFile as File).size > MAX_CSV_BYTES) return { error: CSV_TOO_LARGE_ERROR };
       const text = await (csvFile as File).text();
       const parsed = parseCSVCodes(text);
       if (parsed.length === 0) {

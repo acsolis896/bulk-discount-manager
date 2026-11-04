@@ -6,6 +6,7 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
+import { BAD_FORM_ERROR, parseIdList } from "../form-ids";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
 import { getShopCurrencyCode, getShopTimeZone } from "../shop.server";
 import { endOfDayIso } from "../dates";
@@ -82,8 +83,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const combinesWithProduct = formData.get("combinesWithProduct") === "1";
   const combinesWithOrder = formData.get("combinesWithOrder") === "1";
   const combinesWithShipping = formData.get("combinesWithShipping") === "1";
-  const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
-  const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
+  const productIds = parseIdList(formData.get("productIds"));
+  const collectionIds = parseIdList(formData.get("collectionIds"));
+  if (!productIds || !collectionIds) return { error: BAD_FORM_ERROR };
 
   if (!title) return { error: "Title is required." };
   if (!code) return { error: "Discount code is required." };

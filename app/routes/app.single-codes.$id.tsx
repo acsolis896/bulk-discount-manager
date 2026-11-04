@@ -6,6 +6,7 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
+import { BAD_FORM_ERROR, parseIdList } from "../form-ids";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
 import { getShopCurrencyCode, getShopPrimaryUrl, getShopTimeZone } from "../shop.server";
 import { buildDiscountLink } from "../share-link";
@@ -186,8 +187,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const countriesResult = parseAllowedCountries(String(formData.get("allowedCountries") || ""));
     if ("error" in countriesResult) return { error: countriesResult.error };
     const allowedCountries = countriesResult.countries;
-    const productIds: string[] = JSON.parse(String(formData.get("productIds") || "[]"));
-    const collectionIds: string[] = JSON.parse(String(formData.get("collectionIds") || "[]"));
+    const productIds = parseIdList(formData.get("productIds"));
+    const collectionIds = parseIdList(formData.get("collectionIds"));
+    if (!productIds || !collectionIds) return { error: BAD_FORM_ERROR };
     const usageLimitRaw = Number(formData.get("usageLimit") || 0);
     const usageLimit = usageLimitRaw > 0 ? Math.floor(usageLimitRaw) : null;
     // The expiration date, same format as when a code is created. Blank clears it; a request without the
