@@ -552,9 +552,27 @@ export default function SingleCodeDetailsPage() {
 
   return (
     <s-page heading={loaderData.title}>
+      <s-button
+        slot="secondary-actions"
+        tone="critical"
+        disabled={isSaving}
+        onClick={() => {
+          if (confirm(`Delete ${loaderData.code}? This cannot be undone.`)) {
+            const form = new FormData();
+            form.set("intent", "delete");
+            fetcher.submit(form, { method: "post" });
+          }
+        }}
+      >
+        Delete
+      </s-button>
       <FormStyles />
       <style>
-        {`.save-bar { position: sticky; bottom: 12px; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.12); }`}
+        {`.save-bar { position: sticky; bottom: 12px; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.12); }
+          .share-summary { cursor: pointer; display: flex; align-items: center; gap: 10px; list-style: none; font-size: 18px; font-weight: 650; }
+          .share-summary::-webkit-details-marker { display: none; }
+          .share-summary::before { content: ""; width: 8px; height: 8px; border-right: 2px solid #5c5f62; border-bottom: 2px solid #5c5f62; transform: rotate(-45deg); transition: transform 0.15s; flex-shrink: 0; }
+          details[open] > .share-summary::before { transform: rotate(45deg); }`}
       </style>
       <div style={{ marginBottom: "16px" }}>
         <s-button onClick={() => navigate("/app/single-codes")}>← Back to Reusable codes</s-button>
@@ -631,10 +649,10 @@ export default function SingleCodeDetailsPage() {
         {loaderData.storeUrl && (
           <s-section>
             <details>
-              <summary style={{ cursor: "pointer", fontSize: "18px", fontWeight: 650 }}>
+              <summary className="share-summary">
                 Share link
                 <span style={{ marginLeft: "12px", fontSize: "13px", fontWeight: 400, color: "#6d7175" }}>
-                  Apply this code with a link or QR code
+                  Apply this code with a link
                 </span>
               </summary>
               <div style={{ marginTop: "16px" }}>
@@ -912,21 +930,6 @@ export default function SingleCodeDetailsPage() {
           <span style={{ fontSize: "13px", color: "#6d7175" }}>Changes aren&apos;t applied until you save.</span>
           <s-button variant="primary" disabled={isSaving} onClick={handleSave}>
             {isSaving ? "Saving..." : "Save changes"}
-          </s-button>
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <s-button
-            tone="critical"
-            disabled={isSaving}
-            onClick={() => {
-              if (confirm(`Delete ${loaderData.code}? This cannot be undone.`)) {
-                const form = new FormData();
-                form.set("intent", "delete");
-                fetcher.submit(form, { method: "post" });
-              }
-            }}
-          >
-            Delete
           </s-button>
         </div>
       </div>
