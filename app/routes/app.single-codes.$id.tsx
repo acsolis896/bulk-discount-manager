@@ -863,6 +863,24 @@ export default function SingleCodeDetailsPage() {
                 </div>
               )}
             </s-section>
+            <div style={{ display: "flex", gap: "8px", justifyContent: "space-between" }}>
+              <s-button variant="primary" disabled={isSaving} onClick={handleSave}>
+                {isSaving ? "Saving..." : "Save changes"}
+              </s-button>
+              <s-button
+                tone="critical"
+                disabled={isSaving}
+                onClick={() => {
+                  if (confirm(`Delete ${loaderData.code}? This cannot be undone.`)) {
+                    const form = new FormData();
+                    form.set("intent", "delete");
+                    fetcher.submit(form, { method: "post" });
+                  }
+                }}
+              >
+                Delete
+              </s-button>
+            </div>
           </div>
           {loaderData.storeUrl && (
             <div className="detail-side">
@@ -907,25 +925,6 @@ export default function SingleCodeDetailsPage() {
             </div>
           )}
         </div>
-      </div>
-
-      <div style={{ display: "flex", gap: "8px", marginTop: "16px", justifyContent: "space-between" }}>
-        <s-button variant="primary" disabled={isSaving} onClick={handleSave}>
-          {isSaving ? "Saving..." : "Save changes"}
-        </s-button>
-        <s-button
-          tone="critical"
-          disabled={isSaving}
-          onClick={() => {
-            if (confirm(`Delete ${loaderData.code}? This cannot be undone.`)) {
-              const form = new FormData();
-              form.set("intent", "delete");
-              fetcher.submit(form, { method: "post" });
-            }
-          }}
-        >
-          Delete
-        </s-button>
       </div>
     </s-page>
   );
