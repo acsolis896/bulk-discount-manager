@@ -552,20 +552,6 @@ export default function SingleCodeDetailsPage() {
 
   return (
     <s-page heading={loaderData.title}>
-      <s-button
-        slot="secondary-actions"
-        tone="critical"
-        disabled={isSaving}
-        onClick={() => {
-          if (confirm(`Delete ${loaderData.code}? This cannot be undone.`)) {
-            const form = new FormData();
-            form.set("intent", "delete");
-            fetcher.submit(form, { method: "post" });
-          }
-        }}
-      >
-        Delete
-      </s-button>
       <FormStyles />
       <style>
         {`.save-bar { position: sticky; bottom: 12px; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.12); }
@@ -574,8 +560,21 @@ export default function SingleCodeDetailsPage() {
           .share-summary::before { content: ""; width: 8px; height: 8px; border-right: 2px solid #5c5f62; border-bottom: 2px solid #5c5f62; transform: rotate(-45deg); transition: transform 0.15s; flex-shrink: 0; }
           details[open] > .share-summary::before { transform: rotate(45deg); }`}
       </style>
-      <div style={{ marginBottom: "16px" }}>
+      <div style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <s-button onClick={() => navigate("/app/single-codes")}>← Back to Reusable codes</s-button>
+        <s-button
+          tone="critical"
+          disabled={isSaving}
+          onClick={() => {
+            if (confirm(`Delete ${loaderData.code}? This cannot be undone.`)) {
+              const form = new FormData();
+              form.set("intent", "delete");
+              fetcher.submit(form, { method: "post" });
+            }
+          }}
+        >
+          Delete
+        </s-button>
       </div>
 
       {result?.error && (
