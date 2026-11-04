@@ -27,3 +27,17 @@ export async function getShopTimeZone(admin: AdminApiContext): Promise<string> {
     return "UTC";
   }
 }
+
+/** The shop's primary domain URL (e.g. "https://example.com"), or "" if it can't be read. Never throws. */
+export async function getShopPrimaryUrl(admin: AdminApiContext): Promise<string> {
+  try {
+    const res = await admin.graphql(`#graphql
+      query ShopPrimaryUrl {
+        shop { primaryDomain { url } }
+      }`);
+    const data = (await res.json()) as { data?: { shop?: { primaryDomain?: { url?: string } | null } | null } };
+    return data.data?.shop?.primaryDomain?.url ?? "";
+  } catch {
+    return "";
+  }
+}

@@ -7,7 +7,8 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import db from "../db.server";
 import { numericInputHandler } from "../numeric-input";
 import { MAX_DISCOUNTED_ITEMS_ENABLED, useCountryRestrictionEnabled } from "../feature-flags";
-import { getShopCurrencyCode, getShopTimeZone } from "../shop.server";
+import { getShopCurrencyCode, getShopPrimaryUrl, getShopTimeZone } from "../shop.server";
+import { buildDiscountLink } from "../share-link";
 import { endOfDayIso, dateInZone, formatDateInZone } from "../dates";
 import { getCurrentPlan, getPlanFeatures } from "../billing.server";
 import { isFeatureBlocked, featureBlockedMessage, type PlanFeature } from "../billing";
@@ -142,6 +143,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     maxDiscountAmount: typeof config.maxDiscountAmount === "number" && config.maxDiscountAmount > 0 ? (config.maxDiscountAmount as number) : null,
     currencyCode: await getShopCurrencyCode(admin),
     timeZone: await getShopTimeZone(admin),
+    storeUrl: await getShopPrimaryUrl(admin),
     features: await getPlanFeatures(billing, session.shop, {
       countryRestriction: Array.isArray(config.allowedCountries) && config.allowedCountries.length > 0,
       discountCap: typeof config.maxDiscountAmount === "number",
@@ -475,6 +477,8 @@ export default function SingleCodeDetailsPage() {
   const [endsAt, setEndsAt] = useState(loaderData.endsAt ? dateInZone(loaderData.endsAt, loaderData.timeZone) : "");
   const [usesPerCustomerLimit, setUsesPerCustomerLimit] = useState(String(loaderData.usesPerCustomerLimit ?? ""));
   const [maxCartItems, setMaxCartItems] = useState(loaderData.maxCartItems ? String(loaderData.maxCartItems) : "");
+  const [landingPage, setLandingPage] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
   const [maxDiscountAmount, setMaxDiscountAmount] = useState(loaderData.maxDiscountAmount ? String(loaderData.maxDiscountAmount) : "");
 
   const isSaving = fetcher.state !== "idle";
@@ -620,6 +624,47 @@ export default function SingleCodeDetailsPage() {
             </div>
           </div>
         </s-section>
+
+        {loaderData.storeUrl && (
+          <s-section>
+            <CardTitle>Share link</CardTitle>
+            <s-stack direction="block" gap="base">
+              <s-paragraph>
+                Send shoppers a link that applies this code at checkout automatically, or turn it into a QR code.
+                It only works on your online store.
+              </s-paragraph>
+              <s-text-field
+                label="Landing page (optional)"
+                value={landingPage}
+                placeholder="/collections/sale"
+                details="Where shoppers land first, such as /products/your-product. Leave blank for your home page."
+                onInput={(e: { target: { value: string } }) => {
+                  setLandingPage(e.target.value);
+                  setLinkCopied(false);
+                }}
+              />
+              <s-text-field
+                label="Link"
+                readOnly
+                value={buildDiscountLink(loaderData.storeUrl, loaderData.code, landingPage)}
+              />
+              <div>
+                <s-button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(buildDiscountLink(loaderData.storeUrl, loaderData.code, landingPage));
+                      setLinkCopied(true);
+                    } catch {
+                      setLinkCopied(false);
+                    }
+                  }}
+                >
+                  {linkCopied ? "Copied" : "Copy link"}
+                </s-button>
+              </div>
+            </s-stack>
+          </s-section>
+        )}
 
         <s-section>
           <CardTitle>Discount value</CardTitle>
