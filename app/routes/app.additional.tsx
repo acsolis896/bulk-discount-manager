@@ -220,24 +220,24 @@ function DiscountSetRow({ s, navigate }: { s: DiscountSet; navigate: (path: stri
       </div>
     </div>
     {confirmingDelete && (
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", padding: "8px 12px 12px" }}>
-        <span style={{ fontSize: "13px", color: "#d72c0d" }}>
-          {`Delete "${s.title}"? This removes the discount and all its codes from Shopify. This cannot be undone.`}
-        </span>
-        <s-button
-          variant="primary"
-          tone="critical"
-          disabled={busy}
-          onClick={() => {
-            setConfirmingDelete(false);
-            submit("delete");
-          }}
-        >
-          Yes, delete
-        </s-button>
-        <s-button variant="tertiary" onClick={() => setConfirmingDelete(false)}>
-          Cancel
-        </s-button>
+      <div style={{ padding: "4px 12px 12px" }}>
+        <s-banner heading={`Delete "${s.title}"?`} tone="critical">
+          <s-paragraph>This deletes the discount and all its codes from Shopify. This cannot be undone.</s-paragraph>
+          <s-button
+            slot="secondary-actions"
+            tone="critical"
+            disabled={busy}
+            onClick={() => {
+              setConfirmingDelete(false);
+              submit("delete");
+            }}
+          >
+            Yes, delete
+          </s-button>
+          <s-button slot="secondary-actions" onClick={() => setConfirmingDelete(false)}>
+            Cancel
+          </s-button>
+        </s-banner>
       </div>
     )}
     {actionError && (

@@ -574,22 +574,22 @@ export default function SingleCodeDetailsPage() {
       </style>
       <div style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <s-button onClick={() => navigate("/app/single-codes")}>← Back to Reusable codes</s-button>
-        {confirmingDelete ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <span style={{ fontSize: "13px", color: "#d72c0d" }}>{`Delete ${loaderData.code}? This cannot be undone.`}</span>
-            <s-button variant="primary" tone="critical" disabled={isSaving} onClick={handleDelete}>
-              Yes, delete
-            </s-button>
-            <s-button variant="tertiary" onClick={() => setConfirmingDelete(false)}>
-              Cancel
-            </s-button>
-          </div>
-        ) : (
-          <s-button tone="critical" disabled={isSaving} onClick={() => setConfirmingDelete(true)}>
-            Delete
-          </s-button>
-        )}
+        <s-button tone="critical" disabled={isSaving || confirmingDelete} onClick={() => setConfirmingDelete(true)}>
+          Delete
+        </s-button>
       </div>
+
+      {confirmingDelete && (
+        <s-banner heading={`Delete ${loaderData.code}?`} tone="critical" style={{ marginBottom: "16px" }}>
+          <s-paragraph>This deletes the code from Shopify. This cannot be undone.</s-paragraph>
+          <s-button slot="secondary-actions" tone="critical" disabled={isSaving} onClick={handleDelete}>
+            Yes, delete
+          </s-button>
+          <s-button slot="secondary-actions" onClick={() => setConfirmingDelete(false)}>
+            Cancel
+          </s-button>
+        </s-banner>
+      )}
 
       {result?.error && (
         <s-banner tone="critical" style={{ marginBottom: "16px" }}>

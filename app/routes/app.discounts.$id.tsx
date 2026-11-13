@@ -866,25 +866,22 @@ export default function DiscountDetails() {
             Export unused only
           </s-button>
           <s-button onClick={() => navigate("/app/discounts/new")}>Create another discount</s-button>
-          {confirmingDelete ? (
-            <>
-              <span style={{ fontSize: "13px", color: "#d72c0d", alignSelf: "center" }}>
-                Delete this set and all its codes from Shopify? This cannot be undone.
-              </span>
-              <s-button variant="primary" tone="critical" disabled={isDeleting} onClick={handleDelete}>
-                Yes, delete
-              </s-button>
-              <s-button variant="tertiary" onClick={() => setConfirmingDelete(false)}>
-                Cancel
-              </s-button>
-            </>
-          ) : (
-            <s-button tone="critical" disabled={isDeleting} onClick={() => setConfirmingDelete(true)}>
-              {isDeleting ? "Deleting…" : "Delete discount set"}
-            </s-button>
-          )}
+          <s-button tone="critical" disabled={isDeleting || confirmingDelete} onClick={() => setConfirmingDelete(true)}>
+            {isDeleting ? "Deleting…" : "Delete discount set"}
+          </s-button>
         </s-stack>
       </div>
+      {confirmingDelete && (
+        <s-banner heading="Delete this discount set?" tone="critical" style={{ marginBottom: "20px" }}>
+          <s-paragraph>This deletes the set and all of its codes from Shopify. This cannot be undone.</s-paragraph>
+          <s-button slot="secondary-actions" tone="critical" disabled={isDeleting} onClick={handleDelete}>
+            Yes, delete
+          </s-button>
+          <s-button slot="secondary-actions" onClick={() => setConfirmingDelete(false)}>
+            Cancel
+          </s-button>
+        </s-banner>
+      )}
 
       <style>
         {`.discount-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
