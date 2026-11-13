@@ -543,8 +543,18 @@ export default function SingleCodeDetailsPage() {
     fetcher.submit(form, { method: "post" });
   };
 
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
+
+  const handleDelete = () => {
+    setConfirmingDelete(false);
+    const form = new FormData();
+    form.set("intent", "delete");
+    fetcher.submit(form, { method: "post" });
+  };
+
   const handleResetUsage = () => {
-    if (!confirm("Reset usage counts for this code? Every customer will be able to redeem it again, up to the limit.")) return;
+    setConfirmingReset(false);
     const form = new FormData();
     form.set("intent", "resetUsage");
     fetcher.submit(form, { method: "post" });
@@ -564,19 +574,21 @@ export default function SingleCodeDetailsPage() {
       </style>
       <div style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <s-button onClick={() => navigate("/app/single-codes")}>← Back to Reusable codes</s-button>
-        <s-button
-          tone="critical"
-          disabled={isSaving}
-          onClick={() => {
-            if (confirm(`Delete ${loaderData.code}? This cannot be undone.`)) {
-              const form = new FormData();
-              form.set("intent", "delete");
-              fetcher.submit(form, { method: "post" });
-            }
-          }}
-        >
-          Delete
-        </s-button>
+        {confirmingDelete ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <span style={{ fontSize: "13px", color: "#d72c0d" }}>{`Delete ${loaderData.code}? This cannot be undone.`}</span>
+            <s-button variant="primary" tone="critical" disabled={isSaving} onClick={handleDelete}>
+              Yes, delete
+            </s-button>
+            <s-button variant="tertiary" onClick={() => setConfirmingDelete(false)}>
+              Cancel
+            </s-button>
+          </div>
+        ) : (
+          <s-button tone="critical" disabled={isSaving} onClick={() => setConfirmingDelete(true)}>
+            Delete
+          </s-button>
+        )}
       </div>
 
       {result?.error && (
@@ -921,9 +933,23 @@ export default function SingleCodeDetailsPage() {
               <s-text style={{ fontSize: "13px", color: "#6d7175" }}>
                 {loaderData.usageCappedCount} customer{loaderData.usageCappedCount === 1 ? "" : "s"} currently at the limit
               </s-text>
-              <s-button variant="tertiary" onClick={handleResetUsage} disabled={isSaving}>
-                Reset usage counts
-              </s-button>
+              {confirmingReset ? (
+                <>
+                  <span style={{ fontSize: "13px", color: "#d72c0d" }}>
+                    Every customer will be able to redeem it again, up to the limit.
+                  </span>
+                  <s-button variant="primary" tone="critical" disabled={isSaving} onClick={handleResetUsage}>
+                    Yes, reset
+                  </s-button>
+                  <s-button variant="tertiary" onClick={() => setConfirmingReset(false)}>
+                    Cancel
+                  </s-button>
+                </>
+              ) : (
+                <s-button variant="tertiary" onClick={() => setConfirmingReset(true)} disabled={isSaving}>
+                  Reset usage counts
+                </s-button>
+              )}
             </div>
           )}
         </s-section>

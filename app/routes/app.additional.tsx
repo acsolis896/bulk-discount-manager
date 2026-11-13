@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, HeadersFunction } from "react-router";
 import { useLoaderData, useNavigate, useFetcher } from "react-router";
 import { authenticate } from "../shopify.server";
@@ -160,6 +161,7 @@ function formatDate(iso: string | null) {
 function DiscountSetRow({ s, navigate }: { s: DiscountSet; navigate: (path: string) => void }) {
   const fetcher = useFetcher();
   const busy = fetcher.state !== "idle";
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const setUsageRate = s.totalCodes > 0 ? Math.round((s.usedCodes / s.totalCodes) * 100) : 0;
 
   const submit = (intent: "activate" | "deactivate" | "delete") => {
@@ -210,17 +212,34 @@ function DiscountSetRow({ s, navigate }: { s: DiscountSet; navigate: (path: stri
           <s-button
             tone="critical"
             disabled={busy}
-            onClick={() => {
-              if (confirm(`Delete "${s.title}"? This removes the discount and all its codes from Shopify. This cannot be undone.`)) {
-                submit("delete");
-              }
-            }}
+            onClick={() => setConfirmingDelete(true)}
           >
             Delete
           </s-button>
         </s-menu>
       </div>
     </div>
+    {confirmingDelete && (
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", padding: "8px 12px 12px" }}>
+        <span style={{ fontSize: "13px", color: "#d72c0d" }}>
+          {`Delete "${s.title}"? This removes the discount and all its codes from Shopify. This cannot be undone.`}
+        </span>
+        <s-button
+          variant="primary"
+          tone="critical"
+          disabled={busy}
+          onClick={() => {
+            setConfirmingDelete(false);
+            submit("delete");
+          }}
+        >
+          Yes, delete
+        </s-button>
+        <s-button variant="tertiary" onClick={() => setConfirmingDelete(false)}>
+          Cancel
+        </s-button>
+      </div>
+    )}
     {actionError && (
       <s-paragraph style={{ color: "#d72c0d", fontSize: "13px", padding: "0 12px 8px" }}>{actionError}</s-paragraph>
     )}

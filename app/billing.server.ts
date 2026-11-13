@@ -165,14 +165,20 @@ export async function getPlanUsage(
   reusableUsed: number;
 }> {
   const { tier, planName, limit: bulkLimit } = await getCurrentPlan(billing);
-  const reusable = await db.singleCodeDiscount.findMany({ where: { shop }, select: { discountId: true } });
+  const reusableLimit = reusableLimitFor(tier, shop);
+  let reusable = await db.singleCodeDiscount.findMany({ where: { shop }, select: { discountId: true } });
+  if (reusableLimit !== null && reusable.length >= reusableLimit) {
+    // Same check as creating a code: drop any deleted in Shopify so the count here isn't stale.
+    await pruneDeletedReusableCodes(admin, shop);
+    reusable = await db.singleCodeDiscount.findMany({ where: { shop }, select: { discountId: true } });
+  }
   const bulkUsed = await countActiveCodes(admin, bulkLimit, new Set(reusable.map((r) => r.discountId)));
   return {
     tier,
     planName,
     bulkLimit,
     bulkUsed,
-    reusableLimit: reusableLimitFor(tier, shop),
+    reusableLimit,
     reusableUsed: reusable.length,
   };
 }

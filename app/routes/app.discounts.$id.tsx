@@ -576,6 +576,7 @@ export default function DiscountDetails() {
   const fetcher = useFetcher();
   const shopify = useAppBridge();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if ((fetcher.data as { deleted?: boolean } | undefined)?.deleted) {
@@ -585,12 +586,12 @@ export default function DiscountDetails() {
   }, [fetcher.data, shopify, navigate]);
 
   const handleDelete = useCallback(() => {
-    if (!confirm(`Delete "${title}"? This removes the discount and all its codes from Shopify. This cannot be undone.`)) return;
+    setConfirmingDelete(false);
     setIsDeleting(true);
     const form = new FormData();
     form.set("intent", "delete");
     fetcher.submit(form, { method: "post" });
-  }, [fetcher, title]);
+  }, [fetcher]);
 
   const unusedCount = Math.max(0, totalCount - usedCount - preUsedCodes.length);
   const [confirmCode, setConfirmCode] = useState<string | null>(null);
@@ -865,9 +866,23 @@ export default function DiscountDetails() {
             Export unused only
           </s-button>
           <s-button onClick={() => navigate("/app/discounts/new")}>Create another discount</s-button>
-          <s-button tone="critical" disabled={isDeleting} onClick={handleDelete}>
-            {isDeleting ? "Deleting…" : "Delete discount set"}
-          </s-button>
+          {confirmingDelete ? (
+            <>
+              <span style={{ fontSize: "13px", color: "#d72c0d", alignSelf: "center" }}>
+                Delete this set and all its codes from Shopify? This cannot be undone.
+              </span>
+              <s-button variant="primary" tone="critical" disabled={isDeleting} onClick={handleDelete}>
+                Yes, delete
+              </s-button>
+              <s-button variant="tertiary" onClick={() => setConfirmingDelete(false)}>
+                Cancel
+              </s-button>
+            </>
+          ) : (
+            <s-button tone="critical" disabled={isDeleting} onClick={() => setConfirmingDelete(true)}>
+              {isDeleting ? "Deleting…" : "Delete discount set"}
+            </s-button>
+          )}
         </s-stack>
       </div>
 
