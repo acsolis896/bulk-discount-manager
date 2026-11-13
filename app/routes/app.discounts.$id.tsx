@@ -815,6 +815,7 @@ export default function DiscountDetails() {
 
   return (
     <s-page heading={title ?? "Discount"}>
+      <s-link slot="breadcrumb-actions" href="shopify://admin/discounts">Discounts</s-link>
       <FormStyles />
       {error && (
         <s-banner title="Error" tone="critical">
