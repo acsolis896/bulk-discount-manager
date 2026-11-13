@@ -1,6 +1,6 @@
 import { useCallback, useState, useMemo, useRef, useEffect } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs, HeadersFunction } from "react-router";
-import { useLoaderData, useNavigate, useFetcher } from "react-router";
+import { useLoaderData, useNavigate, useFetcher, useSearchParams } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -573,6 +573,9 @@ export default function DiscountDetails() {
   const countryRestrictionEnabled = useCountryRestrictionEnabled();
   const { timeZone, storeUrl, title, numericId, status, startsAt, usageLimit, appliesOncePerCustomer, combinesWith, oncePerOrder, maxDiscountedItems, allowedCountries, codes, totalCount, usedCount, preUsedCodes, codeDates, codePerformance, inferredPrefix, inferredCodeLength, eligibleProducts, eligibleProductIds, eligibleCollections, eligibleCollectionIds, discountType, percentage, fixedAmount, endsAt, configMissing, configTooLarge, configNeedsResave, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+  // In-app links add ?from=app; without it the set was opened from Shopify's Discounts tab.
+  const [searchParams] = useSearchParams();
+  const openedFromApp = searchParams.get("from") === "app";
   const fetcher = useFetcher();
   const shopify = useAppBridge();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -815,7 +818,11 @@ export default function DiscountDetails() {
 
   return (
     <s-page heading={title ?? "Discount"}>
-      <s-link slot="breadcrumb-actions" href="shopify://admin/discounts">Discounts</s-link>
+      {openedFromApp ? (
+        <s-link slot="breadcrumb-actions" href="/app/additional">Discount sets</s-link>
+      ) : (
+        <s-link slot="breadcrumb-actions" href="shopify://admin/discounts">Discounts</s-link>
+      )}
       <FormStyles />
       {error && (
         <s-banner title="Error" tone="critical">

@@ -864,7 +864,7 @@ export default function CreateBulkDiscount() {
           {typeof result.discountId === "string" && (
             <s-button
               slot="secondary-actions"
-              onClick={() => navigate(`/app/discounts/${(result.discountId as string).split("/").pop()}`)}
+              onClick={() => navigate(`/app/discounts/${(result.discountId as string).split("/").pop()}?from=app`)}
             >
               View
             </s-button>

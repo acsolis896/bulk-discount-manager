@@ -196,7 +196,7 @@ function DiscountSetRow({ s, navigate }: { s: DiscountSet; navigate: (path: stri
       <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
         <s-button
           disabled={busy}
-          onClick={() => navigate(s.isReusableCode ? `/app/single-codes/${s.numericId}` : `/app/discounts/${s.numericId}`)}
+          onClick={() => navigate(s.isReusableCode ? `/app/single-codes/${s.numericId}` : `/app/discounts/${s.numericId}?from=app`)}
         >
           View
         </s-button>
